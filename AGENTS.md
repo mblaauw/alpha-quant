@@ -1,0 +1,151 @@
+# Alpha Quant — Agent Workflow
+
+## Full Issue Lifecycle
+
+### 1. Pick Up Next Issue
+
+```bash
+# Find the next unstarted issue by priority (P0 → P1 → P2 ...)
+gh issue list --state open --json number,title,labels --label P0
+
+# View its full description and acceptance criteria
+gh issue view <N> --json title,body
+```
+
+### 2. Update Board — Start
+
+```bash
+# Find the project item ID for the issue
+gh project item-list 1 --owner mblaauw --format json \
+  | python3 -c "import sys,json; data=json.load(sys.stdin); [print(i['id']) for i in data.get('items',data) if i.get('content',{}).get('number')==<N>]"
+
+# Move to "In Progress" (optionId: 47fc9ee4)
+gh api graphql -f query='
+mutation {
+  updateItem: updateProjectV2ItemFieldValue(
+    input: {
+      projectId: "PVT_kwHOAD316c4BaTNX"
+      itemId: "<PROJECT_ITEM_ID>"
+      fieldId: "PVTSSF_lAHOAD316c4BaTNXzhVLzJo"
+      value: { singleSelectOptionId: "47fc9ee4" }
+    }
+  ) { projectV2Item { id } }
+}'
+
+# Assign to user
+gh issue edit <N> --add-assignee "@me"
+```
+
+### 3. Create Branch
+
+```bash
+git checkout main && git pull origin main
+git checkout -b <feature-branch-name>
+```
+
+Branch naming: `<scope>-<description>` (e.g. `port-interfaces-p0.2`, `fake-adapters-p0.6`).
+
+### 4. Implement
+
+- Follow existing code conventions (type hints, imports, patterns)
+- Use `typing.Protocol` for ports or `abc.ABC` + `@abstractmethod` as specified
+- All data models use `pydantic.BaseModel` with `frozen=True`
+- Verify the code at every step:
+
+```bash
+uv run ruff check alpha_quant/
+uv run ruff format alpha_quant/
+uv run ty check alpha_quant/
+```
+
+### 5. Create PR
+
+```bash
+git add -A && git commit -m "<scope>: <title>"
+git push origin <feature-branch-name>
+
+gh pr create \
+  --base main \
+  --head <feature-branch-name> \
+  --title "<scope>: <title>" \
+  --body "## Summary\n\nCompletes <scope> (closes #<N>).\n\n### Changes\n\n- Bullet list of what was changed\n\n### Verification\n\n- \`ruff check\` — All checks passed\n- \`ruff format\` — All files formatted\n- \`ty check\` — All checks passed"
+```
+
+PR body must include:
+- A summary paragraph
+- A `### Changes` section with bullet points
+- An `### Verification` section with the 3 tool checks
+
+### 6. Review Against Acceptance Criteria
+
+Read the issue's AC list and verify each item against the code:
+
+```bash
+gh issue view <N> --json body
+gh pr diff <PR_NUMBER>
+```
+
+For each unmet AC:
+- Fix the code
+- Re-run `ruff check`, `ruff format`, `ty check`
+- Amend the commit: `git add -A && git commit --amend --no-edit`
+- Force-push: `git push --force-with-lease origin <branch>`
+
+### 7. Update Issue Status
+
+After fixing, update the issue body to check off completed AC items:
+
+```bash
+gh issue edit <N> --body "<updated body with [x] checks>"
+```
+
+### 8. Squash & Merge
+
+```bash
+gh pr merge <PR_NUMBER> --squash \
+  --subject "<scope>: <title>" \
+  --body "Completes <scope> (closes #<N>). <brief summary>."
+```
+
+### 9. Update Board — Done
+
+```bash
+# Move to "Done" (optionId: 98236657)
+gh api graphql -f query='
+mutation {
+  updateItem: updateProjectV2ItemFieldValue(
+    input: {
+      projectId: "PVT_kwHOAD316c4BaTNX"
+      itemId: "<PROJECT_ITEM_ID>"
+      fieldId: "PVTSSF_lAHOAD316c4BaTNXzhVLzJo"
+      value: { singleSelectOptionId: "98236657" }
+    }
+  ) { projectV2Item { id } }
+}'
+```
+
+### 10. Clean Up
+
+```bash
+git checkout main && git pull origin main
+git branch -D <feature-branch-name>
+git push origin --delete <feature-branch-name>
+```
+
+---
+
+## Project Board Constants
+
+| Field | ID |
+|-------|-----|
+| Project ID | `PVT_kwHOAD316c4BaTNX` |
+| Status Field ID | `PVTSSF_lAHOAD316c4BaTNXzhVLzJo` |
+| Status: Todo | `f75ad846` |
+| Status: In Progress | `47fc9ee4` |
+| Status: Done | `98236657` |
+
+## Tooling Requirements
+
+- All code must pass: `ruff check`, `ruff format --check`, `ty check`
+- Python 3.14+, pydantic v2, type-annotated
+- No imports from `adapters/` or `data/` in port definitions

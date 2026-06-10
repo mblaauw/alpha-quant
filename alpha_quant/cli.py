@@ -1,43 +1,81 @@
 import argparse
+import json
 import sys
 
 from alpha_quant import __version__
+from alpha_quant.app.config import ConfigError, load_config, redact_config
 
 
 def cmd_run(args: argparse.Namespace) -> None:
-    print(f"[alpha-quant] stub: run (mode={args.mode})")
+    config = load_config(args.config)
+    print(f"[alpha-quant] run (mode={args.mode})")
+    if args.verbose_config:
+        print(json.dumps(redact_config(config), indent=2, default=str))
 
 
 def cmd_replay(args: argparse.Namespace) -> None:
-    print(f"[alpha-quant] stub: replay (from={args.from_date} to={args.to_date})")
+    config = load_config(args.config)
+    print(f"[alpha-quant] replay (from={args.from_date} to={args.to_date})")
+    if args.verbose_config:
+        print(json.dumps(redact_config(config), indent=2, default=str))
 
 
 def cmd_backtest(args: argparse.Namespace) -> None:
-    print(f"[alpha-quant] stub: backtest (from={args.from_date} to={args.to_date})")
+    config = load_config(args.config)
+    print(f"[alpha-quant] backtest (from={args.from_date} to={args.to_date})")
+    if args.verbose_config:
+        print(json.dumps(redact_config(config), indent=2, default=str))
 
 
 def cmd_bootstrap(args: argparse.Namespace) -> None:
-    print(f"[alpha-quant] stub: bootstrap (fixture_only={args.fixture_only})")
+    config = load_config(args.config)
+    print(f"[alpha-quant] bootstrap (fixture_only={args.fixture_only})")
+    if args.verbose_config:
+        print(json.dumps(redact_config(config), indent=2, default=str))
 
 
 def cmd_journal(args: argparse.Namespace) -> None:
-    print(f"[alpha-quant] stub: journal (since={args.since})")
+    config = load_config(args.config)
+    print(f"[alpha-quant] journal (since={args.since})")
+    if args.verbose_config:
+        print(json.dumps(redact_config(config), indent=2, default=str))
 
 
 def cmd_ask(args: argparse.Namespace) -> None:
-    print(f"[alpha-quant] stub: ask (query={args.query})")
+    config = load_config(args.config)
+    print(f"[alpha-quant] ask (query={' '.join(args.query)})")
+    if args.verbose_config:
+        print(json.dumps(redact_config(config), indent=2, default=str))
 
 
 def cmd_report(args: argparse.Namespace) -> None:
-    print(f"[alpha-quant] stub: report (type={args.type})")
+    config = load_config(args.config)
+    print(f"[alpha-quant] report (type={args.type})")
+    if args.verbose_config:
+        print(json.dumps(redact_config(config), indent=2, default=str))
 
 
 def cmd_status(args: argparse.Namespace) -> None:
-    print(f"[alpha-quant] stub: status (json={args.json})")
+    config = load_config(args.config)
+    if args.show_config:
+        if args.json:
+            print(json.dumps(redact_config(config), indent=2, default=str))
+        else:
+            for section, fields in redact_config(config).items():
+                print(f"[{section}]")
+                for key, value in fields.items():
+                    print(f"  {key} = {value}")
+                print()
+    else:
+        print("[alpha-quant] status: OK")
 
 
 def cmd_halt(args: argparse.Namespace) -> None:
-    print(f"[alpha-quant] stub: halt (action={args.action})")
+    config = load_config(args.config)
+    action = "resume" if args.resume else "halt"
+    print(f"[alpha-quant] {action}")
+    if args.verbose_config:
+        print(json.dumps(redact_config(config), indent=2, default=str))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -45,14 +83,17 @@ def build_parser() -> argparse.ArgumentParser:
         prog="alpha-quant",
         description="Deterministic, daily-cadence, long-only equity trading system",
     )
-    parser.add_argument(
-        "--version", action="version", version=f"%(prog)s {__version__}"
-    )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument(
         "--config",
         type=str,
         default=None,
         help="Path to config.toml (default: $PWD/config.toml or ~/.alpha-quant/config.toml)",
+    )
+    parser.add_argument(
+        "--verbose-config",
+        action="store_true",
+        help="Print resolved config on every command",
     )
 
     sub = parser.add_subparsers(dest="command", required=True)
@@ -112,6 +153,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Output as JSON",
     )
+    p_status.add_argument(
+        "--show-config",
+        action="store_true",
+        dest="show_config",
+        help="Print resolved config (secrets redacted)",
+    )
     p_status.set_defaults(func=cmd_status)
 
     p_halt = sub.add_parser("halt", help="Halt or resume pipeline")
@@ -120,7 +167,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Resume after halt",
     )
-    p_halt.set_defaults(func=cmd_halt, action="halt")
+    p_halt.set_defaults(func=cmd_halt)
 
     return parser
 
@@ -128,8 +175,12 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    args.func(args)
-    return 0
+    try:
+        args.func(args)
+        return 0
+    except ConfigError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
