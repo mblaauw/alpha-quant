@@ -2,11 +2,19 @@ views {
   view systemContext of alphaQuant {
     title 'System Context — Alpha-Quant v1.2'
     description 'System boundary, user, and all external dependencies. Every external system has a fixture-backed fake twin for deterministic testing.'
-    include *
+    include user
+    include alphaQuant
+    include eodhd
+    include alpaca
+    include secEdgar
+    include openInsider
+    include reddit
+    include llmProvider
   }
 
   view container of alphaQuant {
     title 'Container Diagram — Alpha-Quant'
+    include user
     include alphaQuant.cli
     include alphaQuant.pipelineEngine
     include alphaQuant.dataLayer
@@ -25,7 +33,6 @@ views {
     include openInsider
     include reddit
     include llmProvider
-    include *
   }
 
   view dataLayerComponents of alphaQuant.dataLayer {
@@ -38,12 +45,13 @@ views {
     include alphaQuant.dataLayer.deriveEngine
     include alphaQuant.dataLayer.validator
     include alphaQuant.dataLayer.catalog
+    include alphaQuant.sqliteStore
+    include alphaQuant.parquetArchive
     include eodhd
     include alpaca
     include secEdgar
     include openInsider
     include reddit
-    include *
   }
 
   view decisionEngineComponents of alphaQuant.domainCore {
@@ -59,7 +67,6 @@ views {
     include alphaQuant.domainCore.m8
     include alphaQuant.domainCore.positionSizer
     include alphaQuant.domainCore.riskEvaluator
-    include *
   }
 
   view fillModelPortfolioComponents of alphaQuant.fillModel {
@@ -70,10 +77,9 @@ views {
     include alphaQuant.fillModel.fillPartial
     include alphaQuant.fillModel.fillCorpAction
     include alphaQuant.paperPortfolio
+    include alphaQuant.paperPortfolio.consistencyChecker
     include alphaQuant.shadowBooks.shadowBookInternal
     include alphaQuant.shadowBooks.spyBaseline
-    include consistencyChecker
-    include *
   }
 
   view deployment of localMachine {
@@ -93,6 +99,5 @@ views {
     include openInsider
     include reddit
     include llmProvider
-    include *
   }
 }

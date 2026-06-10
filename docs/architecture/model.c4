@@ -103,10 +103,12 @@ model {
 
       logicalComponent m1 'M1 Universe' {
         description 'Filters by price >= $5, liquidity ADV >= $5M, SEC-map validity, quarantine status.'
+        technology 'plain Python'
       }
 
       logicalComponent m2 'M2 Regime' {
         description 'Classifies market: RISK_ON (SPY uptrend, VIX < 20, breadth > 0.4), CAUTION, RISK_OFF (SPY < EMA200, VIX > 30).'
+        technology 'numpy'
       }
 
       logicalComponent m3 'M3 Technical' {
@@ -116,22 +118,27 @@ model {
 
       logicalComponent m4 'M4 Quality' {
         description 'Binary pass/fail: OCF > 0, D/E < 2x sector median, accruals sane, no negative earnings surprise.'
+        technology 'pydantic, numpy'
       }
 
       logicalComponent m5 'M5 Insider' {
         description 'Insider cluster score: >= 2 officers/directors, >= $200k net in 30d gives 0.15 boost.'
+        technology 'plain Python'
       }
 
       logicalComponent m6 'M6 Crowding' {
         description 'Reddit mention z-score veto. z > 3 gives 10-day entry block. Count arithmetic only, no LLM sentiment.'
+        technology 'numpy'
       }
 
       logicalComponent m7 'M7 Blackout' {
         description 'Earnings blackout: no entries within 3 trading days before report.'
+        technology 'plain Python'
       }
 
       logicalComponent m8 'M8 Ranker' {
         description 'Composite ranking: 0.6 x technical + 0.25 x momentum + 0.15 x insider. Gates applied first. Ties broken by ADV.'
+        technology 'numpy'
       }
 
       logicalComponent positionSizer 'Position Sizer' {
@@ -172,6 +179,10 @@ model {
       logicalComponent paperPortfolioInternal 'Paper Portfolio State' {
         description 'Authoritative portfolio: cash, positions, orders, fills, equity curve. All written transactionally with Decision lineage.'
       }
+
+      logicalComponent consistencyChecker 'Self-Consistency Checker' {
+        description 'Assertion engine: cash + mark == equity, every position traces to Decision, no orphans. Violation = software bug = full halt.'
+      }
     }
 
     container shadowBooks 'Shadow Books' {
@@ -211,10 +222,6 @@ model {
       description 'Analytical data: daily bars, fundamentals snapshots, insider transactions, mention counts. Date-partitioned, queried via DuckDB.'
       technology 'Parquet (zstd), DuckDB'
     }
-  }
-
-  logicalComponent consistencyChecker 'Self-Consistency Checker' {
-    description 'Assertion engine: cash + mark == equity, every position traces to Decision, no orphans. Violation = software bug = full halt.'
   }
 
   computeNode localMachine 'Local Machine' {
@@ -298,8 +305,8 @@ model {
   connectors -> vault 'Raw payload (before parsing)'
   vault -> normalizer 'Raw bytes'
   normalizer -> canonicalWriter 'Parsed canonical models'
-  validator -> canonicalWriter 'Validates before write'
-  deriveEngine -> canonicalWriter 'Reads bars for incremental update'
+  validator -> canonicalWriter 'Validates parsed models before storage'
+  deriveEngine -> canonicalWriter 'Reads bars, publishes derived indicators'
 
   cli -> pipelineEngine 'Dispatches run, replay, backtest commands'
 
@@ -352,5 +359,5 @@ model {
   fillCorpAction -> paperPortfolio 'Adjusts positions/stops'
   paperPortfolio -> shadowBooks 'Same data, toggled mechanisms'
   paperPortfolio -> spyBaseline 'Comparison baseline'
-  consistencyChecker -> paperPortfolio 'Post-fill verification'
+  paperPortfolio.consistencyChecker -> paperPortfolio.paperPortfolioInternal 'Post-fill verification'
 }

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "likec4-architecture": {
+      "source": "timseriakov/likec4-architecture-skill",
+      "sourceType": "github",
+      "skillPath": "likec4-architecture/SKILL.md",
+      "computedHash": "81fcb3790ecab6c090cb45fe048a2faf04128d1c868bbda759973e2f1cf9d821"
+    }
+  }
+}
