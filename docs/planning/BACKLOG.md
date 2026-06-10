@@ -235,6 +235,196 @@ Set up CI pipeline (GitHub Actions) that runs `alpha-quant replay --fixture --fr
 
 ---
 
+## Epic 0.5: Architecture Documentation — ADRs, C4 Diagrams & Reference Architecture Document
+
+**Duration:** Week 1 (parallel to P0) | **Dependencies:** None (parallel) | **Size:** 25 points
+
+Create the formal architecture documentation: 18 Architecture Decision Records (ADRs) covering every technology choice, C4 model diagrams (L1–L4) using LikeC4 DSL, and a comprehensive Reference Architecture Document (RAD) that ties together design decisions and diagrams. This runs parallel to Epic 0 — ADRs inform the scaffold and port interfaces, C4 diagrams inform the project structure.
+
+---
+
+### STORY-0.5.1: Write 18 ADRs covering all technology decisions
+
+**Points:** 8 | **Priority:** P0 | **Status:** 📝
+
+**Description:**
+Write 18 Architecture Decision Records (MADR template) covering every architecturally-significant technology choice in the project. Each ADR documents the context, options considered, decision outcome, positive and negative consequences, and links to related decisions/sources.
+
+**Acceptance Criteria:**
+- [ ] 18 ADRs written to `docs/adr/` using MADR template (see `docs/planning/ADR_PLAN.md`)
+- [ ] Each ADR covers Context, Decision Drivers, Considered Options (≥2), Decision Outcome, Positive/Negative Consequences
+- [ ] ADR-001 through ADR-018 cover:
+  - 001: Python Runtime (3.12 LTS)
+  - 002: Package Manager (uv)
+  - 003: Architecture Pattern (Ports-and-Adapters)
+  - 004: CLI Framework (argparse stdlib)
+  - 005: Configuration (pydantic-settings + TOML)
+  - 006: Analytical Store (DuckDB + Parquet)
+  - 007: Transactional Store (SQLite WAL + SQLAlchemy Core)
+  - 008: Technical Indicators (custom numpy O(1) recurrences)
+  - 009: Fill Model (custom pessimistic semantics)
+  - 010: Backtesting Engine (custom event-driven)
+  - 011: LLM Integration (direct httpx, no SDK)
+  - 012: Primary Market Data Source (EODHD)
+  - 013: Logging Strategy (structlog JSON)
+  - 014: Dashboard Framework (Streamlit)
+  - 015: Indicator Engine Architecture (incremental O(1))
+  - 016: Data Failure Model (degrade-don't-block)
+  - 017: QA Strategy (golden replay CI)
+  - 018: Developer Workflow (bootstrap + fixture)
+- [ ] ADRs reviewed by the team
+- [ ] `docs/adr/README.md` generated with table of contents linking all 18 ADRs
+- [ ] Each ADR cross-references the relevant C4 diagram(s) and RAD section(s)
+
+**Technical Details:**
+- Use MADR (Markdown ADR) template — structured sections, not freeform
+- ADR directory: `docs/adr/`
+- Naming: `NNNN-title-with-kebab-case.md` with zero-padded sequential numbers
+- ADR statuses: all start as `Proposed`, move to `Accepted` after team review
+- README.md can be auto-generated with `adr-tools` or maintained manually
+- Each ADR should be 1-2 pages, focused on one decision
+- Cross-references: `See C4 Container diagram (docs/architecture/views/container.png)` and `See RAD §5`
+
+---
+
+### STORY-0.5.2: Create C4 System Context + Container diagrams (L1–L2)
+
+**Points:** 5 | **Priority:** P0 | **Status:** 📝
+
+**Description:**
+Create the LikeC4 DSL workspace and define Level 1 (System Context) and Level 2 (Container) C4 diagrams. These show the system's boundaries, external dependencies, and major subsystems.
+
+**Acceptance Criteria:**
+- [ ] LikeC4 DSL project initialized at `docs/architecture/` with `model.c4` entry point
+- [ ] **L1 System Context** diagram shows:
+  - Person: User (retail investor reading journal/dashboard)
+  - Software System: Alpha-Quant (the system boundary)
+  - External systems: EODHD, Alpaca Data, SEC EDGAR, OpenInsider, Reddit Public API, LLM Provider (OpenAI/OpenRouter)
+  - Relationships: data flows, protocols, cadence labels
+- [ ] **L2 Container** diagram shows:
+  - 12 containers: CLI, Pipeline Engine, Data Layer (connectors/vault/canonical/inference/validation), Domain Core, Fill Model, Paper Portfolio, Shadow Books, LLM Narrator, Dashboard, SQLite State Store, Parquet Archive, Event Log
+  - Technology labels (e.g., `[Python 3.12]`, `[httpx]`, `[DuckDB]`)
+  - Relationships between containers with data flow descriptions
+- [ ] Interactive preview works: `npx likec4 start` from `docs/architecture/`
+- [ ] PNG exports generate: `likec4 export png -o docs/architecture/views/`
+- [ ] Exported PNGs checked into repo
+
+**Technical Details:**
+- LikeC4 installation: `npx likec4` (no global install needed, runs via npm)
+- DSL files: `docs/architecture/model.c4` (main model), `docs/architecture/views.c4` (view definitions)
+- Element specification: define custom element kinds (`person`, `softwareSystem`, `container`, `component`)
+- Use `specification` block for custom element types and styling
+- Layout hints: LikeC4 auto-layouts; use relationship labels for data flow descriptions
+- Technology tags on elements: `[Python 3.12]`, `[DuckDB]`, `[httpx]`
+- Export command: `cd docs/architecture && npx likec4 export png -o views/`
+
+---
+
+### STORY-0.5.3: Create C4 Component + Dynamic diagrams (L3)
+
+**Points:** 5 | **Priority:** P0 | **Status:** 📝
+
+**Description:**
+Define Level 3 component diagrams for the three critical subsystems (Data Layer, Decision Engine, Fill Model/Portfolio) and a Level 3 Dynamic diagram showing the daily run sequence. These decompose containers into their key components and interactions.
+
+**Acceptance Criteria:**
+- [ ] **L3 Component — Data Layer** diagram showing:
+  - 5 Connectors (EODHD, Alpaca, SEC, OpenInsider, Reddit)
+  - Vault (zstd, content-addressed)
+  - Normalizer (pydantic parsers)
+  - Canonical Writer (Parquet + SQLite writers)
+  - Derive Engine (numpy indicator recurrence)
+  - Validator (~15 predicate checks)
+  - Catalog (dataset versioning)
+- [ ] **L3 Component — Decision Engine** diagram showing:
+  - M1 Universe Filter, M2 Regime Gate, M3 Technical Scorer, M4 Quality Gate, M5 Insider Scorer, M6 Crowding Veto, M7 Blackout Gate, M8 Composite Ranker
+  - Position Sizer (Kelly-lite)
+  - Risk Evaluator (stops, trails, drawdown, halts)
+  - Data flow: filtered universe flows through gates → scores → ranking → sizing → risk
+- [ ] **L3 Component — Fill Model & Portfolio** diagram showing:
+  - FillEntry, FillStop, FillPartialTake, FillCorporateAction
+  - PaperPortfolio (cash, positions, orders, equity)
+  - 3 ShadowBooks (RULES_ONLY, NO_INSIDER, NO_CROWDING_VETO)
+  - SelfConsistencyChecker
+- [ ] **L3 Dynamic — Daily Run Sequence** showing step-by-step flow:
+  - 17:30 ET: Ingest → Validate → Derive → Regime → Risk → Decide → Order → Persist → Narrate
+  - T+1 Open: Fill queued orders → Mark equity → Self-consistency check
+  - Sequence or flow-diagram layout
+- [ ] All PNGs exported and checked into repo
+- [ ] Interactive preview works for all views
+
+**Technical Details:**
+- Use LikeC4 `dynamic` view type for the daily run sequence diagram
+- Component-level elements use `element component` kind with `component` specification
+- Data flow arrows labeled with the data being passed (e.g., `list[Bar]`, `list[Candidate]`)
+- For the decision engine, show the pipeline stages as sequential steps with fork/join for parallel paths
+
+---
+
+### STORY-0.5.4: Create C4 Deployment diagram + documentation index (L4)
+
+**Points:** 2 | **Priority:** P1 | **Status:** 📝
+
+**Description:**
+Create the Level 4 Deployment diagram showing the physical deployment architecture, and build the documentation index that ties together ADRs, C4 diagrams, and the RAD.
+
+**Acceptance Criteria:**
+- [ ] **L4 Deployment** diagram showing:
+  - Single-machine deployment (developer workstation or server)
+  - APScheduler process (daily 17:30 ET cron)
+  - CLI process (ad-hoc operations)
+  - Streamlit process (dashboard, read-only)
+  - File system: vault/ (zstd blobs), canonical/ (parquet partitions), data/state.db (SQLite)
+  - Network: outbound HTTPS to 5 external APIs
+- [ ] `docs/architecture/README.md` with:
+  - Navigation links to all diagrams (PNG thumbnails)
+  - Quick-start for viewing diagrams (`npx likec4 start`)
+  - Short description of each diagram's purpose
+- [ ] Architecture documentation renders and is browseable
+
+**Technical Details:**
+- Deployment diagram uses LikeC4 `deploymentNode` specification
+- Show the deployment context as a single `deploymentNode` of type `"local" | "server"`
+- File system elements as `infrastructure` or `storage` elements
+
+---
+
+### STORY-0.5.5: Write Reference Architecture Document (RAD)
+
+**Points:** 5 | **Priority:** P0 | **Status:** 📝
+
+**Description:**
+Write the comprehensive Reference Architecture Document (`docs/architecture/REFERENCE_ARCHITECTURE.md`) that ties together the design, ADRs, and C4 diagrams into a single navigable reference. Every section references the relevant ADR(s) and C4 diagram(s).
+
+**Acceptance Criteria:**
+- [ ] RAD covers all 12 sections:
+  1. Executive Summary
+  2. Architectural Principles & Constraints
+  3. Technology Stack Summary (18-row table referencing ADR-001–018)
+  4. System Context (C4 L1) — with embedded diagram + narrative
+  5. Container Architecture (C4 L2) — with embedded diagram + container descriptions
+  6. Component Architecture (C4 L3) — three subsystems described with embedded diagrams
+  7. Dynamic Views — daily run sequence diagram + narrative
+  8. Deployment (C4 L4) — deployment diagram + description
+  9. Key Architecture Decisions — ADR index table
+  10. Cross-Cutting Concerns — logging, security, testing, backup
+  11. Glossary — ATR, ADV, CIK, OCF, D/E, CAGR, Sharpe, Sortino, VaR
+  12. References — DESIGN.md, ROADMAP.md, BACKLOG.md
+- [ ] Every section references relevant ADRs (e.g., `See ADR-006` with link)
+- [ ] Every section references relevant C4 diagrams (e.g., `See System Context view`)
+- [ ] Cross-references are bi-directional (ADRs link back to RAD sections)
+- [ ] RAD is comprehensive enough that a new team member can understand the full architecture by reading it
+
+**Technical Details:**
+- Single markdown file at `docs/architecture/REFERENCE_ARCHITECTURE.md`
+- Diagrams embedded as: `![System Context](views/system-context.png)`
+- ADR references: `[ADR-0006](adr/0006-use-duckdb-parquet-analytical-store.md)`
+- Use anchors for intra-document navigation
+- Technology stack table with columns: Layer, Technology, Version, ADR, Rationale
+- RAD is a living document — updated when architecture changes
+
+---
+
 ## Epic 1: Data Layer
 
 **Duration:** Weeks 1–3 (overlaps with P0 after ports are defined) | **Dependencies:** P0 (ports) | **Size:** 34 points

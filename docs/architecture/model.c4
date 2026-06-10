@@ -1,0 +1,356 @@
+specification {
+  element actor
+  element softwareSystem
+  element externalSystem
+  element container
+  element logicalComponent
+  element dataStore
+  element computeNode
+  element monitoredProcess
+}
+
+model {
+  actor user 'User' {
+    description 'Retail investor with non-technical background. Reads daily journal, reviews reports, asks "why" questions, monitors dashboard.'
+  }
+
+  externalSystem eodhd 'EODHD' {
+    description 'Primary market data source. Daily OHLCV bars, fundamentals snapshots, and earnings calendar via REST API.'
+    technology 'REST API'
+  }
+
+  externalSystem alpaca 'Alpaca Data' {
+    description 'Market data enhancement. Latest quotes for spread estimation, trading calendar, corporate actions. Data module only — no trading.'
+    technology 'alpaca-py SDK'
+  }
+
+  externalSystem secEdgar 'SEC EDGAR' {
+    description 'Company identifier mapping. Fetches company_tickers.json for authoritative ticker to CIK to exchange mapping.'
+    technology 'REST API'
+  }
+
+  externalSystem openInsider 'OpenInsider' {
+    description 'Insider transaction data. Scraped HTML screener for cluster buy/sell detection. Provides M5 signal data.'
+    technology 'HTML scraping'
+  }
+
+  externalSystem reddit 'Reddit Public API' {
+    description 'Social sentiment data. Public JSON endpoints for mention count tracking. Provides M6 crowding veto data.'
+    technology 'REST API'
+  }
+
+  externalSystem llmProvider 'LLM Provider' {
+    description 'OpenAI-compatible chat API (OpenAI or OpenRouter). Generates narrated journal and concept card explanations. Never in decision path.'
+    technology 'OpenAI-compatible REST API'
+  }
+
+  softwareSystem alphaQuant 'Alpha-Quant' {
+    description 'Deterministic, daily-cadence, long-only equity trading system. Internal paper engine. LLM-powered narration and education.'
+
+    container cli 'CLI' {
+      description 'Command-line interface. Entry point for all operations: run, replay, backtest, bootstrap, journal, ask, report, status, halt.'
+      technology 'argparse'
+    }
+
+    container pipelineEngine 'Pipeline Engine' {
+      description 'Daily-run orchestrator. Sequences ingest, validate, derive, regime, risk, decide, order, persist, narrate. Runs at 17:30 ET via APScheduler.'
+      technology 'APScheduler'
+    }
+
+    container dataLayer 'Data Layer' {
+      description 'Data subsystem: 5 connectors, raw vault, canonical store, indicator engine, validation gates. Four-zone architecture per DESIGN section 3.'
+      technology 'httpx, DuckDB, PyArrow, numpy'
+
+      logicalComponent connectors 'Connectors (5)' {
+        description 'One base class, 5 implementations: EODHD, Alpaca Data, SEC, OpenInsider, Reddit. Shared machinery: httpx, tenacity retry, token-bucket rate limiter.'
+        technology 'httpx, tenacity'
+      }
+
+      logicalComponent vault 'Raw Vault' {
+        description 'Append-only, content-addressed, zstd-compressed raw payload archive. Nothing is ever deleted or rewritten.'
+        technology 'zstandard, DuckDB (manifest)'
+      }
+
+      logicalComponent normalizer 'Normalizer' {
+        description 'Pydantic model parsers: one per source, converting raw bytes into frozen canonical models.'
+        technology 'pydantic v2'
+      }
+
+      logicalComponent canonicalWriter 'Canonical Writer' {
+        description 'Writes parsed data: analytical data to date-partitioned Parquet, transactional state to SQLite.'
+        technology 'PyArrow, SQLAlchemy Core'
+      }
+
+      logicalComponent deriveEngine 'Derive Engine' {
+        description 'Incremental O(1) indicator computation. EMA, RSI, ATR, MACD via numpy recurrence formulas.'
+        technology 'numpy'
+      }
+
+      logicalComponent validator 'Validator' {
+        description '~15 declarative predicate checks: calendar gaps, zero/negative prices, return anomalies, staleness, schema drift.'
+        technology 'plain Python'
+      }
+
+      logicalComponent catalog 'Catalog' {
+        description 'Dataset versioning and manifest tracking. Run metadata, fixture integrity verification, golden replay hash management.'
+        technology 'SQLAlchemy Core'
+      }
+    }
+
+    container domainCore 'Domain Core' {
+      description 'Pure functions implementing all decision mechanisms (M1-M8), position sizing, and risk management. No I/O, no imports from adapters.'
+      technology 'pydantic, numpy'
+
+      logicalComponent m1 'M1 Universe' {
+        description 'Filters by price >= $5, liquidity ADV >= $5M, SEC-map validity, quarantine status.'
+      }
+
+      logicalComponent m2 'M2 Regime' {
+        description 'Classifies market: RISK_ON (SPY uptrend, VIX < 20, breadth > 0.4), CAUTION, RISK_OFF (SPY < EMA200, VIX > 30).'
+      }
+
+      logicalComponent m3 'M3 Technical' {
+        description 'Composite score from trend, momentum, RSI (45-70), MACD histogram, volume confirmation, ATR sanity.'
+        technology 'numpy'
+      }
+
+      logicalComponent m4 'M4 Quality' {
+        description 'Binary pass/fail: OCF > 0, D/E < 2x sector median, accruals sane, no negative earnings surprise.'
+      }
+
+      logicalComponent m5 'M5 Insider' {
+        description 'Insider cluster score: >= 2 officers/directors, >= $200k net in 30d gives 0.15 boost.'
+      }
+
+      logicalComponent m6 'M6 Crowding' {
+        description 'Reddit mention z-score veto. z > 3 gives 10-day entry block. Count arithmetic only, no LLM sentiment.'
+      }
+
+      logicalComponent m7 'M7 Blackout' {
+        description 'Earnings blackout: no entries within 3 trading days before report.'
+      }
+
+      logicalComponent m8 'M8 Ranker' {
+        description 'Composite ranking: 0.6 x technical + 0.25 x momentum + 0.15 x insider. Gates applied first. Ties broken by ADV.'
+      }
+
+      logicalComponent positionSizer 'Position Sizer' {
+        description 'Kelly-lite: shares = (equity x 1%) / (2 x ATR). Capped at 15% per position, 80% gross, 2 per sector.'
+        technology 'numpy'
+      }
+
+      logicalComponent riskEvaluator 'Risk Evaluator' {
+        description 'Exit-only risk rules: 2x ATR stop, trail after +1R, partial at +2R, 30d time stop, drawdown ladder, daily loss halt.'
+      }
+    }
+
+    container fillModel 'Fill Model' {
+      description 'The single fill model used by all execution realities. Pessimistic semantics: gap-through-stop fills at open, gap-up entries cancel.'
+      technology 'pydantic'
+
+      logicalComponent fillEntry 'Fill Entry' {
+        description 'Entry order filling: fills at T+1 open + slippage. Cancels if gap > 0.2% from decision quote.'
+      }
+
+      logicalComponent fillStop 'Fill Stop' {
+        description 'Stop-loss execution: if bar.low <= stop_price, fill at min(open, stop_price) - slippage. Gap-downs fill at open (pessimistic).'
+      }
+
+      logicalComponent fillPartial 'Fill Partial Take' {
+        description 'Partial take-profit: if bar.high >= take_price, sell 50% at max(open, take_price) + slippage.'
+      }
+
+      logicalComponent fillCorpAction 'Fill Corporate Action' {
+        description 'Dividends and stock splits: cash dividends credited on pay date, splits adjust positions/stops atomically.'
+      }
+    }
+
+    container paperPortfolio 'Paper Portfolio' {
+      description 'Authoritative internal portfolio. Cash, positions, orders, fills, equity curve in SQLite. Transactional integrity. No broker dependency.'
+      technology 'SQLAlchemy Core'
+
+      logicalComponent paperPortfolioInternal 'Paper Portfolio State' {
+        description 'Authoritative portfolio: cash, positions, orders, fills, equity curve. All written transactionally with Decision lineage.'
+      }
+    }
+
+    container shadowBooks 'Shadow Books' {
+      description '3 ablation books (RULES_ONLY, NO_INSIDER, NO_CROWDING_VETO) running parallel to PAPER with mechanism toggles. SPY buy-and-hold curve.'
+      technology 'SQLAlchemy Core'
+
+      logicalComponent shadowBookInternal 'Shadow Books (x3)' {
+        description 'RULES_ONLY, NO_INSIDER, NO_CROWDING_VETO. Same fill model, toggled mechanisms. Live ablation by construction.'
+      }
+
+      logicalComponent spyBaseline 'SPY Buy-and-Hold' {
+        description 'Benchmark curve: buys SPY on day 1, holds, collects dividends. Zero decisions, zero costs (except initial slippage).'
+      }
+    }
+
+    container narrator 'LLM Narrator' {
+      description 'Reads events from event log, builds NarrationContext, sends to LLM, fact-checks output, generates Markdown journal/reports.'
+      technology 'httpx, structlog'
+    }
+
+    container dashboard 'Streamlit Dashboard' {
+      description 'Read-only monitoring dashboard. Tabs: Overview, Portfolio, Risk, Reports, Concepts. Reads from SQLite only — zero pipeline coupling.'
+      technology 'Streamlit, altair'
+    }
+
+    container eventLog 'Event Log' {
+      description 'Append-only typed events from every pipeline stage. Written to both SQLite (queries) and structlog JSON stream (debugging).'
+      technology 'SQLAlchemy Core, structlog'
+    }
+
+    dataStore sqliteStore 'SQLite State Store' {
+      description 'Transactional state: decisions, orders, fills, positions, equity curve, events, concept_log, indicator_state, catalog. WAL mode for concurrent reads.'
+      technology 'SQLite WAL'
+    }
+
+    dataStore parquetArchive 'Parquet Archive' {
+      description 'Analytical data: daily bars, fundamentals snapshots, insider transactions, mention counts. Date-partitioned, queried via DuckDB.'
+      technology 'Parquet (zstd), DuckDB'
+    }
+  }
+
+  logicalComponent consistencyChecker 'Self-Consistency Checker' {
+    description 'Assertion engine: cash + mark == equity, every position traces to Decision, no orphans. Violation = software bug = full halt.'
+  }
+
+  computeNode localMachine 'Local Machine' {
+    description 'Single-machine deployment. Developer workstation (macOS/Linux) or headless server. Runs the daily pipeline, CLI operations, and dashboard.'
+
+    monitoredProcess schedulerProcess 'APScheduler Process' {
+      description 'Daily pipeline scheduler. Runs at 17:30 ET on trading days. Single-threaded Python process.'
+      technology 'APScheduler 3.x, Python 3.12'
+    }
+
+    monitoredProcess cliProcess 'CLI Process' {
+      description 'Ad-hoc operations. Invoked by user for replay, backtest, bootstrap, status, halt, ask.'
+      technology 'argparse, Python 3.12'
+    }
+
+    monitoredProcess dashboardProcess 'Streamlit Process' {
+      description 'Read-only monitoring dashboard. Serves on localhost:8501. Auto-refresh every 60s.'
+      technology 'Streamlit 1.58+, Starlette'
+    }
+
+    dataStore vaultDir 'Vault Directory' {
+      description 'Append-only zstd-compressed raw payload archive. Organized by source/yyyy/mm/dd/'
+      technology 'zstandard, file system'
+    }
+
+    dataStore canonicalDir 'Canonical Directory' {
+      description 'Date-partitioned Parquet files for analytical data. Pruned to 50-day tail.'
+      technology 'Parquet, file system'
+    }
+
+    dataStore stateDb 'SQLite Database' {
+      description 'Single-file SQLite database in WAL mode. Contains all transactional state and indicator data.'
+      technology 'SQLite WAL'
+    }
+
+    dataStore configFile 'Config File' {
+      description 'TOML configuration file at $PWD/config.toml or ~/.alpha-quant/config.toml.'
+      technology 'TOML'
+    }
+
+    dataStore haltFile 'Halt Lockfile' {
+      description 'data/.HALT lockfile. Written on halt condition. Pipeline refuses to run while it exists.'
+      technology 'JSON file'
+    }
+  }
+
+  user -> alphaQuant 'Reads journal, asks questions, monitors dashboard' {
+    technology 'CLI, Streamlit browser'
+  }
+
+  alphaQuant -> eodhd 'Fetches daily bars, fundamentals, earnings' {
+    technology 'httpx + tenacity'
+  }
+
+  alphaQuant -> alpaca 'Fetches latest quotes, trading calendar' {
+    technology 'alpaca-py data client'
+  }
+
+  alphaQuant -> secEdgar 'Fetches company_tickers.json (weekly)' {
+    technology 'httpx'
+  }
+
+  alphaQuant -> openInsider 'Fetches insider transaction HTML (daily)' {
+    technology 'httpx + selectolax'
+  }
+
+  alphaQuant -> reddit 'Fetches mention counts from subreddits (daily)' {
+    technology 'httpx'
+  }
+
+  alphaQuant -> llmProvider 'Sends NarrationContext, receives prose' {
+    technology 'httpx chat completions API'
+  }
+
+  connectors -> eodhd 'HTTPS bars, fundamentals, earnings'
+  connectors -> alpaca 'HTTPS quotes, calendar'
+  connectors -> secEdgar 'HTTPS company tickers (weekly)'
+  connectors -> openInsider 'HTTPS insider HTML (daily)'
+  connectors -> reddit 'HTTPS mention counts (daily)'
+
+  connectors -> vault 'Raw payload (before parsing)'
+  vault -> normalizer 'Raw bytes'
+  normalizer -> canonicalWriter 'Parsed canonical models'
+  validator -> canonicalWriter 'Validates before write'
+  deriveEngine -> canonicalWriter 'Reads bars for incremental update'
+
+  cli -> pipelineEngine 'Dispatches run, replay, backtest commands'
+
+  pipelineEngine -> dataLayer 'Steps 1-3: ingest, validate, derive' {
+    technology 'port interface'
+  }
+
+  pipelineEngine -> domainCore 'Steps 4-6: regime, risk, decide' {
+    technology 'port interface'
+  }
+
+  pipelineEngine -> fillModel 'Step 7: queue T+1 orders'
+  pipelineEngine -> paperPortfolio 'Steps 7-8: book fills, mark equity' {
+    technology 'port interface'
+  }
+
+  pipelineEngine -> shadowBooks 'Parallel: same data, toggled mechanisms'
+  pipelineEngine -> eventLog 'Emits events from every stage' {
+    technology 'EventSink port'
+  }
+
+  dataLayer -> sqliteStore 'Writes indicator_state, catalog; reads quarantines'
+  dataLayer -> parquetArchive 'Writes bars, fundamentals, insider_tx, mentions'
+
+  paperPortfolio -> sqliteStore 'Reads/writes positions, orders, fills, equity'
+  shadowBooks -> sqliteStore 'Reads/writes shadow book state'
+  shadowBooks -> fillModel 'Uses same fill model as PAPER'
+
+  narrator -> eventLog 'Reads events for context building'
+  narrator -> sqliteStore 'Reads positions, equity curve, concept_log'
+  narrator -> llmProvider 'Sends context, receives prose'
+
+  dashboard -> sqliteStore 'Reads-only: positions, equity_curve, events, journals'
+  dashboard -> parquetArchive 'Reads analytical data for charts (via DuckDB)'
+
+  m1 -> m3 'Universe members for scoring'
+  m1 -> m4 'Universe members for quality gate'
+  m2 -> m8 'Regime multiplier for ranking'
+  m3 -> m8 'Technical scores'
+  m4 -> m8 'Gate pass/fail'
+  m5 -> m8 'Insider boost'
+  m6 -> m8 'Veto signal'
+  m7 -> m8 'Blackout signal'
+  m8 -> positionSizer 'Ranked candidates'
+  positionSizer -> riskEvaluator 'Sized positions for risk check'
+
+  fillEntry -> paperPortfolio 'Booked entry fills'
+  fillStop -> paperPortfolio 'Booked exit fills'
+  fillPartial -> paperPortfolio 'Booked partial fills'
+  fillCorpAction -> paperPortfolio 'Adjusts positions/stops'
+  paperPortfolio -> shadowBooks 'Same data, toggled mechanisms'
+  paperPortfolio -> spyBaseline 'Comparison baseline'
+  consistencyChecker -> paperPortfolio 'Post-fill verification'
+}
