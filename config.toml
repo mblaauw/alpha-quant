@@ -15,34 +15,37 @@ min_adv_usd = 5_000_000
 index_base = "sp500_plus_midcap400"
 
 [portfolio]
-starting_equity = 100_000.0
-max_positions = 10
+max_positions = 8
 max_position_pct = 0.15
-max_gross_pct = 0.80
-max_per_sector = 2
+max_gross_exposure = 0.80
+risk_per_trade_pct = 0.01
+max_sector_positions = 2
+
+[paper]
+starting_equity = 100000
+slippage_bps = 5
+spread_model = "half_spread_estimate"
 
 [risk]
-atr_multiple = 2.0
-partial_at = 2.0
+stop_atr_mult = 2.0
+trail_after_r = 1.0
+partial_take_at_r = 2.0
 time_stop_days = 30
-max_daily_loss_pct = 0.02
-max_drawdown_pct = 0.15
+dd_ladder = [[0.10, 0.5], [0.15, 0.0]]
+daily_loss_halt_pct = 0.03
 
-[weights]
-technical = 0.6
-momentum = 0.25
-insider = 0.15
+[shadow]
+books = ["RULES_ONLY", "NO_INSIDER", "NO_CROWDING_VETO"]
 
 [llm]
-provider = "openai"
-model = "gpt-4o-mini"
-temperature = 0.7
-max_tokens = 2048
+provider = "openrouter"
+model = "anthropic/claude-sonnet-4"
+base_url = ""
+timeout_s = 30
 
-[dashboard]
-host = "localhost"
-port = 8501
-refresh_seconds = 60
+[education]
+level = "beginner"
+concept_repeat_limit = 3
 
 [eodhd]
 api_key = ""
@@ -52,3 +55,8 @@ base_url = "https://eodhd.com/api"
 api_key = ""
 secret_key = ""
 base_url = "https://data.alpaca.markets"
+
+[dashboard]
+host = "localhost"
+port = 8501
+refresh_seconds = 60
