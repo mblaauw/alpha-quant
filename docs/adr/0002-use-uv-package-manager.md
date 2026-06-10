@@ -48,8 +48,17 @@ Rationale:
 - Team must learn uv CLI (similar to pip, but not identical)
 - Not yet the universal default (pip-users need a brief orientation)
 
+## Astral Ecosystem Alignment
+
+uv is part of the Astral toolchain (astral.sh), which also provides:
+- **ruff** — Extremely fast Python linter and formatter (replaces Flake8, isort, Black, pyupgrade)
+- **ty** — Rust-based type checker (adopted via ADR-0019, replaces mypy)
+
+Using these tools together ensures consistent formatting, linting, and type checking across the project with minimal configuration and near-instant execution.
+
 ## References
 
 - DESIGN.md §3.8 (Library decisions)
 - uv documentation: https://docs.astral.sh/uv/
 - RAD §3 (Technology Stack Summary)
+- ADR-0019: Astral Development Tooling (ruff + ty)

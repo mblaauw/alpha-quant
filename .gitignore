@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+*.toml.user
+data/vault/
+data/.HALT
+fixtures/*/
+!fixtures/fx-*
