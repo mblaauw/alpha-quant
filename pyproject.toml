@@ -1,0 +1,67 @@
+[project]
+name = "alpha-quant"
+version = "0.1.0"
+description = "Deterministic, daily-cadence, long-only equity trading system"
+requires-python = ">=3.14"
+dependencies = [
+    "httpx>=0.28",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "structlog>=24.4",
+    "sqlalchemy>=2.0",
+    "duckdb>=1.2",
+    "pyarrow>=19.0",
+    "polars>=1.20",
+    "numpy>=2.2",
+    "tenacity>=9.0",
+    "apscheduler>=3.10",
+    "zstandard>=0.23",
+    "selectolax>=0.3",
+]
+
+[project.scripts]
+alpha-quant = "alpha_quant.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=6.0",
+    "hypothesis>=6.0",
+    "ruff>=0.11",
+    "ty>=0.0.40",
+]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.ty.environment]
+python-version = "3.14"
+python = "./.venv"
+python-platform = "darwin"
+
+[tool.ty.rules]
+possibly-unresolved-reference = "error"
+invalid-argument-type = "error"
+missing-argument = "error"
+invalid-return-type = "error"
+division-by-zero = "warn"
+unused-ignore-comment = "warn"
+redundant-cast = "warn"
+
+[tool.ty.src]
+include = ["alpha_quant", "tests"]
+exclude = [".venv"]
