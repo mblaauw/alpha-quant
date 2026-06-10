@@ -1,11 +1,8 @@
-from abc import ABC, abstractmethod
-
-from alpha_quant.domain.models import InsiderCluster, InsiderTransaction
+from typing import Protocol, runtime_checkable
 
 
-class InsiderFeed(ABC):
-    @abstractmethod
-    async def cluster_transactions(self, symbol: str) -> list[InsiderTransaction]: ...
+@runtime_checkable
+class InsiderFeed(Protocol):
+    async def insider_trades(self, symbol: str) -> list[dict]: ...
 
-    @abstractmethod
-    async def recent_clusters(self, symbol: str) -> list[InsiderCluster]: ...
+    async def cluster_signals(self, symbol: str) -> list[dict]: ...

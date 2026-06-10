@@ -1,22 +1,12 @@
-from abc import ABC, abstractmethod
-
-from alpha_quant.domain.models import Fill, Order, Position
+from typing import Protocol, runtime_checkable
 
 
-class Broker(ABC):
-    @abstractmethod
-    async def submit_order(self, order: Order) -> Order: ...
+@runtime_checkable
+class Broker(Protocol):
+    async def submit_order(self, order: dict) -> dict: ...
 
-    @abstractmethod
     async def cancel_order(self, order_id: str) -> bool: ...
 
-    @abstractmethod
-    async def portfolio(
-        self,
-    ) -> dict: ...
+    async def portfolio(self) -> dict: ...
 
-    @abstractmethod
-    async def positions(self) -> list[Position]: ...
-
-    @abstractmethod
-    async def fills(self, since: str | None = None) -> list[Fill]: ...
+    async def positions(self) -> list[dict]: ...

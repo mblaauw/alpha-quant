@@ -1,9 +1,6 @@
-from abc import ABC, abstractmethod
+from typing import Protocol, runtime_checkable
 
 
-class LLM(ABC):
-    @abstractmethod
-    async def explain(self, context: dict) -> str: ...
-
-    @abstractmethod
-    async def generate_card(self, symbol: str, data: dict) -> str: ...
+@runtime_checkable
+class LLM(Protocol):
+    async def generate(self, prompt: str, **kwargs: object) -> str: ...

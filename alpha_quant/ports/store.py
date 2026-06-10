@@ -1,60 +1,14 @@
-from abc import ABC, abstractmethod
-from datetime import date, datetime
-
-from alpha_quant.domain.events import DomainEvent
-from alpha_quant.domain.models import (
-    Bar,
-    Decision,
-    Fill,
-    IndicatorState,
-    Order,
-    Position,
-)
+from typing import Protocol, runtime_checkable
 
 
-class Store(ABC):
-    @abstractmethod
-    async def save_bars(self, symbol: str, bars: list[Bar]) -> None: ...
+@runtime_checkable
+class Store(Protocol):
+    async def get(self, key: str) -> bytes | None: ...
 
-    @abstractmethod
-    async def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]: ...
+    async def set(self, key: str, value: bytes) -> None: ...
 
-    @abstractmethod
-    async def save_decision(self, decision: Decision) -> None: ...
+    async def delete(self, key: str) -> None: ...
 
-    @abstractmethod
-    async def load_decisions(self, symbol: str, since: date) -> list[Decision]: ...
+    async def exists(self, key: str) -> bool: ...
 
-    @abstractmethod
-    async def save_order(self, order: Order) -> None: ...
-
-    @abstractmethod
-    async def load_order(self, order_id: str) -> Order | None: ...
-
-    @abstractmethod
-    async def save_fill(self, fill: Fill) -> None: ...
-
-    @abstractmethod
-    async def load_fills(self, order_id: str) -> list[Fill]: ...
-
-    @abstractmethod
-    async def save_position(self, position: Position) -> None: ...
-
-    @abstractmethod
-    async def load_positions(self) -> list[Position]: ...
-
-    @abstractmethod
-    async def save_event(self, event: DomainEvent) -> None: ...
-
-    @abstractmethod
-    async def load_events(
-        self,
-        event_type: str | None = None,
-        since: datetime | None = None,
-    ) -> list[DomainEvent]: ...
-
-    @abstractmethod
-    async def save_indicator_state(self, state: IndicatorState) -> None: ...
-
-    @abstractmethod
-    async def load_indicator_state(self, symbol: str, date: date) -> IndicatorState | None: ...
+    async def list_keys(self, prefix: str) -> list[str]: ...

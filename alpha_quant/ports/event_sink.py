@@ -1,8 +1,11 @@
-from abc import ABC, abstractmethod
+from datetime import datetime
+from typing import Protocol, runtime_checkable
 
-from alpha_quant.domain.events import DomainEvent
 
+@runtime_checkable
+class EventSink(Protocol):
+    async def emit(self, event: str, context: dict | None = None) -> None: ...
 
-class EventSink(ABC):
-    @abstractmethod
-    async def emit(self, event: DomainEvent) -> None: ...
+    async def query(
+        self, event_type: str | None = None, since: datetime | None = None
+    ) -> list[dict]: ...
