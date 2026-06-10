@@ -1,9 +1,15 @@
+from abc import ABC, abstractmethod
 from datetime import date
-from typing import Protocol, runtime_checkable
+
+from alpha_quant.domain.models import Bar, Quote, TradingDay
 
 
-@runtime_checkable
-class MarketData(Protocol):
-    async def bars(self, symbol: str, start: date, end: date) -> list[dict]: ...
+class MarketData(ABC):
+    @abstractmethod
+    async def daily_bars(self, symbol: str, start: date, end: date) -> list[Bar]: ...
 
-    async def quote(self, symbol: str) -> dict: ...
+    @abstractmethod
+    async def latest_quote(self, symbol: str) -> Quote: ...
+
+    @abstractmethod
+    async def trading_calendar(self, start: date, end: date) -> list[TradingDay]: ...

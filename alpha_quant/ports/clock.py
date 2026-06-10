@@ -1,9 +1,13 @@
+from abc import ABC, abstractmethod
 from datetime import date, datetime
-from typing import Protocol, runtime_checkable
 
 
-@runtime_checkable
-class Clock(Protocol):
+class Clock(ABC):
+    @abstractmethod
     def now(self) -> datetime: ...
 
+    @abstractmethod
     def today(self) -> date: ...
+
+    @abstractmethod
+    def market_date(self) -> date: ...

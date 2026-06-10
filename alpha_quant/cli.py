@@ -45,9 +45,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="alpha-quant",
         description="Deterministic, daily-cadence, long-only equity trading system",
     )
-    parser.add_argument(
-        "--version", action="version", version=f"%(prog)s {__version__}"
-    )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument(
         "--config",
         type=str,

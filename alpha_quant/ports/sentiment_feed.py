@@ -1,8 +1,11 @@
-from typing import Protocol, runtime_checkable
+from abc import ABC, abstractmethod
+
+from alpha_quant.domain.models import MentionCount, SentimentBaseline
 
 
-@runtime_checkable
-class SentimentFeed(Protocol):
-    async def sentiment(self, symbol: str) -> dict: ...
+class SentimentFeed(ABC):
+    @abstractmethod
+    async def mention_counts(self, symbol: str, days: int = 30) -> list[MentionCount]: ...
 
-    async def trending(self, limit: int = 20) -> list[dict]: ...
+    @abstractmethod
+    async def baseline(self, symbol: str) -> SentimentBaseline: ...

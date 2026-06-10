@@ -1,8 +1,11 @@
-from typing import Protocol, runtime_checkable
+from abc import ABC, abstractmethod
+
+from alpha_quant.domain.models import EarningsEntry, FundamentalsSnapshot
 
 
-@runtime_checkable
-class Fundamentals(Protocol):
-    async def fundamentals(self, symbol: str) -> dict: ...
+class Fundamentals(ABC):
+    @abstractmethod
+    async def snapshot(self, symbol: str) -> FundamentalsSnapshot: ...
 
-    async def earnings_calendar(self, start: str, end: str) -> list[dict]: ...
+    @abstractmethod
+    async def earnings_calendar(self, start: str, end: str) -> list[EarningsEntry]: ...
