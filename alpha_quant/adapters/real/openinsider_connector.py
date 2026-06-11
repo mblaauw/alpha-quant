@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 from datetime import date, datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
 import structlog
@@ -35,9 +35,6 @@ class OpenInsiderConnector(BaseConnector):
             user_agent=user_agent,
             vault=vault,
         )
-
-    def parse(self, data: bytes, **kwargs: Any) -> Any:
-        return data
 
     def _build_screener_url(self, days: int) -> str:
         start = (date.today() - timedelta(days=days)).isoformat()
