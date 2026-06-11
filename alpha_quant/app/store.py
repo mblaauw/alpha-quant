@@ -365,6 +365,16 @@ class CanonicalStore:
             "  PRIMARY KEY (dataset, version, symbol)"
             ")"
         )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS quarantine ("
+            "  symbol VARCHAR NOT NULL,"
+            "  reason VARCHAR NOT NULL,"
+            "  quarantined_date DATE NOT NULL,"
+            "  cleared_date DATE,"
+            "  severity VARCHAR NOT NULL DEFAULT 'QUARANTINE',"
+            "  PRIMARY KEY (symbol, quarantined_date)"
+            ")"
+        )
         conn.commit()
 
     def save_decision(self, decision: Decision) -> None:
@@ -576,6 +586,46 @@ class CanonicalStore:
             values=json.loads(row[2]),
         )
 
+    def add_quarantine(self, symbol: str, reason: str, severity: str = "QUARANTINE") -> None:
+        self._state_conn.execute(
+            "INSERT OR REPLACE INTO quarantine (symbol, reason, quarantined_date, severity)"
+            " VALUES (?, ?, CURRENT_DATE, ?)",
+            [symbol, reason, severity],
+        )
+        self._state_conn.commit()
+
+    def list_quarantine(self, cleared: bool = False) -> list[dict[str, Any]]:
+        if cleared:
+            rows = self._state_conn.execute(
+                "SELECT symbol, reason, quarantined_date, cleared_date, severity"
+                " FROM quarantine WHERE cleared_date IS NOT NULL"
+                " ORDER BY quarantined_date DESC"
+            ).fetchall()
+        else:
+            rows = self._state_conn.execute(
+                "SELECT symbol, reason, quarantined_date, cleared_date, severity"
+                " FROM quarantine WHERE cleared_date IS NULL"
+                " ORDER BY quarantined_date DESC"
+            ).fetchall()
+        return [
+            {
+                "symbol": r[0],
+                "reason": r[1],
+                "quarantined_date": str(r[2]),
+                "cleared_date": str(r[3]) if r[3] else None,
+                "severity": r[4],
+            }
+            for r in rows
+        ]
+
+    def clear_quarantine(self, symbol: str) -> None:
+        self._state_conn.execute(
+            "UPDATE quarantine SET cleared_date = CURRENT_DATE"
+            " WHERE symbol = ? AND cleared_date IS NULL",
+            [symbol],
+        )
+        self._state_conn.commit()
+
     def close(self) -> None:
         self._analytical.close()
         self._state_conn.close()
@@ -583,7 +633,7 @@ class CanonicalStore:
 
 def _dedup_keys(dataset: str) -> str:
     mapping = {
-        "bars": "symbol, bar_date",
+        "bars": "symbol, date",
         "fundamentals": "symbol, as_of_date",
         "insider_transactions": "symbol, filing_date, transaction_date, transaction_type, owner",
         "mentions": "symbol, mention_date, source",
