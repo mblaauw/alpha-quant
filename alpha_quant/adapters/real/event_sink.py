@@ -1,6 +1,7 @@
 import sqlite3
 from datetime import datetime
 from pathlib import Path
+from typing import override
 
 import structlog
 from pydantic import TypeAdapter
@@ -35,6 +36,7 @@ class SqliteEventSink(EventSink):
         self._conn.commit()
         self._batch: list[DomainEvent] = []
 
+    @override
     def emit(self, event: DomainEvent) -> None:
         self._batch.append(event)
         payload = event.model_dump_json()
@@ -56,6 +58,7 @@ class SqliteEventSink(EventSink):
         self._conn.commit()
         self._batch = []
 
+    @override
     def query(
         self,
         run_id: str | None = None,

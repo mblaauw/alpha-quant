@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from typing import override
 
 import pyarrow.parquet as pq
 
@@ -14,6 +15,7 @@ class FixtureMarketData(MarketData):
     def __init__(self, fixture_path: Path) -> None:
         self._bars_dir = fixture_path / "bars"
 
+    @override
     def daily_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
         path = self._bars_dir / f"{symbol}.parquet"
         if not path.exists():
@@ -44,6 +46,7 @@ class FixtureMarketData(MarketData):
                 )
         return bars
 
+    @override
     def latest_quote(self, symbol: str) -> Quote:
         return Quote(
             symbol=symbol,
@@ -53,6 +56,7 @@ class FixtureMarketData(MarketData):
             ask=101.0,
         )
 
+    @override
     def trading_calendar(self, start: date, end: date) -> list[TradingDay]:
         days: list[TradingDay] = []
         current = start

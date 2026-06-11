@@ -4,7 +4,7 @@ import json
 import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 import structlog
 
@@ -48,6 +48,7 @@ class SECConnector(BaseConnector):
             vault=vault,
         )
 
+    @override
     def parse(self, data: bytes, **kwargs: Any) -> Any:
         return json.loads(data)
 
@@ -101,6 +102,7 @@ class SECConnector(BaseConnector):
                 return cached
             raise
 
+    @override
     def close(self) -> None:
         self._cache_conn.close()
         super().close()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -144,7 +145,7 @@ class Order(BaseModel):
     avg_fill_price: float | None = None
 
     @model_validator(mode="after")
-    def _validate_fill_quantity(self) -> Order:
+    def _validate_fill_quantity(self) -> Self:
         if (
             self.filled_quantity is not None
             and self.quantity is not None
