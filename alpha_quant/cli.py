@@ -1,11 +1,45 @@
 import argparse
 import json
+import os
 import sys
+
+import structlog
 
 from alpha_quant import __version__
 from alpha_quant.app.bootstrap import run_bootstrap
 from alpha_quant.app.config import ConfigError, load_config, redact_config
 from alpha_quant.app.replay import run_replay, write_golden
+
+
+def _configure_logging() -> None:
+    is_dev = os.environ.get("ALPHA_QUANT_DEV", "").strip() in ("1", "true", "yes")
+
+    shared_processors: list[structlog.typing.Processor] = [
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.add_logger_name,
+        structlog.dev.set_exc_info,
+    ]
+
+    if is_dev:
+        processors: list[structlog.typing.Processor] = [
+            *shared_processors,
+            structlog.dev.ConsoleRenderer(),
+        ]
+    else:
+        processors = [
+            *shared_processors,
+            structlog.processors.dict_tracebacks,
+            structlog.processors.JSONRenderer(),
+        ]
+
+    structlog.configure(
+        processors=processors,
+        wrapper_class=structlog.stdlib.BoundLogger,
+        context_class=dict,
+        logger_factory=structlog.PrintLoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
 
 
 def cmd_run(args: argparse.Namespace) -> None:
@@ -219,6 +253,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _configure_logging()
     parser = build_parser()
     args = parser.parse_args(argv)
     try:

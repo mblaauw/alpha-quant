@@ -10,6 +10,7 @@ import structlog
 
 from alpha_quant.adapters.real.base_connector import BaseConnector
 from alpha_quant.domain.models import MentionCount, SentimentBaseline
+from alpha_quant.ports.sentiment_feed import SentimentFeed
 
 if TYPE_CHECKING:
     from alpha_quant.app.vault import Vault
@@ -83,7 +84,7 @@ _COMMON_WORDS: set[str] = {
 _REDDIT_UA = "alpha-quant/0.1.0 (research project; contact m@mblaauw.dev)"
 
 
-class RedditSentimentConnector(BaseConnector):
+class RedditSentimentConnector(BaseConnector, SentimentFeed):
     def __init__(
         self,
         symbols: list[str],
@@ -129,7 +130,7 @@ class RedditSentimentConnector(BaseConnector):
                     counts[sym] += len(matches)
         return dict(counts)
 
-    def mention_counts(
+    def _fetch_all_mention_counts(
         self,
         subreddits: list[str] | None = None,
     ) -> list[MentionCount]:
@@ -162,8 +163,14 @@ class RedditSentimentConnector(BaseConnector):
 
         return results
 
+    # --- Port interface (SentimentFeed) ---
+
+    def mention_counts(self, symbol: str, days: int = 30) -> list[MentionCount]:
+        all_counts = self._fetch_all_mention_counts()
+        return [c for c in all_counts if c.symbol.upper() == symbol.upper()]
+
     def baseline(self, symbol: str) -> SentimentBaseline:
-        counts = self.mention_counts()
+        counts = self._fetch_all_mention_counts()
         relevant = [c.count for c in counts if c.symbol.upper() == symbol.upper()]
         if len(relevant) < 2:
             return SentimentBaseline(

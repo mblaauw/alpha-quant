@@ -35,7 +35,7 @@ class SqliteEventSink(EventSink):
         self._conn.commit()
         self._batch: list[DomainEvent] = []
 
-    async def emit(self, event: DomainEvent) -> None:
+    def emit(self, event: DomainEvent) -> None:
         self._batch.append(event)
         payload = event.model_dump_json()
         self._conn.execute(
@@ -52,11 +52,11 @@ class SqliteEventSink(EventSink):
         )
         logger.info("domain_event", event_type=event.event_type, run_id=event.run_id)
 
-    async def flush(self) -> None:
+    def flush(self) -> None:
         self._conn.commit()
         self._batch = []
 
-    async def query(
+    def query(
         self,
         run_id: str | None = None,
         event_type: str | None = None,
