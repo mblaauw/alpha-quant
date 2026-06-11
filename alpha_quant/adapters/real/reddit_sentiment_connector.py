@@ -1,14 +1,18 @@
+from __future__ import annotations
+
 import re
 from collections import defaultdict
 from datetime import date
-from pathlib import Path
 from statistics import mean, stdev
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from alpha_quant.adapters.real.base_connector import BaseConnector
 from alpha_quant.domain.models import MentionCount, SentimentBaseline
+
+if TYPE_CHECKING:
+    from alpha_quant.app.vault import Vault
 
 logger = structlog.get_logger()
 
@@ -85,7 +89,7 @@ class RedditSentimentConnector(BaseConnector):
         symbols: list[str],
         *,
         user_agent: str = _REDDIT_UA,
-        vault_base: Path | None = None,
+        vault: Vault | None = None,
     ) -> None:
         self._symbols = sorted(symbols)
         self._patterns = {
@@ -100,7 +104,7 @@ class RedditSentimentConnector(BaseConnector):
             max_burst=1,
             timeout_s=15.0,
             user_agent=user_agent,
-            vault_base=vault_base,
+            vault=vault,
         )
 
     def parse(self, data: bytes, **kwargs: Any) -> Any:

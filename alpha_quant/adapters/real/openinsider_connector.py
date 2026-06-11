@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import re
 from collections import Counter
 from datetime import date, datetime, timedelta
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
 import structlog
@@ -10,6 +11,9 @@ from selectolax.parser import HTMLParser
 
 from alpha_quant.adapters.real.base_connector import BaseConnector
 from alpha_quant.domain.models import InsiderCluster, InsiderTransaction
+
+if TYPE_CHECKING:
+    from alpha_quant.app.vault import Vault
 
 logger = structlog.get_logger()
 
@@ -21,7 +25,7 @@ class OpenInsiderConnector(BaseConnector):
         self,
         *,
         user_agent: str = "",
-        vault_base: Path | None = None,
+        vault: Vault | None = None,
     ) -> None:
         super().__init__(
             source_name="openinsider",
@@ -29,7 +33,7 @@ class OpenInsiderConnector(BaseConnector):
             tokens_per_second=0.33,
             max_burst=1,
             user_agent=user_agent,
-            vault_base=vault_base,
+            vault=vault,
         )
 
     def parse(self, data: bytes, **kwargs: Any) -> Any:
