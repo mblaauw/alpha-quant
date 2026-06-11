@@ -6,7 +6,7 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
-| [0001](./0001-use-python-3-12-lts.md) | Use Python 3.12 LTS as the Runtime | Accepted | 2026-06-10 |
+| [0001](./0001-use-python-3-14.md) | Use Python 3.14 as the Runtime | Accepted | 2026-06-10 |
 | [0002](./0002-use-uv-package-manager.md) | Use uv as the Package Manager | Accepted | 2026-06-10 |
 | [0003](./0003-use-ports-and-adapters.md) | Use Ports-and-Adapters (Hexagonal) Architecture | Accepted | 2026-06-10 |
 | [0004](./0004-use-argparse-for-cli.md) | Use argparse (stdlib) for the CLI | Accepted | 2026-06-10 |
@@ -24,6 +24,8 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0016](./0016-use-degrade-dont-block-failure-model.md) | Use Degrade-Don't-Block Data Failure Model | Accepted | 2026-06-10 |
 | [0017](./0017-use-golden-replay-ci.md) | Use Golden Replay as the Primary CI Strategy | Accepted | 2026-06-10 |
 | [0018](./0018-use-bootstrap-fixture-workflow.md) | Use Bootstrap + Fixture Bundle Developer Workflow | Accepted | 2026-06-10 |
+| [0019](./0019-use-astral-tooling-ruff-ty.md) | Use Astral Development Tooling (ruff + ty) | Accepted | 2026-06-10 |
+| [0020](./0020-use-duckdb-for-vault-manifest.md) | Use DuckDB for the Vault Manifest (Dual Use) | Proposed | 2026-06-11 |
 
 ## Status Meanings
 

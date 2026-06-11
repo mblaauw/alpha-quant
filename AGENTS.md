@@ -134,6 +134,38 @@ git push origin --delete <feature-branch-name>
 
 ---
 
+## Refinement Workflow
+
+When the PO calls for a technical refinement, the Software Designer evaluates the current state and reports back.
+
+### 1. PO creates a Refinement Issue (P1.R style)
+
+Issue title: `P1.R: Technical refinement — <scope>`
+Labels: `story, priority/p0, size/m, domain/backend, P1`
+Body includes:
+- Acceptance criteria organized in sections (ADR audit, dependency fitness, duplicate code, architecture consistency, future-proofing)
+- Required outputs: updated ADRs, refactoring punch list (P0/P1/P2), library recommendation report
+
+### 2. Software Designer completes evaluation
+
+- Reviews every ADR for relevance
+- Evaluates every dependency (keep / remove / replace / add)
+- Quantifies duplicate code patterns
+- Proposes ADR amendments or new ADRs (status: Proposed)
+- Produces the refactoring punch list
+
+### 3. Software Designer commits ADR updates
+
+Files in `docs/adr/` — new ADR files following MADR template. Updated `docs/adr/README.md` index.
+
+### 4. PO acts on outputs
+
+- Creates refactoring issue(s) from punch list (P1.RA, P1.RB, etc.)
+- Updates remaining P1.x issue descriptions if ADR changes affect their scope
+- Updates priority/size labels on affected issues
+
+---
+
 ## Project Board Constants
 
 | Field | ID |
