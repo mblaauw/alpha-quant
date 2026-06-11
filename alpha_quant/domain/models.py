@@ -21,9 +21,11 @@ class Quote(BaseModel):
 
     symbol: str
     timestamp: datetime
-    price: float
+    price: float | None = None
     bid: float | None = None
     ask: float | None = None
+    bid_size: float | None = None
+    ask_size: float | None = None
     volume: float | None = None
 
 

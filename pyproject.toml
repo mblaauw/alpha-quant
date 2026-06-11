@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Deterministic, daily-cadence, long-only equity trading system"
 requires-python = ">=3.14"
 dependencies = [
+    "alpaca-py>=0.30",
     "httpx>=0.28",
     "pydantic>=2.10",
     "pydantic-settings>=2.7",
@@ -34,6 +35,9 @@ dev = [
 [build-system]
 requires = ["setuptools>=75"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["alpha_quant", "alpha_quant.*"]
 
 [tool.uv]
 package = true
