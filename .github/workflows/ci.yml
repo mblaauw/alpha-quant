@@ -33,17 +33,23 @@ jobs:
       - name: Type check
         run: uv run ty check alpha_quant/
 
-      - name: Bootstrap fixtures
-        run: uv run alpha-quant bootstrap
+      - name: Run tests
+        run: uv run pytest
 
-      - name: Golden replay
+      - name: Bootstrap fixtures
         run: |
+          export PYTHONHASHSEED=0
+          uv run alpha-quant bootstrap
+
+      - name: Stub replay (no DAG yet — #97)
+        run: |
+          export PYTHONHASHSEED=0
           uv run alpha-quant replay \
             --from-date 2024-01-01 \
             --to-date 2024-01-31 \
             --output fixtures/golden/golden_run.json
 
-      - name: Verify golden hash
+      - name: Verify stub golden hash (placeholder — #97)
         run: |
           EXPECTED_HASH=$(sha256sum fixtures/golden/golden_run.json | cut -d' ' -f1)
           echo "Golden hash: ${EXPECTED_HASH}"
@@ -61,11 +67,12 @@ jobs:
             exit 1
           fi
 
-      - name: Verify no datetime.now() outside clock adapter
+      - name: Verify no clock readings in domain core (I9)
         run: |
-          RESULT=$(grep -rn "datetime\.now(" alpha_quant/ --include="*.py" | grep -v "adapters/real/clock.py" || true)
+          RESULT=$(grep -rnE "(datetime\.now\(|date\.today\(|time\.time\()" alpha_quant/domain/ \
+            --include="*.py" || true)
           if [ -n "$RESULT" ]; then
-            echo "::error::datetime.now() found outside clock adapter"
+            echo "::error::Clock reading in domain/ violates I9. Route through Clock port."
             echo "$RESULT"
             exit 1
           fi
