@@ -107,9 +107,6 @@ class RedditSentimentConnector(BaseConnector):
             vault=vault,
         )
 
-    def parse(self, data: bytes, **kwargs: Any) -> Any:
-        return data
-
     def _fetch_subreddit_new(self, sub: str) -> list[dict[str, Any]]:
         path = f"/r/{sub}/new.json"
         params: dict[str, str] = {"limit": "100"}
