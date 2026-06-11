@@ -90,6 +90,10 @@ class InsiderCluster(BaseModel):
     net_shares: float
     avg_price: float | None = None
     signal: str | None = None
+    value: float | None = None
+    transaction_type: str | None = None
+    officer_count: int | None = None
+    director_count: int | None = None
 
 
 class MentionCount(BaseModel):
