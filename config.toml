@@ -1,5 +1,13 @@
 [bootstrap]
-symbols = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "JPM", "V", "JNJ"]
+symbols = [
+    "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "AVGO", "ORCL", "CRM",
+    "JPM", "V", "MA", "BAC", "WFC", "GS", "MS", "BLK", "SCHW", "C",
+    "JNJ", "UNH", "LLY", "PFE", "MRK", "ABBV", "TMO", "BMY", "AMGN", "REGN",
+    "XOM", "CVX", "COP", "EOG", "OXY",
+    "WMT", "COST", "HD", "LOW", "TGT",
+    "PG", "KO", "PEP", "PM", "MDLZ",
+    "BA", "CAT", "GE", "HON", "MMM",
+]
 history_years = 3
 include_benchmarks = ["SPY", "^VIX"]
 
