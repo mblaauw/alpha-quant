@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import hashlib
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -14,6 +17,10 @@ from alpha_quant.domain.models import (
 )
 
 
+def _det(key: str, modulus: int) -> int:
+    return int.from_bytes(hashlib.sha256(key.encode()).digest()[:4]) % modulus
+
+
 def _generate_bars(symbol: str, start: date, end: date) -> list[Bar]:
     bars: list[Bar] = []
     price = 100.0
@@ -27,8 +34,8 @@ def _generate_bars(symbol: str, start: date, end: date) -> list[Bar]:
                     open=price,
                     high=price * 1.02,
                     low=price * 0.98,
-                    close=price * (1 + (hash(f"{symbol}-{current}") % 21 - 10) / 500),
-                    volume=1_000_000 + hash(f"v-{symbol}-{current}") % 500_000,
+                    close=price * (1 + (_det(f"{symbol}-{current}", 21) - 10) / 500),
+                    volume=1_000_000 + _det(f"v-{symbol}-{current}", 500_000),
                 )
             )
             price = bars[-1].close
@@ -40,10 +47,10 @@ def _generate_fundamentals(symbol: str) -> FundamentalsSnapshot:
     return FundamentalsSnapshot(
         symbol=symbol,
         as_of_date=date.today(),
-        market_cap=50_000_000_000 + hash(symbol) % 2_000_000_000_000,
-        pe_ratio=15.0 + hash(symbol) % 30,
-        eps_ttm=2.0 + hash(symbol) % 10,
-        dividend_yield=0.5 + hash(symbol) % 3,
+        market_cap=50_000_000_000 + _det(symbol, 2_000_000_000_000),
+        pe_ratio=15.0 + _det(symbol, 30),
+        eps_ttm=2.0 + _det(symbol, 10),
+        dividend_yield=0.5 + _det(symbol, 3),
         sector="Technology",
         industry="Software",
     )
@@ -57,8 +64,8 @@ def _generate_earnings(symbol: str, years: int) -> list[EarningsEntry]:
                 EarningsEntry(
                     symbol=symbol,
                     date=date(y, q * 3, 15),
-                    eps_estimate=1.0 + hash(f"e-{symbol}-{y}-{q}") % 200 / 100,
-                    eps_actual=1.0 + hash(f"a-{symbol}-{y}-{q}") % 200 / 100,
+                    eps_estimate=1.0 + _det(f"e-{symbol}-{y}-{q}", 200) / 100,
+                    eps_actual=1.0 + _det(f"a-{symbol}-{y}-{q}", 200) / 100,
                 )
             )
     return entries
@@ -73,9 +80,9 @@ def _generate_insider_tx(symbol: str) -> list[InsiderTransaction]:
             owner=f"exec_{i % 5 + 1}",
             title="Officer",
             transaction_type="Buy" if i % 3 != 0 else "Sell",
-            shares_traded=1_000 + hash(f"i-{symbol}-{i}") % 10_000,
+            shares_traded=1_000 + _det(f"i-{symbol}-{i}", 10_000),
             price=100.0,
-            shares_held=10_000 + hash(f"h-{symbol}-{i}") % 100_000,
+            shares_held=10_000 + _det(f"h-{symbol}-{i}", 100_000),
         )
         for i, d in enumerate(range(5, 365, 30))
     ]
@@ -87,7 +94,7 @@ def _generate_mentions(symbol: str) -> list[MentionCount]:
             symbol=symbol,
             date=date.today() - timedelta(days=d),
             source="reddit",
-            count=10 + hash(f"m-{symbol}-{d}") % 200,
+            count=10 + _det(f"m-{symbol}-{d}", 200),
         )
         for d in range(30)
     ]

@@ -166,7 +166,9 @@ def normalize_eodhd_bars(raw: bytes | str, symbol: str) -> list[Bar] | None:
     return bars if bars else None
 
 
-def normalize_eodhd_fundamentals(raw: bytes | str, symbol: str) -> FundamentalsSnapshot | None:
+def normalize_eodhd_fundamentals(
+    raw: bytes | str, symbol: str, today: date | None = None
+) -> FundamentalsSnapshot | None:
     try:
         data = json.loads(raw)
     except (json.JSONDecodeError, ValueError, TypeError) as exc:
@@ -180,11 +182,14 @@ def normalize_eodhd_fundamentals(raw: bytes | str, symbol: str) -> FundamentalsS
     highlights = data.get("Highlights", {}) or {}
 
     as_of_str = general.get("LastUpdated") or general.get("Date")
-    as_of_date = date.today()
     if as_of_str:
         parsed = _parse_date(as_of_str)
         if parsed is not None:
             as_of_date = parsed
+        else:
+            return None
+    else:
+        return None
 
     financials = data.get("Financials", {}) or {}
     balance = financials.get("Balance_Sheet", {}).get("quarterly", {}) or {}
@@ -386,12 +391,12 @@ def _row_to_transaction(cells: list) -> InsiderTransaction | None:
     date_text = _cell_text(cells, 8)
     tx_date = _parse_date(date_text)
 
-    if not ticker or qty is None:
+    if not ticker or qty is None or tx_date is None:
         return None
 
     return InsiderTransaction(
         symbol=ticker,
-        filing_date=tx_date or date.today(),
+        filing_date=tx_date,
         transaction_date=tx_date,
         owner=owner or "Unknown",
         title=title,
@@ -428,7 +433,7 @@ def normalize_openinsider_html(raw: bytes | str) -> list[InsiderTransaction] | N
 
 
 def normalize_reddit_mentions(
-    raw: bytes | str, symbols: list[str], subreddit: str = "reddit"
+    raw: bytes | str, symbols: list[str], subreddit: str = "reddit", today: date | None = None
 ) -> list[MentionCount] | None:
     try:
         data = json.loads(raw)
@@ -459,7 +464,8 @@ def normalize_reddit_mentions(
             if matches:
                 counts[sym] += len(matches)
 
-    today = date.today()
+    if today is None:
+        return None
     results = [
         MentionCount(symbol=sym, date=today, source=subreddit, count=count)
         for sym, count in counts.items()
