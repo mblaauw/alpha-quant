@@ -8,8 +8,9 @@ Deterministic, daily-cadence, long-only equity trading system
 
 [![CI](https://github.com/mblaauw/alpha-quant/actions/workflows/ci.yml/badge.svg)](https://github.com/mblaauw/alpha-quant/actions)
 [![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://python.org)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![ty checked](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ty/main/assets/badge/v0.json)](https://github.com/astral-sh/ty)
 [![Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 </div>
 

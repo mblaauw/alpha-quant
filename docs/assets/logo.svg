@@ -1,57 +1,92 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 120" fill="none">
   <defs>
-    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#1a2332"/>
-      <stop offset="100%" stop-color="#2d3a4a"/>
+      <stop offset="100%" stop-color="#0d1117"/>
     </linearGradient>
-    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#c9a84c"/>
-      <stop offset="100%" stop-color="#a88a3a"/>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0d060"/>
+      <stop offset="50%" stop-color="#c9a84c"/>
+      <stop offset="100%" stop-color="#a08030"/>
     </linearGradient>
+    <linearGradient id="goldGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0d060" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#c9a84c" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#46ebe1"/>
+      <stop offset="100%" stop-color="#2a9d8f"/>
+    </linearGradient>
+    <linearGradient id="gridLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#c9a84c" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#c9a84c" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#c9a84c" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glowStrong">
+      <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
 
   <!-- Background -->
-  <rect width="480" height="120" rx="12" fill="#0f1419"/>
+  <rect width="480" height="120" rx="12" fill="url(#g1)"/>
 
-  <!-- Alpha symbol (α) - geometric -->
-  <g transform="translate(28, 20)">
-    <!-- Alpha strokes -->
-    <path d="M 35 80 C 35 80 20 55 20 40 C 20 22 32 10 48 10 C 64 10 76 22 76 40 C 76 58 64 70 50 75 L 25 85"
-          stroke="url(#g2)" stroke-width="6" stroke-linecap="round" fill="none"/>
-    <path d="M 50 75 L 72 85" stroke="url(#g2)" stroke-width="6" stroke-linecap="round"/>
+  <!-- Grid lines -->
+  <line x1="0" y1="30" x2="480" y2="30" stroke="url(#gridLine)" stroke-width="0.5"/>
+  <line x1="0" y1="60" x2="480" y2="60" stroke="url(#gridLine)" stroke-width="0.5"/>
+  <line x1="0" y1="90" x2="480" y2="90" stroke="url(#gridLine)" stroke-width="0.5"/>
+  <line x1="115" y1="0" x2="115" y2="120" stroke="url(#gridLine)" stroke-width="0.5"/>
+
+  <!-- === LOGO MARK: Alpha Symbol === -->
+
+  <!-- Outer glow circle -->
+  <circle cx="58" cy="60" r="42" fill="none" stroke="url(#gold)" stroke-width="1.5" opacity="0.3" filter="url(#glowStrong)"/>
+
+  <!-- Inner circle -->
+  <circle cx="58" cy="60" r="38" fill="none" stroke="url(#gold)" stroke-width="2" opacity="0.6"/>
+
+  <!-- Alpha symbol (α) - geometric, inside circle -->
+  <g transform="translate(58, 60)" filter="url(#glow)">
+    <!-- Left arc of alpha -->
+    <path d="M -2 -22 C -14 -22 -22 -12 -22 0 C -22 12 -14 22 0 22 C 14 22 22 12 22 0 C 22 -8 17 -15 10 -18 L -18 -26"
+          stroke="url(#gold)" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <!-- Right tail of alpha -->
+    <path d="M 10 -18 L 20 -26" stroke="url(#gold)" stroke-width="4" stroke-linecap="round"/>
+    <!-- Horizontal bar -->
+    <line x1="-4" y1="-2" x2="18" y2="-2" stroke="url(#teal)" stroke-width="2.5" stroke-linecap="round" opacity="0.8"/>
   </g>
 
-  <!-- Candlestick pattern (subtle) -->
-  <g transform="translate(115, 30)" opacity="0.25">
-    <line x1="0" y1="15" x2="0" y2="65" stroke="#c9a84c" stroke-width="1.5"/>
-    <rect x="-3" y="25" width="6" height="20" fill="#c9a84c" rx="1"/>
-    <line x1="18" y1="10" x2="18" y2="70" stroke="#c9a84c" stroke-width="1.5"/>
-    <rect x="15" y="20" width="6" height="25" fill="#c9a84c" rx="1"/>
-    <line x1="36" y1="5" x2="36" y2="75" stroke="#c9a84c" stroke-width="1.5"/>
-    <rect x="33" y="15" width="6" height="30" fill="#c9a84c" rx="1"/>
-    <line x1="54" y1="12" x2="54" y2="68" stroke="#c9a84c" stroke-width="1.5"/>
-    <rect x="51" y="22" width="6" height="22" fill="#c9a84c" rx="1"/>
-    <line x1="72" y1="8" x2="72" y2="72" stroke="#c9a84c" stroke-width="1.5"/>
-    <rect x="69" y="18" width="6" height="28" fill="#c9a84c" rx="1"/>
-    <line x1="90" y1="18" x2="90" y2="62" stroke="#c9a84c" stroke-width="1.5"/>
-    <rect x="87" y="28" width="6" height="18" fill="#c9a84c" rx="1"/>
-    <line x1="108" y1="14" x2="108" y2="66" stroke="#c9a84c" stroke-width="1.5"/>
-    <rect x="105" y="24" width="6" height="24" fill="#c9a84c" rx="1"/>
-    <line x1="126" y1="20" x2="126" y2="60" stroke="#c9a84c" stroke-width="1.5"/>
-    <rect x="123" y="30" width="6" height="15" fill="#c9a84c" rx="1"/>
-    <line x1="144" y1="25" x2="144" y2="55" stroke="#c9a84c" stroke-width="1.5"/>
-    <rect x="141" y="35" width="6" height="10" fill="#c9a84c" rx="1"/>
-    <line x1="162" y1="22" x2="162" y2="58" stroke="#c9a84c" stroke-width="1.5"/>
-    <rect x="159" y="32" width="6" height="16" fill="#c9a84c" rx="1"/>
-  </g>
+  <!-- Small decorative dots -->
+  <circle cx="42" cy="42" r="1.5" fill="#c9a84c" opacity="0.5"/>
+  <circle cx="74" cy="78" r="1.5" fill="#46ebe1" opacity="0.5"/>
 
-  <!-- Text -->
-  <text x="145" y="72" font-family="'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="38" font-weight="600" fill="#e8e8e8" letter-spacing="3">
-    <tspan fill="#e8e8e8">ALPHA</tspan><tspan fill="#c9a84c">Q</tspan><tspan fill="#e8e8e8">UANT</tspan>
+  <!-- === TEXT === -->
+
+  <!-- ALPHAQUANT main title -->
+  <text font-family="'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="38" font-weight="700" letter-spacing="3" fill="#e8e8e8">
+    <tspan x="130" y="62">ALPHA</tspan>
+  </text>
+  <text font-family="'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="38" font-weight="700" letter-spacing="3">
+    <tspan x="300" y="62" fill="url(#gold)">Q</tspan><tspan fill="#e8e8e8">UANT</tspan>
   </text>
 
   <!-- Tagline -->
-  <text x="145" y="98" font-family="'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#7a8a9a" letter-spacing="4">
-    DETERMINISTIC · DAILY · LONG-ONLY
+  <text x="130" y="90" font-family="'SF Mono', SFMono-Regular, 'SF Pro Display', -apple-system, monospace" font-size="11" font-weight="400" fill="#7a8a9a" letter-spacing="5">
+    DETERMINISTIC  ·  DAILY  ·  LONG-ONLY
   </text>
+
+  <!-- Version badge -->
+  <rect x="130" y="97" width="52" height="16" rx="3" fill="#1a2332" stroke="#c9a84c" stroke-width="0.8" opacity="0.7"/>
+  <text x="133" y="108" font-family="'SF Mono', monospace" font-size="9" fill="#c9a84c" opacity="0.8">v0.1.0</text>
 </svg>
