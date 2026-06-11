@@ -1,0 +1,34 @@
+{
+  "meta": {
+    "command": "replay",
+    "config_hash": "2bea91dc5ad08618",
+    "fixture_path": null,
+    "from_date": "2024-01-01",
+    "to_date": "2024-01-31"
+  },
+  "pipeline": {
+    "completed": 9,
+    "stages": [
+      "ingest",
+      "validate",
+      "derive",
+      "regime",
+      "risk",
+      "decide",
+      "simulate",
+      "persist",
+      "narrate"
+    ],
+    "status": "golden_pass"
+  },
+  "symbols": {
+    "benchmarks": 2,
+    "primary": 50,
+    "total": 52
+  },
+  "system": {
+    "config_version": "2bea91dc5ad08618",
+    "platform": "deterministic",
+    "python": "3.14"
+  }
+}
