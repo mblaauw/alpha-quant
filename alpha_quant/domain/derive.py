@@ -99,19 +99,10 @@ def update_indicator_state(state: IndicatorState, bar: Bar) -> IndicatorState:
         atr = src["atr"]
 
     v: dict[str, float] = {
-        "ema12": e12,
-        "ema20": e20,
-        "ema26": e26,
-        "ema50": e50,
-        "ema200": e200,
-        "macd_line": m_line,
-        "macd_signal": m_sig,
-        "macd_histogram": m_hist,
-        "rsi_avg_gain": ra_g,
-        "rsi_avg_loss": ra_l,
-        "rsi": rsi,
-        "atr": atr,
-        "prev_close": price,
+        "ema12": e12, "ema20": e20, "ema26": e26, "ema50": e50, "ema200": e200,
+        "macd_line": m_line, "macd_signal": m_sig, "macd_histogram": m_hist,
+        "rsi_avg_gain": ra_g, "rsi_avg_loss": ra_l, "rsi": rsi,
+        "atr": atr, "prev_close": price,
     }
 
     return IndicatorState(symbol=state.symbol, date=bar.date, values=v)
