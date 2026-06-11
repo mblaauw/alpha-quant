@@ -159,6 +159,16 @@ class Decision(BaseModel):
     reasons: list[str] = []
 
 
+class TickerRecord(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    ticker: str
+    cik: str
+    name: str
+    exchange: str | None = None
+    sic_code: int | None = None
+
+
 class IndicatorState(BaseModel):
     model_config = ConfigDict(frozen=True)
 
