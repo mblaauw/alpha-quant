@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 from statistics import mean, stdev
+from typing import override
 
 import pyarrow.parquet as pq
 
@@ -14,6 +15,7 @@ class FixtureSentimentFeed(SentimentFeed):
     def __init__(self, fixture_path: Path) -> None:
         self._mentions_dir = fixture_path / "mentions"
 
+    @override
     def mention_counts(self, symbol: str, days: int = 30) -> list[MentionCount]:
         path = self._mentions_dir / f"{symbol}.parquet"
         if not path.exists():
@@ -32,6 +34,7 @@ class FixtureSentimentFeed(SentimentFeed):
             )
         return counts
 
+    @override
     def baseline(self, symbol: str) -> SentimentBaseline:
         counts = self.mention_counts(symbol)
         values = [c.count for c in counts]

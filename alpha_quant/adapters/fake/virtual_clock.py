@@ -1,4 +1,5 @@
 from datetime import UTC, date, datetime, timedelta
+from typing import override
 
 from alpha_quant.app.calendar import is_market_day
 from alpha_quant.ports.clock import Clock
@@ -8,12 +9,15 @@ class VirtualClock(Clock):
     def __init__(self, start_date: date) -> None:
         self._current = datetime(start_date.year, start_date.month, start_date.day, tzinfo=UTC)
 
+    @override
     def now(self) -> datetime:
         return self._current
 
+    @override
     def today(self) -> date:
         return self._current.date()
 
+    @override
     def market_date(self) -> date:
         return self._current.date()
 

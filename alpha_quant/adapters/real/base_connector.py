@@ -94,10 +94,20 @@ class BaseConnector:
         response = self._do_request(url, params)
         latency = time.monotonic() - start
 
+        # Strip sensitive query params before logging
+        safe_url = url.split("?")[0] if "?" in url else url
+        safe_params = None
+        if params:
+            sensitive_keys = {"api_token", "apikey", "api_key", "secret", "token", "key"}
+            safe_params = {
+                k: ("***" if k.lower() in sensitive_keys else v) for k, v in params.items()
+            }
+
         logger.debug(
             "http_fetch",
             source=self._source_name,
-            url=url,
+            url=safe_url,
+            params=safe_params,
             status=response.status_code,
             latency_ms=round(latency * 1000),
             byte_size=len(response.content),

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import override
 
 from alpha_quant.domain.events import DomainEvent
 from alpha_quant.ports.event_sink import EventSink
@@ -8,9 +9,11 @@ class FakeEventSink(EventSink):
     def __init__(self) -> None:
         self.events: list[DomainEvent] = []
 
+    @override
     def emit(self, event: DomainEvent) -> None:
         self.events.append(event)
 
+    @override
     def query(
         self,
         run_id: str | None = None,

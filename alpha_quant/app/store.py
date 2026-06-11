@@ -5,7 +5,7 @@ import shutil
 import uuid
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import duckdb
 import pyarrow as pa
@@ -81,48 +81,50 @@ def _model_to_pylist(
     models: list[Any],
     model_name: str,
 ) -> list[dict[str, Any]]:
-    if model_name == "bars":
-        return [
-            {
-                "symbol": m.symbol,
-                _BAR_DATE_COL: m.date,
-                "open": m.open,
-                "high": m.high,
-                "low": m.low,
-                "close": m.close,
-                "volume": m.volume,
-                "adj_close": m.adj_close,
-            }
-            for m in models
-        ]
-    if model_name == "fundamentals":
-        return [m.model_dump() for m in models] if models else []
-    if model_name == "insider_transactions":
-        return [
-            {
-                "symbol": m.symbol,
-                "filing_date": m.filing_date,
-                "transaction_date": m.transaction_date,
-                "owner": m.owner,
-                "title": m.title,
-                "transaction_type": m.transaction_type,
-                "shares_traded": m.shares_traded,
-                "price": m.price,
-                "shares_held": m.shares_held,
-            }
-            for m in models
-        ]
-    if model_name == "mentions":
-        return [
-            {
-                "symbol": m.symbol,
-                "mention_date": m.date,
-                "source": m.source,
-                "count": m.count,
-            }
-            for m in models
-        ]
-    return [m.model_dump() for m in models]
+    match model_name:
+        case "bars":
+            return [
+                {
+                    "symbol": m.symbol,
+                    _BAR_DATE_COL: m.date,
+                    "open": m.open,
+                    "high": m.high,
+                    "low": m.low,
+                    "close": m.close,
+                    "volume": m.volume,
+                    "adj_close": m.adj_close,
+                }
+                for m in models
+            ]
+        case "fundamentals":
+            return [m.model_dump() for m in models] if models else []
+        case "insider_transactions":
+            return [
+                {
+                    "symbol": m.symbol,
+                    "filing_date": m.filing_date,
+                    "transaction_date": m.transaction_date,
+                    "owner": m.owner,
+                    "title": m.title,
+                    "transaction_type": m.transaction_type,
+                    "shares_traded": m.shares_traded,
+                    "price": m.price,
+                    "shares_held": m.shares_held,
+                }
+                for m in models
+            ]
+        case "mentions":
+            return [
+                {
+                    "symbol": m.symbol,
+                    "mention_date": m.date,
+                    "source": m.source,
+                    "count": m.count,
+                }
+                for m in models
+            ]
+        case _:
+            return [m.model_dump() for m in models]
 
 
 def _partition_col(model_name: str) -> str:
@@ -247,9 +249,11 @@ class CanonicalStore(Store):
 
     # --- Port interface (Store) ---
 
+    @override
     def save_bars(self, symbol: str, bars: list[Bar]) -> None:
         self.write_bars(bars)
 
+    @override
     def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
         return self.read_bars(symbol, start, end)
 
@@ -412,6 +416,7 @@ class CanonicalStore(Store):
         )
         conn.commit()
 
+    @override
     def save_decision(self, decision: Decision) -> None:
         self._state_conn.execute(
             "INSERT OR REPLACE INTO decisions"
@@ -435,6 +440,7 @@ class CanonicalStore(Store):
         )
         self._state_conn.commit()
 
+    @override
     def load_decisions(self, symbol: str, since: date) -> list[Decision]:
         rows = self._state_conn.execute(
             "SELECT decision_id, run_id, symbol, decision_date, action, confidence, reasons,"
@@ -461,6 +467,7 @@ class CanonicalStore(Store):
             for r in rows
         ]
 
+    @override
     def save_order(self, order: Order) -> None:
         self._state_conn.execute(
             "INSERT OR REPLACE INTO orders"
@@ -483,6 +490,7 @@ class CanonicalStore(Store):
         )
         self._state_conn.commit()
 
+    @override
     def load_order(self, order_id: str) -> Order | None:
         row = self._state_conn.execute(
             "SELECT order_id, symbol, action, quantity, order_type, limit_price, status,"
@@ -506,6 +514,7 @@ class CanonicalStore(Store):
             avg_fill_price=row[10],
         )
 
+    @override
     def save_fill(self, fill: Fill) -> None:
         self._state_conn.execute(
             "INSERT OR REPLACE INTO fills"
@@ -522,6 +531,7 @@ class CanonicalStore(Store):
         )
         self._state_conn.commit()
 
+    @override
     def load_fills(self, order_id: str) -> list[Fill]:
         rows = self._state_conn.execute(
             "SELECT fill_id, order_id, symbol, quantity, price, filled_at"
@@ -540,6 +550,7 @@ class CanonicalStore(Store):
             for r in rows
         ]
 
+    @override
     def save_position(self, position: Position) -> None:
         self._state_conn.execute(
             "INSERT OR REPLACE INTO positions"
@@ -563,6 +574,7 @@ class CanonicalStore(Store):
         )
         self._state_conn.commit()
 
+    @override
     def load_positions(self) -> list[Position]:
         cols = (
             "symbol, quantity, entry_price, avg_cost, current_price, stop_price, trail_price,"
@@ -587,6 +599,7 @@ class CanonicalStore(Store):
             for r in rows
         ]
 
+    @override
     def save_event(self, event: DomainEvent) -> None:
         payload = event.model_dump(mode="json")
         self._state_conn.execute(
@@ -603,6 +616,7 @@ class CanonicalStore(Store):
         )
         self._state_conn.commit()
 
+    @override
     def load_events(
         self,
         event_type: str | None = None,
@@ -631,6 +645,7 @@ class CanonicalStore(Store):
             results.append(DomainEventType.model_validate(payload))
         return results
 
+    @override
     def save_indicator_state(self, state: IndicatorState) -> None:
         self._state_conn.execute(
             "INSERT OR REPLACE INTO indicator_state (symbol, state_date, values) VALUES (?, ?, ?)",
@@ -638,6 +653,7 @@ class CanonicalStore(Store):
         )
         self._state_conn.commit()
 
+    @override
     def load_indicator_state(self, symbol: str, dt: date) -> IndicatorState | None:
         row = self._state_conn.execute(
             "SELECT symbol, state_date, values"

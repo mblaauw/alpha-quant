@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
+from typing import override
 
 import pyarrow.parquet as pq
 
@@ -14,6 +15,7 @@ class FixtureFundamentals(Fundamentals):
         self._fundamentals_dir = fixture_path / "fundamentals"
         self._earnings_dir = fixture_path / "earnings"
 
+    @override
     def snapshot(self, symbol: str) -> FundamentalsSnapshot:
         path = self._fundamentals_dir / f"{symbol}.parquet"
         if not path.exists():
@@ -41,6 +43,7 @@ class FixtureFundamentals(Fundamentals):
             industry=row.get("industry"),
         )
 
+    @override
     def earnings_calendar(self, start: date, end: date) -> list[EarningsEntry]:
         if not self._earnings_dir.exists():
             return []

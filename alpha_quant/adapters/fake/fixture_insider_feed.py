@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
+from typing import override
 
 import pyarrow.parquet as pq
 
@@ -13,6 +14,7 @@ class FixtureInsiderFeed(InsiderFeed):
     def __init__(self, fixture_path: Path) -> None:
         self._insider_dir = fixture_path / "insider_tx"
 
+    @override
     def cluster_transactions(self, symbol: str) -> list[InsiderTransaction]:
         path = self._insider_dir / f"{symbol}.parquet"
         if not path.exists():
@@ -46,6 +48,7 @@ class FixtureInsiderFeed(InsiderFeed):
             )
         return transactions
 
+    @override
     def recent_clusters(self, symbol: str) -> list[InsiderCluster]:
         _ = symbol
         return []
