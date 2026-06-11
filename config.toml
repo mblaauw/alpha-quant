@@ -64,6 +64,12 @@ api_key = ""
 secret_key = ""
 base_url = "https://data.alpaca.markets"
 
+[connector]
+user_agent = "AlphaQuant/0.1.0 (research project; contact m@mblaauw.dev)"
+tokens_per_second = 10.0
+max_burst = 20.0
+default_timeout_s = 30.0
+
 [dashboard]
 host = "localhost"
 port = 8501

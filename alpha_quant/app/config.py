@@ -174,6 +174,13 @@ class AlpacaConfig(BaseModel):
     base_url: str = "https://data.alpaca.markets"
 
 
+class ConnectorConfig(BaseModel):
+    user_agent: str = "AlphaQuant/0.1.0 (research project; contact m@mblaauw.dev)"
+    tokens_per_second: float = 10.0
+    max_burst: float = 20.0
+    default_timeout_s: float = 30.0
+
+
 class DashboardConfig(BaseModel):
     host: str = "localhost"
     port: int = 8501
@@ -210,6 +217,7 @@ class AppConfig(BaseSettings):
     shadow: ShadowConfig
     llm: LLMConfig
     education: EducationConfig
+    connector: ConnectorConfig
     eodhd: EODHDConfig
     alpaca: AlpacaConfig
     dashboard: DashboardConfig

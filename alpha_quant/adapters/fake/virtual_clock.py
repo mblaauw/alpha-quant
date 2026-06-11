@@ -6,9 +6,7 @@ from alpha_quant.ports.clock import Clock
 
 class VirtualClock(Clock):
     def __init__(self, start_date: date) -> None:
-        self._current = datetime(
-            start_date.year, start_date.month, start_date.day, tzinfo=UTC
-        )
+        self._current = datetime(start_date.year, start_date.month, start_date.day, tzinfo=UTC)
 
     def now(self) -> datetime:
         return self._current
