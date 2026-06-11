@@ -178,41 +178,90 @@ class CanonicalStore(Store):
         new_table = pa.Table.from_pylist(pylist, schema=self._schema(dataset))
 
         pcol = _partition_col(dataset)
-        existing_pattern = str(data_path / "**" / "*.parquet")
+        dedup_key = _dedup_keys(dataset)
+        hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
+
+        # Find affected partition dates from new data
+        new_dates = sorted(set(new_table.column(pcol).to_pylist()))
+        if not new_dates:
+            return
+
+        min_date, max_date = min(new_dates), max(new_dates)
+
+        # Find existing partition directories that overlap with new data
+        affected_partitions: list[Path] = []
+        for p_dir in data_path.iterdir():
+            if not p_dir.is_dir() or not p_dir.name.startswith(f"{pcol}="):
+                continue
+            try:
+                dt = date.fromisoformat(p_dir.name.split("=", 1)[1])
+                if min_date <= dt <= max_date:
+                    affected_partitions.append(p_dir)
+            except ValueError, IndexError:
+                continue
 
         self._analytical.register("_new_data", new_table)
 
-        dedup_key = _dedup_keys(dataset)
-        hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
-        read_parquet = f"read_parquet('{existing_pattern}', hive_partitioning=true, {hive_spec})"
+        if not affected_partitions:
+            # First write or no overlap with existing: write directly
+            copy_opts = (
+                f"FORMAT PARQUET, PER_THREAD_OUTPUT 1, PARTITION_BY {pcol}, COMPRESSION ZSTD"
+            )
+            self._analytical.execute(f"""
+                COPY _new_data TO '{data_path}' ({copy_opts})
+            """)
+        else:
+            # Read only affected partitions, merge with new data, write back
+            file_patterns = [str(p / "*.parquet") for p in affected_partitions]
+            read_parquet = (
+                f"read_parquet([{', '.join(repr(f) for f in file_patterns)}],"
+                f" hive_partitioning=true, {hive_spec})"
+            )
 
-        self._analytical.execute(f"""
-            CREATE OR REPLACE TABLE _merged AS
-            SELECT DISTINCT ON ({dedup_key}) *
-            FROM (
-                SELECT * FROM {read_parquet}
-                UNION ALL
-                SELECT * FROM _new_data
-            ) sub
-            ORDER BY {dedup_key} DESC
-        """)
+            self._analytical.execute(f"""
+                CREATE OR REPLACE TABLE _merged AS
+                SELECT DISTINCT ON ({dedup_key}) *
+                FROM (
+                    SELECT * FROM {read_parquet}
+                    UNION ALL
+                    SELECT * FROM _new_data
+                ) sub
+                ORDER BY {dedup_key} DESC
+            """)
 
-        shutil.rmtree(data_path, ignore_errors=True)
-        data_path.mkdir(parents=True, exist_ok=True)
+            # Write merged data to a temp location first
+            tmp_path = data_path.parent / f".tmp_{dataset}_{uuid.uuid4().hex[:8]}"
+            tmp_path.mkdir(parents=True, exist_ok=True)
 
-        copy_opts = f"FORMAT PARQUET, PER_THREAD_OUTPUT 1, PARTITION_BY {pcol}, COMPRESSION ZSTD"
-        self._analytical.execute(f"""
-            COPY (SELECT * FROM _merged ORDER BY {dedup_key})
-            TO '{data_path}' ({copy_opts})
-        """)
+            copy_opts = (
+                f"FORMAT PARQUET, PER_THREAD_OUTPUT 1, PARTITION_BY {pcol}, COMPRESSION ZSTD"
+            )
+            self._analytical.execute(f"""
+                COPY (SELECT * FROM _merged ORDER BY {dedup_key})
+                TO '{tmp_path}' ({copy_opts})
+            """)
 
-        self._analytical.execute("DROP TABLE IF EXISTS _merged")
+            self._analytical.execute("DROP TABLE IF EXISTS _merged")
+
+            # Remove affected partitions from final location
+            for p_dir in affected_partitions:
+                shutil.rmtree(p_dir, ignore_errors=True)
+
+            # Move merged partitions from temp to final
+            for p_dir in tmp_path.iterdir():
+                if p_dir.is_dir():
+                    shutil.move(str(p_dir), str(data_path / p_dir.name))
+
+            # Clean up temp directory
+            shutil.rmtree(tmp_path, ignore_errors=True)
+
         self._analytical.unregister("_new_data")
 
         logger.debug(
             "store_write",
             dataset=dataset,
             count=len(models),
+            partitions=len(affected_partitions),
         )
 
     def _schema(self, dataset: str) -> pa.Schema:
