@@ -31,39 +31,66 @@ Three execution realities, one domain core, one fill model:
 
 ```
 alpha_quant/
-├── domain/
-│   ├── universe.py  regime.py  signals.py  quality.py
-│   ├── insider.py   crowding.py  earnings_blackout.py  ranking.py
-│   ├── sizing.py    risk.py
-│   ├── fills.py                  # THE fill model — backtest, replay, paper, shadows
-│   ├── models.py                 # Candidate, Position, Order, Decision (frozen)
-│   └── domain_events.py
-├── ports/
-│   ├── clock.py                  # nothing reads the OS clock directly
+├── domain/                      # pure functions, no I/O (§1 rationale)
+│   ├── __init__.py              # re-exports models + events
+│   ├── models.py                # all pydantic data models (frozen)
+│   ├── events.py                # 21 discriminated domain event types
+│   ├── normalize.py             # boundary parsing: bytes → pydantic models
+│   ├── validate.py              # quality gates → QUARANTINE/DATA_HALT
+│   ├── derive.py                # incremental O(1) indicator engine (numpy)
+│   ├── universe.py              # M1 universe selection
+│   └── exceptions.py            # AlphaQuantError, DataNormalizationError
+├── ports/                       # ABC interfaces for all external dependencies
+│   ├── clock.py                 # nothing reads the OS clock directly
 │   ├── market_data.py  fundamentals.py  insider_feed.py  sentiment_feed.py
 │   ├── llm.py  store.py  event_sink.py
-│   └── broker.py                 # designed, NOT implemented in v1 (§9.4)
-├── data/                         # the data layer subsystem (§3)
-│   ├── connectors/   eodhd.py  alpaca_data.py  sec_tickers.py
-│   │                 openinsider.py  reddit_public.py
-│   ├── vault.py                  # raw payload archive (append-only, zstd)
-│   ├── normalize.py              # pydantic models + parsers
-│   ├── canonical.py              # parquet/DuckDB bars + SQLite state writers
-│   ├── derive.py                 # incremental indicator engine
-│   ├── validate.py               # quality gates → DATA_HALT
-│   └── catalog.py                # dataset/fixture versions, manifests
+│   └── broker.py                # designed, NOT implemented in v1 (§9.4)
 ├── adapters/
-│   ├── real/    llm_openai_compat.py  sqlite_store.py  system_clock.py
-│   └── fake/    fixture_* (one per connector)  canned_llm.py  virtual_clock.py
-├── app/
-│   ├── pipeline.py  paper.py  shadow.py  replay.py  backtest.py
-│   ├── narrator.py  reports.py
-├── fixtures/                     # versioned bootstrap dataset (§3.7)
-├── config.toml
-└── cli.py  # run|replay|backtest|bootstrap|journal|ask|report|status|halt
+│   ├── real/                    # production implementations
+│   │   ├── clock.py             # SystemClock — wraps datetime.now(UTC)
+│   │   ├── base_connector.py    # shared HTTP: httpx, tenacity retry, token-bucket, vault
+│   │   ├── token_bucket.py      # thread-safe rate limiter
+│   │   ├── event_sink.py        # SqliteEventSink
+│   │   ├── eodhd_connector.py   # EODHD: bars, fundamentals, earnings
+│   │   ├── alpaca_connector.py  # Alpaca Data API: quotes, calendar, latest bar
+│   │   ├── sec_connector.py     # SEC EDGAR: ticker → CIK mapping
+│   │   ├── openinsider_connector.py  # OpenInsider HTML scraping
+│   │   └── reddit_sentiment_connector.py  # Reddit public JSON
+│   └── fake/                    # test/fixture implementations
+│       ├── virtual_clock.py     # deterministic clock for replay/backtest
+│       ├── fake_event_sink.py   # in-memory event store
+│       ├── canned_llm.py        # static template responses
+│       ├── fixture_market_data.py    # bars from fixture parquet
+│       ├── fixture_fundamentals.py   # snapshots from fixture data
+│       ├── fixture_insider_feed.py   # insider data from fixture
+│       ├── fixture_sentiment_feed.py # mention counts from fixture
+│       └── fixture_store.py         # in-memory store for test isolation
+├── app/                         # application wiring + infrastructure
+│   ├── config.py                # pydantic-settings + TOML loading
+│   ├── store.py                 # CanonicalStore: DuckDB (parquet + state)
+│   ├── vault.py                 # append-only zstd-compressed raw payload archive
+│   ├── bootstrap.py             # fixture generation (deterministic)
+│   ├── fixtures.py              # freeze_bundle: parquet + manifest writer
+│   ├── catalog.py               # fixture integrity verification
+│   ├── calendar.py              # NYSE market calendar
+│   ├── replay.py                # golden replay harness (stub — #97)
+│   └── cli.py                   # run|replay|backtest|bootstrap|journal|ask|report|status|halt
+├── tests/                       # test suite
+│   ├── unit/                    # unit tests (pure domain functions)
+│   └── integration/             # integration tests (adapter contracts)
+├── fixtures/                    # versioned bootstrap dataset (§3.7)
+│   └── golden/                  # golden replay outputs for CI
+├── docs/
+│   ├── adr/                     # architecture decision records
+│   ├── architecture/            # C4 diagrams (LikeC4 DSL)
+│   └── spike-*.md               # evaluation spike reports
+├── config.toml                  # config template (secrets in config.local.toml)
+└── config.local.toml.example    # local override template
 ```
 
-**Rules:** `domain/` imports nothing from `adapters/` or `data/`. Every connector has a fixture-backed fake twin on the same port. The pipeline never knows which reality it runs in.
+**Rationale for domain/ layout:** `normalize.py`, `validate.py`, and `derive.py` live in `domain/` because they are pure functions with no I/O — they take data and return data. Normalization is boundary parsing (HTTP response bytes → pydantic models), but the parsing itself has no adapter dependency. This keeps the domain core complete (all data transformations are together) while ports and adapters remain separate in their own layers.
+
+**Rules:** `domain/` imports nothing from `adapters/`. Every connector has a fixture-backed fake twin on the same port. The pipeline never knows which reality it runs in.
 
 ---
 
@@ -133,15 +160,15 @@ Parameter budget unchanged: **max 3 tunable parameters**, walk-forward only.
 ┌──────────┐   fetch   ┌─────────────┐ parse ┌──────────────────┐ derive ┌──────────────────┐
 │ EODHD    │──────────▶│ append-only │──────▶│ bars/      parquet│──────▶│ indicator_state  │
 │ Alpaca   │  httpx +  │ zstd blobs  │ pydan-│  (DuckDB queries) │ numpy │ month_end_closes │
-│ SEC      │  tenacity │ + manifest  │ tic   │ state/     SQLite │ O(1)  │ regime_state     │
-│ OpenIns. │  + rate   │ (content-   │ models│  (WAL, transact.) │ incr. │ mention_baseline │
-│ Reddit   │  limiter  │  addressed) │       │                   │       │ (all in SQLite)  │
+│ SEC      │  tenacity │ + manifest  │ tic   │ state/     DuckDB │ O(1)  │ regime_state     │
+│ OpenIns. │  + rate   │ (content-   │ models│  (per-conn.  tx)  │ incr. │ mention_baseline │
+│ Reddit   │  limiter  │  addressed) │       │                   │       │ (DuckDB)         │
 └──────────┘           └─────────────┘       └──────────────────┘       └────────┬─────────┘
                                                                                   │
                                                               ACCESS: ports (MarketData,
                                                               Fundamentals, …) backed by
-                                                              DuckDB views + SQLite reads —
-                                                              domain code sees ports only
+                                                              DuckDB views — domain code
+                                                              sees ports only
 ```
 
 Properties: re-parseable forever (vault keeps every raw byte), reproducible (everything downstream is a deterministic function of the vault), prunable (raw bars trimmed to the 50-day tail without losing derived capability), and swappable (fixture adapters plug in at the ACCESS layer for replay/CI).
@@ -170,7 +197,9 @@ vault/{source}/{yyyy}/{mm}/{dd}/{fetch_id}.zst     + vault/manifest.duckdb
 
 `fetch_id = sha256(source|endpoint|params|ingest_ts)[:16]`; manifest rows record source, endpoint, params, ingest_ts, content hash, byte size. **Nothing is ever deleted or rewritten.** Cost is trivial (daily JSON/HTML for ~1k symbols compresses to a few MB/day). Payoff: any parser bug, schema change, or new mechanism can be replayed against history you already own — this is what makes the immutability contract real rather than aspirational.
 
-### 3.4 Zone 3 — Canonical store (split by access pattern)
+### 3.4 Zone 3 — Canonical store (DuckDB for both access patterns)
+
+Per ADR-0021 (supersedes ADR-0007), Alpha-Quant uses **DuckDB for both analytical and transactional access** — no SQLAlchemy Core or separate SQLite.
 
 **Analytical data → Parquet, queried by DuckDB.** Daily bars, fundamentals snapshots, insider transactions, mention counts: columnar, scan-heavy, append-mostly.
 
@@ -183,9 +212,15 @@ canonical/mentions/date=.../
 
 Date partitioning makes the 50-day tail prune a directory delete and makes as-of queries natural. DuckDB reads parquet globs directly with zero server footprint — and you already know this stack cold from the postgres-connector pipeline (PostgreSQL→DuckDB→Parquet); same pattern, new domain.
 
-**Transactional state → SQLite (WAL mode).** Decisions, orders, fills, positions, equity curves, events, concept_log, indicator_state, catalog. Single-writer, ACID, one file to back up. Accessed via SQLAlchemy **Core** (no ORM — explicit SQL, typed rows).
+**Transactional state → DuckDB (direct).** Decisions, orders, fills, positions, equity curves, events, concept_log, indicator_state, catalog. Single-writer, ACID via DuckDB's per-connection transactions. DuckDB's SQLite scanner bridges to `.db` files for state tables.
 
-Why both: parquet/DuckDB for "scan a column across all symbols", SQLite for "atomically record this decision and fill". Forcing one store to do both jobs is how trading systems corrupt themselves. Migration path: SQLite→Postgres and local parquet→MinIO/S3 are both behind the `store` port and DuckDB's path config — non-events later.
+While splitting analytical and transactional stores is generally prudent, DuckDB is safe for both because:
+- The pipeline is single-writer (no concurrent write access)
+- DuckDB provides snapshot isolation per connection
+- State tables use DuckDB's SQLite scanner for ACID row-level operations
+- The `Store` port abstracts storage — migrating to PostgreSQL later requires only a new adapter (per ADR-0021)
+
+Migration path: local Parquet → MinIO/S3 is behind DuckDB's path config; state → PostgreSQL requires a new `Store` adapter. Both are non-events.
 
 ### 3.5 Zone 4 — Derived state (the incremental engine)
 
@@ -214,11 +249,11 @@ Development speeds: domain unit tests (ms) → full-DAG replay over fixtures (se
 | Rate limiting | small token-bucket util (~30 lines) | not worth a dependency |
 | HTML parsing (OpenInsider) | **selectolax** | fast, lenient; lxml fallback |
 | Validation/models | **pydantic v2** | parse-don't-validate at zone boundaries |
-| DataFrames | **polars** | fast, lazy scans over parquet; pandas only where a lib demands it |
-| Analytical SQL | **DuckDB** | zero-ops parquet queries; your existing stack |
+| DataFrames | — (use DuckDB SQL + pyarrow) | polars evaluated but unused; DuckDB SQL covers all analytical needs |
+| Analytical SQL | **DuckDB** | zero-ops parquet queries; covers both analytical and transactional access |
 | Columnar files | **pyarrow** (parquet, zstd codec) | standard |
 | Compression | **zstandard** | vault blobs |
-| Transactional DB | **SQLite WAL** via **SQLAlchemy Core** | ACID, one file, no ORM magic |
+| Transactional DB | **DuckDB** (direct, via `app/store.py`) | ACID, single-writer, no ORM; supersedes SQLite/SQLAlchemy (ADR-0021) |
 | Indicators | **numpy** recurrences (own ~100 lines) | incremental O(1); window libs unnecessary |
 | Scheduling | **APScheduler** (cron fallback) | in-process, simple |
 | Config | **pydantic-settings** + TOML | typed, env-overridable |
