@@ -52,6 +52,7 @@ class BaseConnector(ABC):
         vault_base: Path | None = None,
     ):
         self._source_name = source_name
+        self._base_url = base_url.rstrip("/")
         self._bucket = TokenBucket(tokens_per_second, max_burst)
         self._vault_base = vault_base
 
