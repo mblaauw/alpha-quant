@@ -6,12 +6,14 @@ from typing import TYPE_CHECKING, Any
 from alpha_quant.adapters.real.base_connector import BaseConnector, _parse_date
 from alpha_quant.domain.exceptions import DataNormalizationError
 from alpha_quant.domain.models import Bar, EarningsEntry, FundamentalsSnapshot
+from alpha_quant.ports.fundamentals import Fundamentals
+from alpha_quant.ports.market_data import MarketData
 
 if TYPE_CHECKING:
     from alpha_quant.app.vault import Vault
 
 
-class EODHDConnector(BaseConnector):
+class EODHDConnector(BaseConnector, MarketData, Fundamentals):
     def __init__(
         self,
         *,
@@ -78,7 +80,7 @@ class EODHDConnector(BaseConnector):
             bars.append(self._parse_bar(entry, symbol))
         return bars
 
-    def fundamentals_snapshot(self, symbol: str) -> FundamentalsSnapshot:
+    def snapshot(self, symbol: str) -> FundamentalsSnapshot:
         raw = self._get_json(f"fundamentals/{symbol}")
         _expect_type(raw, dict, "dict for fundamentals")
 

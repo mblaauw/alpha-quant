@@ -6,10 +6,10 @@ from alpha_quant.domain.events import DomainEvent
 
 class EventSink(ABC):
     @abstractmethod
-    async def emit(self, event: DomainEvent) -> None: ...
+    def emit(self, event: DomainEvent) -> None: ...
 
     @abstractmethod
-    async def query(
+    def query(
         self,
         run_id: str | None = None,
         event_type: str | None = None,

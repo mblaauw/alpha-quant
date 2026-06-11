@@ -24,6 +24,7 @@ from alpha_quant.domain.models import (
     Order,
     Position,
 )
+from alpha_quant.ports.store import Store
 
 logger = structlog.get_logger()
 
@@ -134,7 +135,7 @@ def _partition_col(model_name: str) -> str:
     return mapping.get(model_name, "date")
 
 
-class CanonicalStore:
+class CanonicalStore(Store):
     def __init__(self, base_path: str | Path) -> None:
         self._base = Path(base_path)
         self._base.mkdir(parents=True, exist_ok=True)
@@ -243,6 +244,14 @@ class CanonicalStore:
             )
             for r in result
         ]
+
+    # --- Port interface (Store) ---
+
+    def save_bars(self, symbol: str, bars: list[Bar]) -> None:
+        self.write_bars(bars)
+
+    def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
+        return self.read_bars(symbol, start, end)
 
     def prune(self, tail_days: int = 50) -> None:
         cutoff = date.today()

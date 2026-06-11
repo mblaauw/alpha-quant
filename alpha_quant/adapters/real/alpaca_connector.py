@@ -4,11 +4,12 @@ import httpx
 import structlog
 
 from alpha_quant.domain.models import Bar, Quote, TradingDay
+from alpha_quant.ports.market_data import MarketData
 
 logger = structlog.get_logger()
 
 
-class AlpacaConnector:
+class AlpacaConnector(MarketData):
     def __init__(
         self,
         api_key: str,
