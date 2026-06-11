@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
+from contextlib import AbstractContextManager
 from datetime import date, datetime
+from typing import Self
 
 from alpha_quant.domain.events import DomainEvent
 from alpha_quant.domain.models import (
@@ -13,6 +15,9 @@ from alpha_quant.domain.models import (
 
 
 class Store(ABC):
+    @abstractmethod
+    def transaction(self) -> AbstractContextManager[Self]: ...
+
     @abstractmethod
     def save_bars(self, symbol: str, bars: list[Bar]) -> None: ...
 

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Generator
+from contextlib import contextmanager
 from datetime import date, datetime
-from typing import override
+from typing import Self, override
 
 from alpha_quant.domain.events import DomainEvent
 from alpha_quant.domain.models import (
@@ -18,6 +20,10 @@ from alpha_quant.ports.store import Store
 class FixtureStore(Store):
     def __init__(self) -> None:
         self._bars: dict[tuple[str, date], list[Bar]] = {}
+
+    @contextmanager
+    def transaction(self) -> Generator[Self]:
+        yield self
 
     @override
     def save_bars(self, symbol: str, bars: list[Bar]) -> None:
