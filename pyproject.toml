@@ -9,13 +9,10 @@ dependencies = [
     "pydantic>=2.10",
     "pydantic-settings>=2.7",
     "structlog>=24.4",
-    "sqlalchemy>=2.0",
     "duckdb>=1.2",
     "pyarrow>=19.0",
-    "polars>=1.20",
     "numpy>=2.2",
     "tenacity>=9.0",
-    "apscheduler>=3.10",
     "zstandard>=0.23",
     "selectolax>=0.3",
 ]
