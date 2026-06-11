@@ -10,7 +10,7 @@ build/
 .pytest_cache/
 *.toml.user
 config.local.toml
-data/vault/
+vault/
 data/.HALT
 fixtures/*/
 !fixtures/fx-*
