@@ -76,24 +76,57 @@ PR body must include:
 - A `### Changes` section with bullet points
 - An `### Verification` section with the 3 tool checks
 
-### 6. Review Against Acceptance Criteria
+### 6. Code Review Loop (Iterative)
 
-Read the issue's AC list and verify each item against the code:
+**ALWAYS do a thorough code review of the PR after pushing.** Do NOT skip this step. The review is your own critical assessment — read every changed line, run the code mentally, and check every acceptance criterion from the issue.
+
+#### 6a. Review PR diff against each AC item
 
 ```bash
-gh issue view <N> --json body
 gh pr diff <PR_NUMBER>
+gh issue view <N> --json body
 ```
 
-For each unmet AC:
-- Fix the code
-- Re-run `ruff check`, `ruff format`, `ty check`
+For every acceptance criterion in the issue:
+- Read the corresponding code in the diff
+- Verify the code actually satisfies the criterion
+- Check edge cases, error handling, typing, and performance
+- For each criterion, note PASS or FAIL in your head (or in a PR comment)
+
+#### 6b. Add PR review comments for every issue found
+
+For each issue (unmet AC, bug, style problem, missing edge case, performance concern, etc.):
+
+```bash
+# Add a PR review comment pointing at the specific code
+gh pr review <PR_NUMBER> --comment --body "<file>:<line> — <what's wrong>"
+```
+
+#### 6c. Fix every issue
+
+For each issue:
+- Fix the code locally
+- Re-run the 3 tool checks:
+  ```bash
+  uv run ruff check alpha_quant/
+  uv run ruff format alpha_quant/
+  uv run ty check alpha_quant/
+  ```
 - Amend the commit: `git add -A && git commit --amend --no-edit`
 - Force-push: `git push --force-with-lease origin <branch>`
 
+#### 6d. Re-review the PR
+
+After all fixes are pushed:
+- Read the updated diff to confirm each issue is resolved: `gh pr diff <PR_NUMBER>`
+- Verify no new issues were introduced
+- If new issues found, go back to step 6b
+
+**The review-fix-re-review cycle must converge to zero issues before proceeding.** Only when every AC item is demonstrably satisfied and no issues remain should you move on.
+
 ### 7. Update Issue Status
 
-After fixing, update the issue body to check off completed AC items:
+After the code review loop passes (zero issues), update the issue body to check off all completed AC items:
 
 ```bash
 gh issue edit <N> --body "<updated body with [x] checks>"
