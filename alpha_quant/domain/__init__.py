@@ -24,6 +24,7 @@ from alpha_quant.domain.events import (
 )
 from alpha_quant.domain.models import (
     Bar,
+    Candidate,
     Decision,
     EarningsEntry,
     Fill,
@@ -42,6 +43,7 @@ from alpha_quant.domain.models import (
 
 __all__ = [
     "Bar",
+    "Candidate",
     "Quote",
     "TradingDay",
     "FundamentalsSnapshot",
