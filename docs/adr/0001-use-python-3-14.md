@@ -16,7 +16,7 @@ Key considerations:
 - Library wheel availability for all planned dependencies (numpy, pydantic, DuckDB, etc. all ship 3.14 wheels)
 - GIL-free / free-threaded Python (3.13 experimental) offers no benefit for a single-threaded daily pipeline
 - The 50-day tail with O(1) numpy recurrences has trivial compute requirements
-- Python 3.14 brings `compression.zstd` to stdlib, eliminating the `zstandard` third-party dependency
+- Python 3.14's `compression.zstd` (PEP 759) was proposed but did not land; `zstandard` remains a third-party dependency for now
 
 ## Decision Drivers
 
@@ -29,7 +29,7 @@ Key considerations:
 
 - **Option A: Python 3.12 LTS** — Conservative, widest wheel support, supported until Oct 2028
 - **Option B: Python 3.13** — Free-threaded mode available, but still experimental
-- **Option C: Python 3.14** — Latest stable, t-string support, `compression.zstd` in stdlib; all core libraries shipping 3.14 wheels
+- **Option C: Python 3.14** — Latest stable, t-string support; all core libraries shipping 3.14 wheels
 
 ## Decision Outcome
 
@@ -46,7 +46,6 @@ Rationale:
 ### Positive Consequences
 
 - Access to t-strings and other 3.14 quality-of-life features
-- `compression.zstd` in stdlib — one less third-party dependency
 - CI matches the development environment exactly
 
 ### Negative Consequences
