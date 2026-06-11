@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import time
-from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -42,7 +41,7 @@ def _wait(retry_state: Any) -> float:
     return min(2 * (2**retry_state.attempt_number), 30)
 
 
-class BaseConnector(ABC):
+class BaseConnector:
     def __init__(
         self,
         source_name: str,
@@ -68,8 +67,8 @@ class BaseConnector(ABC):
             follow_redirects=True,
         )
 
-    @abstractmethod
-    def parse(self, data: bytes, **kwargs: Any) -> Any: ...
+    def parse(self, data: bytes, **kwargs: Any) -> Any:
+        return data
 
     def _do_request(self, url: str, params: dict[str, str] | None = None) -> httpx.Response:
         for attempt in Retrying(

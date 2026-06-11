@@ -45,8 +45,25 @@ class EODHDConnector(BaseConnector):
         response = self.fetch(url, merged)
         return response.json()
 
-    def parse(self, data: bytes, **kwargs: Any) -> Any:
-        return data
+    def _parse_bar(self, entry: dict[str, Any], symbol: str) -> Bar:
+        try:
+            bar_date = datetime.strptime(entry["date"], "%Y-%m-%d").date()
+        except (KeyError, ValueError, TypeError) as e:
+            raise DataNormalizationError(
+                f"Invalid bar date: {e}",
+                source="eodhd",
+                raw=str(entry)[:500],
+            ) from e
+        return Bar(
+            symbol=symbol,
+            date=bar_date,
+            open=_float(entry.get("open")) or 0.0,
+            high=_float(entry.get("high")) or 0.0,
+            low=_float(entry.get("low")) or 0.0,
+            close=_float(entry.get("close")) or 0.0,
+            adj_close=_float(entry.get("adjusted_close")),
+            volume=_float(entry.get("volume")) or 0.0,
+        )
 
     def daily_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
         raw = self._get_json(
@@ -63,26 +80,7 @@ class EODHDConnector(BaseConnector):
         for entry in raw:
             if not isinstance(entry, dict):
                 continue
-            try:
-                bar_date = datetime.strptime(entry["date"], "%Y-%m-%d").date()
-            except (KeyError, ValueError, TypeError) as e:
-                raise DataNormalizationError(
-                    f"Invalid bar date: {e}",
-                    source="eodhd",
-                    raw=str(entry)[:500],
-                ) from e
-            bars.append(
-                Bar(
-                    symbol=symbol,
-                    date=bar_date,
-                    open=_float(entry.get("open")) or 0.0,
-                    high=_float(entry.get("high")) or 0.0,
-                    low=_float(entry.get("low")) or 0.0,
-                    close=_float(entry.get("close")) or 0.0,
-                    adj_close=_float(entry.get("adjusted_close")),
-                    volume=_float(entry.get("volume")) or 0.0,
-                )
-            )
+            bars.append(self._parse_bar(entry, symbol))
         return bars
 
     def fundamentals_snapshot(self, symbol: str) -> FundamentalsSnapshot:
@@ -190,26 +188,7 @@ class EODHDConnector(BaseConnector):
         for entry in raw:
             if not isinstance(entry, dict):
                 continue
-            try:
-                bar_date = datetime.strptime(entry["date"], "%Y-%m-%d").date()
-            except (KeyError, ValueError, TypeError) as e:
-                raise DataNormalizationError(
-                    f"Invalid bulk bar date: {e}",
-                    source="eodhd",
-                    raw=str(entry)[:500],
-                ) from e
-            bars.append(
-                Bar(
-                    symbol=entry.get("code", ""),
-                    date=bar_date,
-                    open=_float(entry.get("open")) or 0.0,
-                    high=_float(entry.get("high")) or 0.0,
-                    low=_float(entry.get("low")) or 0.0,
-                    close=_float(entry.get("close")) or 0.0,
-                    adj_close=_float(entry.get("adjusted_close")),
-                    volume=_float(entry.get("volume")) or 0.0,
-                )
-            )
+            bars.append(self._parse_bar(entry, entry.get("code", "")))
         return bars
 
 
