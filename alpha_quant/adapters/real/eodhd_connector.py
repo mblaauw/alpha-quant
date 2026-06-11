@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 from datetime import date, datetime
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from alpha_quant.adapters.real.base_connector import BaseConnector
 from alpha_quant.domain.exceptions import DataNormalizationError
 from alpha_quant.domain.models import Bar, EarningsEntry, FundamentalsSnapshot
+
+if TYPE_CHECKING:
+    from alpha_quant.app.vault import Vault
 
 
 class EODHDConnector(BaseConnector):
@@ -16,7 +20,7 @@ class EODHDConnector(BaseConnector):
         tokens_per_second: float = 10.0,
         max_burst: float = 20.0,
         user_agent: str = "",
-        vault_base: Path | None = None,
+        vault: Vault | None = None,
     ) -> None:
         self._api_token = api_token
         super().__init__(
@@ -25,7 +29,7 @@ class EODHDConnector(BaseConnector):
             tokens_per_second=tokens_per_second,
             max_burst=max_burst,
             user_agent=user_agent,
-            vault_base=vault_base,
+            vault=vault,
         )
 
     def _build_url(self, path: str) -> str:

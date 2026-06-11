@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 import json
 import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from alpha_quant.adapters.real.base_connector import BaseConnector
 from alpha_quant.domain.models import TickerRecord
+
+if TYPE_CHECKING:
+    from alpha_quant.app.vault import Vault
 
 logger = structlog.get_logger()
 
@@ -22,7 +27,7 @@ class SECConnector(BaseConnector):
         *,
         user_agent: str,
         cache_path: str | Path = "sec_cache.sqlite",
-        vault_base: Path | None = None,
+        vault: Vault | None = None,
     ) -> None:
         self._cache_path = Path(cache_path)
         self._cache_conn = sqlite3.connect(str(self._cache_path))
@@ -40,7 +45,7 @@ class SECConnector(BaseConnector):
             tokens_per_second=1.0,
             max_burst=1.0,
             user_agent=user_agent,
-            vault_base=vault_base,
+            vault=vault,
         )
 
     def parse(self, data: bytes, **kwargs: Any) -> Any:

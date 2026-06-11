@@ -1,10 +1,10 @@
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from alpha_quant.app.config import AppConfig
 from alpha_quant.app.fixtures import freeze_bundle
-from alpha_quant.app.vault import write_blob
+from alpha_quant.app.vault import Vault
 from alpha_quant.domain.models import (
     Bar,
     EarningsEntry,
@@ -121,14 +121,14 @@ def run_bootstrap(
         all_mentions[symbol] = _generate_mentions(symbol)
 
         if not fixture_only:
+            vault = Vault(vault_base)
             for bar in bars:
-                write_blob(
-                    vault_base,
-                    "eodhd",
-                    bar.date,
-                    "bars",
-                    symbol,
-                    bar.model_dump_json().encode(),
+                vault.store(
+                    source="eodhd",
+                    endpoint="bars",
+                    params=symbol,
+                    data=bar.model_dump_json().encode(),
+                    ingest_ts=datetime.combine(bar.date, datetime.min.time()).replace(tzinfo=UTC),
                 )
 
     bundle = freeze_bundle(

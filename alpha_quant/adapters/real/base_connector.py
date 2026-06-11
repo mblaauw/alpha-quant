@@ -1,9 +1,9 @@
+from __future__ import annotations
+
 import logging
 import time
 from abc import ABC, abstractmethod
-from datetime import date
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import structlog
@@ -15,6 +15,9 @@ from tenacity import (
 )
 
 from alpha_quant.adapters.real.token_bucket import TokenBucket
+
+if TYPE_CHECKING:
+    from alpha_quant.app.vault import Vault
 
 logger = structlog.get_logger()
 
@@ -49,12 +52,12 @@ class BaseConnector(ABC):
         max_burst: float = 20.0,
         timeout_s: float = 30.0,
         user_agent: str = "",
-        vault_base: Path | None = None,
+        vault: Vault | None = None,
     ):
         self._source_name = source_name
         self._base_url = base_url.rstrip("/")
         self._bucket = TokenBucket(tokens_per_second, max_burst)
-        self._vault_base = vault_base
+        self._vault = vault
 
         headers = {}
         if user_agent:
@@ -99,18 +102,14 @@ class BaseConnector(ABC):
             byte_size=len(response.content),
         )
 
-        if self._vault_base is not None:
-            from alpha_quant.app.vault import write_blob
-
-            query_str = ""
+        if self._vault is not None:
+            query_params = {}
             if params:
-                query_str = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
-            write_blob(
-                base=self._vault_base,
+                query_params = dict(sorted(params.items()))
+            self._vault.store(
                 source=self._source_name,
-                dt=date.today(),
                 endpoint=url,
-                params=query_str,
+                params=query_params,
                 data=response.content,
             )
 
