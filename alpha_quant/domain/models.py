@@ -1,6 +1,31 @@
-from datetime import date, datetime
+from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+import csv
+from dataclasses import dataclass
+from datetime import date, datetime
+from pathlib import Path
+
+from pydantic import BaseModel, ConfigDict, model_validator
+
+
+@dataclass(frozen=True)
+class SectorMap:
+    _ticker_to_sector: dict[str, str]
+
+    @classmethod
+    def from_csv(cls, path: Path) -> SectorMap:
+        mapping: dict[str, str] = {}
+        with path.open() as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                ticker = row.get("ticker", "").strip().upper()
+                sector = row.get("sector", "").strip()
+                if ticker and sector:
+                    mapping[ticker] = sector
+        return cls(_ticker_to_sector=mapping)
+
+    def lookup(self, ticker: str) -> str | None:
+        return self._ticker_to_sector.get(ticker.upper())
 
 
 class Bar(BaseModel):
@@ -114,20 +139,44 @@ class SentimentBaseline(BaseModel):
     z_score: float | None = None
 
 
+class Candidate(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    symbol: str
+    date: date
+    scores: dict[str, float]
+    composite_score: float
+    regime: str
+    gate_results: dict[str, bool]
+    block_reason: str | None = None
+
+
 class Order(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     order_id: str
     symbol: str
-    side: str
+    action: str
     quantity: float
     order_type: str
     limit_price: float | None = None
     status: str
-    submitted_at: datetime | None = None
-    filled_at: datetime | None = None
+    submitted_at: date | None = None
+    fill_date: date | None = None
     filled_quantity: float | None = None
     avg_fill_price: float | None = None
+
+    @model_validator(mode="after")
+    def _validate_fill_quantity(self) -> Order:
+        if (
+            self.filled_quantity is not None
+            and self.quantity is not None
+            and self.filled_quantity > self.quantity
+        ):
+            raise ValueError(
+                f"filled_quantity ({self.filled_quantity}) > quantity ({self.quantity})"
+            )
+        return self
 
 
 class Fill(BaseModel):
@@ -146,21 +195,33 @@ class Position(BaseModel):
 
     symbol: str
     quantity: float
+    entry_price: float | None = None
     avg_cost: float
     current_price: float | None = None
+    stop_price: float | None = None
+    trail_price: float | None = None
     market_value: float | None = None
     unrealized_pl: float | None = None
     realized_pl: float | None = None
+    sector: str | None = None
+    decision_id: str | None = None
 
 
 class Decision(BaseModel):
     model_config = ConfigDict(frozen=True)
 
+    decision_id: str | None = None
+    run_id: str | None = None
     symbol: str
     date: date
     action: str
     confidence: float
     reasons: list[str] = []
+    candidate: Candidate | None = None
+    position: Position | None = None
+    order: Order | None = None
+    risk_results: dict[str, float] = {}
+    mechanism_results: dict[str, float] = {}
 
 
 class TickerRecord(BaseModel):

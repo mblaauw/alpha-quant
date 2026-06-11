@@ -14,6 +14,7 @@ import structlog
 from alpha_quant.domain.events import DomainEvent
 from alpha_quant.domain.models import (
     Bar,
+    Candidate,
     Decision,
     Fill,
     FundamentalsSnapshot,
@@ -276,11 +277,18 @@ class CanonicalStore:
         conn = self._state_conn
         conn.execute(
             "CREATE TABLE IF NOT EXISTS decisions ("
+            "  decision_id VARCHAR,"
+            "  run_id VARCHAR,"
             "  symbol VARCHAR NOT NULL,"
             "  decision_date DATE NOT NULL,"
             "  action VARCHAR NOT NULL,"
             "  confidence DOUBLE NOT NULL,"
             "  reasons JSON,"
+            "  candidate_json JSON,"
+            "  position_json JSON,"
+            "  order_json JSON,"
+            "  risk_results JSON,"
+            "  mechanism_results JSON,"
             "  PRIMARY KEY (symbol, decision_date)"
             ")"
         )
@@ -288,13 +296,13 @@ class CanonicalStore:
             "CREATE TABLE IF NOT EXISTS orders ("
             "  order_id VARCHAR PRIMARY KEY,"
             "  symbol VARCHAR NOT NULL,"
-            "  side VARCHAR NOT NULL,"
+            "  action VARCHAR NOT NULL,"
             "  quantity DOUBLE NOT NULL,"
             "  order_type VARCHAR NOT NULL,"
             "  limit_price DOUBLE,"
             "  status VARCHAR NOT NULL,"
-            "  submitted_at TIMESTAMP,"
-            "  filled_at TIMESTAMP,"
+            "  submitted_at DATE,"
+            "  fill_date DATE,"
             "  filled_quantity DOUBLE,"
             "  avg_fill_price DOUBLE"
             ")"
@@ -313,11 +321,16 @@ class CanonicalStore:
             "CREATE TABLE IF NOT EXISTS positions ("
             "  symbol VARCHAR PRIMARY KEY,"
             "  quantity DOUBLE NOT NULL,"
+            "  entry_price DOUBLE,"
             "  avg_cost DOUBLE NOT NULL,"
             "  current_price DOUBLE,"
+            "  stop_price DOUBLE,"
+            "  trail_price DOUBLE,"
             "  market_value DOUBLE,"
             "  unrealized_pl DOUBLE,"
-            "  realized_pl DOUBLE"
+            "  realized_pl DOUBLE,"
+            "  sector VARCHAR,"
+            "  decision_id VARCHAR"
             ")"
         )
         conn.execute(
@@ -392,32 +405,49 @@ class CanonicalStore:
 
     def save_decision(self, decision: Decision) -> None:
         self._state_conn.execute(
-            "INSERT OR REPLACE INTO decisions (symbol, decision_date, action, confidence, reasons)"
-            " VALUES (?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO decisions"
+            " (decision_id, run_id, symbol, decision_date, action, confidence, reasons,"
+            "  candidate_json, position_json, order_json, risk_results, mechanism_results)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
+                decision.decision_id,
+                decision.run_id,
                 decision.symbol,
                 decision.date,
                 decision.action,
                 decision.confidence,
                 json.dumps(decision.reasons),
+                decision.candidate.model_dump_json() if decision.candidate else None,
+                decision.position.model_dump_json() if decision.position else None,
+                decision.order.model_dump_json() if decision.order else None,
+                json.dumps(decision.risk_results),
+                json.dumps(decision.mechanism_results),
             ],
         )
         self._state_conn.commit()
 
     def load_decisions(self, symbol: str, since: date) -> list[Decision]:
         rows = self._state_conn.execute(
-            "SELECT symbol, decision_date, action, confidence, reasons"
+            "SELECT decision_id, run_id, symbol, decision_date, action, confidence, reasons,"
+            " candidate_json, position_json, order_json, risk_results, mechanism_results"
             " FROM decisions WHERE symbol = ? AND decision_date >= ?"
             " ORDER BY decision_date DESC",
             [symbol, since],
         ).fetchall()
         return [
             Decision(
-                symbol=r[0],
-                date=r[1],
-                action=r[2],
-                confidence=r[3],
-                reasons=json.loads(r[4]) if r[4] else [],
+                decision_id=r[0],
+                run_id=r[1],
+                symbol=r[2],
+                date=r[3],
+                action=r[4],
+                confidence=r[5],
+                reasons=json.loads(r[6]) if r[6] else [],
+                candidate=Candidate.model_validate_json(r[7]) if r[7] else None,
+                position=Position.model_validate_json(r[8]) if r[8] else None,
+                order=Order.model_validate_json(r[9]) if r[9] else None,
+                risk_results=json.loads(r[10]) if r[10] else {},
+                mechanism_results=json.loads(r[11]) if r[11] else {},
             )
             for r in rows
         ]
@@ -425,19 +455,19 @@ class CanonicalStore:
     def save_order(self, order: Order) -> None:
         self._state_conn.execute(
             "INSERT OR REPLACE INTO orders"
-            " (order_id, symbol, side, quantity, order_type, limit_price, status,"
-            "  submitted_at, filled_at, filled_quantity, avg_fill_price)"
+            " (order_id, symbol, action, quantity, order_type, limit_price, status,"
+            "  submitted_at, fill_date, filled_quantity, avg_fill_price)"
             " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 order.order_id,
                 order.symbol,
-                order.side,
+                order.action,
                 order.quantity,
                 order.order_type,
                 order.limit_price,
                 order.status,
                 order.submitted_at,
-                order.filled_at,
+                order.fill_date,
                 order.filled_quantity,
                 order.avg_fill_price,
             ],
@@ -446,8 +476,8 @@ class CanonicalStore:
 
     def load_order(self, order_id: str) -> Order | None:
         row = self._state_conn.execute(
-            "SELECT order_id, symbol, side, quantity, order_type, limit_price, status,"
-            " submitted_at, filled_at, filled_quantity, avg_fill_price"
+            "SELECT order_id, symbol, action, quantity, order_type, limit_price, status,"
+            " submitted_at, fill_date, filled_quantity, avg_fill_price"
             " FROM orders WHERE order_id = ?",
             [order_id],
         ).fetchone()
@@ -456,13 +486,13 @@ class CanonicalStore:
         return Order(
             order_id=row[0],
             symbol=row[1],
-            side=row[2],
+            action=row[2],
             quantity=row[3],
             order_type=row[4],
             limit_price=row[5],
             status=row[6],
             submitted_at=row[7],
-            filled_at=row[8],
+            fill_date=row[8],
             filled_quantity=row[9],
             avg_fill_price=row[10],
         )
@@ -504,32 +534,46 @@ class CanonicalStore:
     def save_position(self, position: Position) -> None:
         self._state_conn.execute(
             "INSERT OR REPLACE INTO positions"
-            " (symbol, quantity, avg_cost, current_price, market_value, unrealized_pl, realized_pl)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            " (symbol, quantity, entry_price, avg_cost, current_price, stop_price, trail_price,"
+            "  market_value, unrealized_pl, realized_pl, sector, decision_id)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 position.symbol,
                 position.quantity,
+                position.entry_price,
                 position.avg_cost,
                 position.current_price,
+                position.stop_price,
+                position.trail_price,
                 position.market_value,
                 position.unrealized_pl,
                 position.realized_pl,
+                position.sector,
+                position.decision_id,
             ],
         )
         self._state_conn.commit()
 
     def load_positions(self) -> list[Position]:
-        cols = "symbol, quantity, avg_cost, current_price, market_value, unrealized_pl, realized_pl"
+        cols = (
+            "symbol, quantity, entry_price, avg_cost, current_price, stop_price, trail_price,"
+            " market_value, unrealized_pl, realized_pl, sector, decision_id"
+        )
         rows = self._state_conn.execute(f"SELECT {cols} FROM positions").fetchall()
         return [
             Position(
                 symbol=r[0],
                 quantity=r[1],
-                avg_cost=r[2],
-                current_price=r[3],
-                market_value=r[4],
-                unrealized_pl=r[5],
-                realized_pl=r[6],
+                entry_price=r[2],
+                avg_cost=r[3],
+                current_price=r[4],
+                stop_price=r[5],
+                trail_price=r[6],
+                market_value=r[7],
+                unrealized_pl=r[8],
+                realized_pl=r[9],
+                sector=r[10],
+                decision_id=r[11],
             )
             for r in rows
         ]
