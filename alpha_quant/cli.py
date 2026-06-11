@@ -44,7 +44,7 @@ def _configure_logging() -> None:
 
 def cmd_run(args: argparse.Namespace) -> None:
     config = load_config(args.config)
-    print(f"[alpha-quant] run (mode={args.mode})")
+    print("[alpha-quant] run: not yet implemented (planned for P2.14 Daily pipeline orchestrator)")
     if args.verbose_config:
         print(json.dumps(redact_config(config), indent=2, default=str))
 
@@ -67,7 +67,7 @@ def cmd_replay(args: argparse.Namespace) -> None:
 
 def cmd_backtest(args: argparse.Namespace) -> None:
     config = load_config(args.config)
-    print(f"[alpha-quant] backtest (from={args.from_date} to={args.to_date})")
+    print("[alpha-quant] backtest: not yet implemented (planned for P2.13 Backtester)")
     if args.verbose_config:
         print(json.dumps(redact_config(config), indent=2, default=str))
 
@@ -97,21 +97,21 @@ def cmd_bootstrap(args: argparse.Namespace) -> None:
 
 def cmd_journal(args: argparse.Namespace) -> None:
     config = load_config(args.config)
-    print(f"[alpha-quant] journal (since={args.since})")
+    print("[alpha-quant] journal: not yet implemented (planned for P4.5 Daily journal generator)")
     if args.verbose_config:
         print(json.dumps(redact_config(config), indent=2, default=str))
 
 
 def cmd_ask(args: argparse.Namespace) -> None:
     config = load_config(args.config)
-    print(f"[alpha-quant] ask (query={' '.join(args.query)})")
+    print("[alpha-quant] ask: not yet implemented (planned for P4.8 ask command)")
     if args.verbose_config:
         print(json.dumps(redact_config(config), indent=2, default=str))
 
 
 def cmd_report(args: argparse.Namespace) -> None:
     config = load_config(args.config)
-    print(f"[alpha-quant] report (type={args.type})")
+    print("[alpha-quant] report: not yet implemented (planned for P4.6 Weekly & monthly reports)")
     if args.verbose_config:
         print(json.dumps(redact_config(config), indent=2, default=str))
 
@@ -134,7 +134,7 @@ def cmd_status(args: argparse.Namespace) -> None:
 def cmd_halt(args: argparse.Namespace) -> None:
     config = load_config(args.config)
     action = "resume" if args.resume else "halt"
-    print(f"[alpha-quant] {action}")
+    print(f"[alpha-quant] {action}: not yet implemented (planned for P5.4 Ops commands)")
     if args.verbose_config:
         print(json.dumps(redact_config(config), indent=2, default=str))
 

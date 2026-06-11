@@ -1,25 +1,40 @@
-from datetime import UTC, date
+from __future__ import annotations
 
-import httpx
+from datetime import UTC, date
+from typing import Any
+
 import structlog
 
+from alpha_quant.adapters.real.base_connector import BaseConnector
 from alpha_quant.domain.models import Bar, Quote, TradingDay
 from alpha_quant.ports.market_data import MarketData
 
 logger = structlog.get_logger()
 
 
-class AlpacaConnector(MarketData):
+class AlpacaConnector(BaseConnector, MarketData):
     def __init__(
         self,
         api_key: str,
         secret_key: str,
         *,
         base_url: str = "https://data.alpaca.markets",
+        tokens_per_second: float = 10.0,
+        max_burst: float = 20.0,
+        user_agent: str = "",
+        vault: Any = None,
     ) -> None:
         self._api_key = api_key
         self._secret_key = secret_key
-        self._base_url = base_url.rstrip("/")
+        super().__init__(
+            source_name="alpaca",
+            base_url=base_url,
+            tokens_per_second=tokens_per_second,
+            max_burst=max_burst,
+            user_agent=user_agent,
+            vault=vault,
+            auth=(api_key, secret_key),
+        )
 
     def _get_stock_client(self):
         from alpaca.data.historical import StockHistoricalDataClient
@@ -50,19 +65,12 @@ class AlpacaConnector(MarketData):
         )
 
     def trading_calendar(self, start: date, end: date) -> list[TradingDay]:
-        url = f"{self._base_url}/v2/calendar"
         params: dict[str, str] = {
             "start": start.isoformat(),
             "end": end.isoformat(),
         }
-        with httpx.Client() as client:
-            response = client.get(
-                url,
-                params=params,
-                auth=(self._api_key, self._secret_key),
-            )
-            response.raise_for_status()
-            entries = response.json()
+        response = self.fetch(f"{self._base_url}/v2/calendar", params)
+        entries = response.json()
 
         return [
             TradingDay(
