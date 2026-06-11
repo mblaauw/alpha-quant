@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
 import structlog
 from selectolax.parser import HTMLParser
 
-from alpha_quant.adapters.real.base_connector import BaseConnector
+from alpha_quant.adapters.real.base_connector import BaseConnector, _parse_date
 from alpha_quant.domain.models import InsiderCluster, InsiderTransaction
 
 if TYPE_CHECKING:
@@ -203,17 +203,6 @@ def _parse_number(text: str | None) -> float | None:
         return float(cleaned)
     except ValueError, TypeError:
         return None
-
-
-def _parse_date(text: str | None) -> date | None:
-    if not text:
-        return None
-    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"):
-        try:
-            return datetime.strptime(text.strip(), fmt).date()
-        except ValueError, TypeError:
-            continue
-    return None
 
 
 def _parse_relationship(rel: str) -> str:

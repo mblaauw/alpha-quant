@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
-from alpha_quant.adapters.real.base_connector import BaseConnector
+from alpha_quant.adapters.real.base_connector import BaseConnector, _parse_date
 from alpha_quant.domain.exceptions import DataNormalizationError
 from alpha_quant.domain.models import Bar, EarningsEntry, FundamentalsSnapshot
 
@@ -70,12 +70,7 @@ class EODHDConnector(BaseConnector):
             f"eod/{symbol}",
             {"from": start.isoformat(), "to": end.isoformat()},
         )
-        if not isinstance(raw, list):
-            raise DataNormalizationError(
-                "Expected list of bars",
-                source="eodhd",
-                raw=str(raw)[:500],
-            )
+        _expect_type(raw, list, "list of bars")
         bars: list[Bar] = []
         for entry in raw:
             if not isinstance(entry, dict):
@@ -85,12 +80,7 @@ class EODHDConnector(BaseConnector):
 
     def fundamentals_snapshot(self, symbol: str) -> FundamentalsSnapshot:
         raw = self._get_json(f"fundamentals/{symbol}")
-        if not isinstance(raw, dict):
-            raise DataNormalizationError(
-                "Expected dict for fundamentals",
-                source="eodhd",
-                raw=str(raw)[:500],
-            )
+        _expect_type(raw, dict, "dict for fundamentals")
 
         general = raw.get("General", {}) or {}
         highlights = raw.get("Highlights", {}) or {}
@@ -139,19 +129,9 @@ class EODHDConnector(BaseConnector):
             "calendar/earnings",
             {"from": start.isoformat(), "to": end.isoformat()},
         )
-        if not isinstance(raw, dict):
-            raise DataNormalizationError(
-                "Expected dict for earnings calendar",
-                source="eodhd",
-                raw=str(raw)[:500],
-            )
+        _expect_type(raw, dict, "dict for earnings calendar")
         entries = raw.get("earnings", [])
-        if not isinstance(entries, list):
-            raise DataNormalizationError(
-                "Expected 'earnings' list",
-                source="eodhd",
-                raw=str(raw)[:500],
-            )
+        _expect_type(entries, list, "'earnings' list")
         results: list[EarningsEntry] = []
         for entry in entries:
             if not isinstance(entry, dict):
@@ -178,12 +158,7 @@ class EODHDConnector(BaseConnector):
 
     def bulk_last_day(self, exchange: str = "US") -> list[Bar]:
         raw = self._get_json(f"eod-bulk-last-day/{exchange}")
-        if not isinstance(raw, list):
-            raise DataNormalizationError(
-                "Expected list for bulk_last_day",
-                source="eodhd",
-                raw=str(raw)[:500],
-            )
+        _expect_type(raw, list, "list for bulk_last_day")
         bars: list[Bar] = []
         for entry in raw:
             if not isinstance(entry, dict):
@@ -201,13 +176,13 @@ def _float(value: Any) -> float | None:
         return None
 
 
-def _parse_date(value: str) -> date | None:
-    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y"):
-        try:
-            return datetime.strptime(value, fmt).date()
-        except ValueError, TypeError:
-            continue
-    return None
+def _expect_type(raw: Any, expected: type, description: str) -> None:
+    if not isinstance(raw, expected):
+        raise DataNormalizationError(
+            f"Expected {description}, got {type(raw).__name__}",
+            source="eodhd",
+            raw=str(raw)[:500],
+        )
 
 
 def _latest_period(*quarters: dict[str, Any]) -> tuple[dict[str, Any], ...] | None:
