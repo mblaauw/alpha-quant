@@ -17,6 +17,26 @@ def run_replay(
     fixture_path: str | None = None,
     store: CanonicalStore | None = None,
 ) -> dict[str, Any]:
+    """Stub replay — builds a static metadata dict, runs no DAG.
+
+    Currently this function produces a synthetic "golden_pass" result without
+    actually running any pipeline stages. This gives false confidence in I7.
+
+    Stages to wire incrementally as they land (tracked in #97):
+      1. indicator engine (derive.py) — load fixture bars, run backfill, emit events
+      2. universe selection (universe.py) — M1 filter against fixture data
+      3. regime detection (domain/regime.py when it exists)
+      4. risk management (domain/risk.py when it exists)
+      5. decision engine gates + scoring (M3-M8 when they exist)
+      6. order simulation + fill model
+      7. paper book + shadow books
+      8. narration
+
+    Each wiring step:
+      - Replaces the static claim (e.g. "ingest": true) with an actual run
+      - Changes the golden output hash (expected — re-bless via make bless-golden)
+      - Must be deterministic (I7) — same fixture + config = same output
+    """
     cfg_redacted = redact_config(config)
     config_hash = hashlib.sha256(json.dumps(cfg_redacted, sort_keys=True).encode()).hexdigest()[:16]
 

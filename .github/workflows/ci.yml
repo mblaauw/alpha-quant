@@ -47,13 +47,13 @@ jobs:
           uv run alpha-quant replay \
             --from-date 2024-01-01 \
             --to-date 2024-01-31 \
-            --output fixtures/golden/golden_run.json
+            --output fixtures/golden/stub_golden_run.json
 
       - name: Verify stub golden hash (placeholder — #97)
         run: |
-          EXPECTED_HASH=$(sha256sum fixtures/golden/golden_run.json | cut -d' ' -f1)
+          EXPECTED_HASH=$(sha256sum fixtures/golden/stub_golden_run.json | cut -d' ' -f1)
           echo "Golden hash: ${EXPECTED_HASH}"
-          git diff --exit-code fixtures/golden/golden_run.json || {
+          git diff --exit-code fixtures/golden/stub_golden_run.json || {
             echo "::error::Golden file mismatch! Run 'make bless-golden' to update."
             exit 1
           }
