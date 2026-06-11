@@ -36,6 +36,7 @@ from alpha_quant.domain.models import (
     Position,
     Quote,
     SentimentBaseline,
+    TickerRecord,
     TradingDay,
 )
 
@@ -49,6 +50,7 @@ __all__ = [
     "InsiderCluster",
     "MentionCount",
     "SentimentBaseline",
+    "TickerRecord",
     "Order",
     "Fill",
     "Position",
