@@ -39,6 +39,7 @@ from alpha_quant.domain.models import (
     SentimentBaseline,
     TickerRecord,
     TradingDay,
+    UniverseMember,
 )
 
 __all__ = [
@@ -58,6 +59,7 @@ __all__ = [
     "Position",
     "Decision",
     "IndicatorState",
+    "UniverseMember",
     "BaseDomainEvent",
     "PipelineRunStarted",
     "PipelineRunCompleted",
