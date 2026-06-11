@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -42,18 +41,6 @@ def _wait(retry_state: Any) -> float:
     return min(2 * (2**retry_state.attempt_number), 30)
 
 
-def _parse_date(value: str | None, *fmts: str) -> date | None:
-    if not value:
-        return None
-    formats = fmts or ("%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y")
-    for fmt in formats:
-        try:
-            return datetime.strptime(value.strip(), fmt).date()
-        except ValueError, TypeError:
-            continue
-    return None
-
-
 class BaseConnector:
     def __init__(
         self,
@@ -65,6 +52,7 @@ class BaseConnector:
         timeout_s: float = 30.0,
         user_agent: str = "",
         vault: Vault | None = None,
+        auth: tuple[str, str] | None = None,
     ):
         self._source_name = source_name
         self._base_url = base_url.rstrip("/")
@@ -77,6 +65,7 @@ class BaseConnector:
         self._client = httpx.Client(
             timeout=httpx.Timeout(timeout_s),
             headers=headers,
+            auth=auth,
             follow_redirects=True,
         )
 

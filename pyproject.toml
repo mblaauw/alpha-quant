@@ -71,3 +71,7 @@ redundant-cast = "warn"
 [tool.ty.src]
 include = ["alpha_quant", "tests"]
 exclude = [".venv"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
