@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
-from alpha_quant.adapters.real.base_connector import BaseConnector, _parse_date
+from alpha_quant.adapters.real.base_connector import BaseConnector
 from alpha_quant.domain.exceptions import DataNormalizationError
 from alpha_quant.domain.models import Bar, EarningsEntry, FundamentalsSnapshot
+from alpha_quant.domain.normalize import _parse_date
 from alpha_quant.ports.fundamentals import Fundamentals
 from alpha_quant.ports.market_data import MarketData
 

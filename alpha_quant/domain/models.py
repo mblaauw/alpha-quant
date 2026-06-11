@@ -1,31 +1,8 @@
 from __future__ import annotations
 
-import csv
-from dataclasses import dataclass
 from datetime import date, datetime
-from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, model_validator
-
-
-@dataclass(frozen=True)
-class SectorMap:
-    _ticker_to_sector: dict[str, str]
-
-    @classmethod
-    def from_csv(cls, path: Path) -> SectorMap:
-        mapping: dict[str, str] = {}
-        with path.open() as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                ticker = row.get("ticker", "").strip().upper()
-                sector = row.get("sector", "").strip()
-                if ticker and sector:
-                    mapping[ticker] = sector
-        return cls(_ticker_to_sector=mapping)
-
-    def lookup(self, ticker: str) -> str | None:
-        return self._ticker_to_sector.get(ticker.upper())
 
 
 class Bar(BaseModel):

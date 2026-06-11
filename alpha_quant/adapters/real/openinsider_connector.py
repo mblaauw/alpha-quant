@@ -9,8 +9,9 @@ from urllib.parse import urlencode
 import structlog
 from selectolax.parser import HTMLParser
 
-from alpha_quant.adapters.real.base_connector import BaseConnector, _parse_date
+from alpha_quant.adapters.real.base_connector import BaseConnector
 from alpha_quant.domain.models import InsiderCluster, InsiderTransaction
+from alpha_quant.domain.normalize import _parse_date
 from alpha_quant.ports.insider_feed import InsiderFeed
 
 if TYPE_CHECKING:
