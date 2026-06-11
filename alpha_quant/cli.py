@@ -3,6 +3,7 @@ import json
 import sys
 
 from alpha_quant import __version__
+from alpha_quant.app.bootstrap import run_bootstrap
 from alpha_quant.app.config import ConfigError, load_config, redact_config
 
 
@@ -28,8 +29,24 @@ def cmd_backtest(args: argparse.Namespace) -> None:
 
 
 def cmd_bootstrap(args: argparse.Namespace) -> None:
+    import time
+    from pathlib import Path
+
     config = load_config(args.config)
-    print(f"[alpha-quant] bootstrap (fixture_only={args.fixture_only})")
+    t0 = time.perf_counter()
+    result = run_bootstrap(
+        config=config,
+        vault_base=Path(args.vault or "vault"),
+        fixture_base=Path("."),
+        fixture_only=args.fixture_only,
+    )
+    elapsed = time.perf_counter() - t0
+    print(
+        f"[alpha-quant] bootstrap: {result['symbols_processed']} symbols, "
+        f"{result['total_bars']} bars, "
+        f"bundle at {result['bundle_path']} "
+        f"({elapsed:.1f}s)"
+    )
     if args.verbose_config:
         print(json.dumps(redact_config(config), indent=2, default=str))
 
@@ -122,6 +139,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--fixture-only",
         action="store_true",
         help="Skip fetch, regenerate fixture bundle from existing vault",
+    )
+    p_bootstrap.add_argument(
+        "--vault",
+        type=str,
+        default=None,
+        help="Vault directory path (default: ./vault)",
     )
     p_bootstrap.set_defaults(func=cmd_bootstrap)
 
