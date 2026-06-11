@@ -13,3 +13,4 @@ data/vault/
 data/.HALT
 fixtures/*/
 !fixtures/fx-*
+!fixtures/golden/

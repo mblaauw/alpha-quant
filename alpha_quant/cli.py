@@ -5,6 +5,7 @@ import sys
 from alpha_quant import __version__
 from alpha_quant.app.bootstrap import run_bootstrap
 from alpha_quant.app.config import ConfigError, load_config, redact_config
+from alpha_quant.app.replay import run_replay, write_golden
 
 
 def cmd_run(args: argparse.Namespace) -> None:
@@ -16,7 +17,16 @@ def cmd_run(args: argparse.Namespace) -> None:
 
 def cmd_replay(args: argparse.Namespace) -> None:
     config = load_config(args.config)
-    print(f"[alpha-quant] replay (from={args.from_date} to={args.to_date})")
+    fixture = args.fixture_path
+    from_date = args.from_date
+    to_date = args.to_date
+    output = run_replay(config, from_date, to_date, fixture)
+    if args.output:
+        path = write_golden(output, args.output)
+        digest = __import__("hashlib").sha256(path.read_bytes()).hexdigest()[:16]
+        print(f"[alpha-quant] replay: golden output written to {path} (sha256={digest})")
+    else:
+        print(f"[alpha-quant] replay (from={from_date} to={to_date}, fixture={fixture})")
     if args.verbose_config:
         print(json.dumps(redact_config(config), indent=2, default=str))
 
@@ -127,6 +137,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_replay = sub.add_parser("replay", help="Replay historical period")
     p_replay.add_argument("--from-date", type=str, required=True)
     p_replay.add_argument("--to-date", type=str, required=True)
+    p_replay.add_argument(
+        "--fixture",
+        type=str,
+        dest="fixture_path",
+        default=None,
+        help="Fixture bundle path (default: ./fixtures/v1)",
+    )
+    p_replay.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="Write golden output to this file",
+    )
     p_replay.set_defaults(func=cmd_replay)
 
     p_backtest = sub.add_parser("backtest", help="Run event-driven backtester")
