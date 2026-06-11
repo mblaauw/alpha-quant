@@ -202,6 +202,18 @@ class Decision(BaseModel):
     mechanism_results: dict[str, float] = {}
 
 
+class UniverseMember(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    symbol: str
+    price: float | None = None
+    volume_adv: float | None = None
+    market_cap: float | None = None
+    sector: str | None = None
+    passes_m1: bool = False
+    fail_reason: str | None = None
+
+
 class TickerRecord(BaseModel):
     model_config = ConfigDict(frozen=True)
 
