@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 import shutil
 import uuid
+from collections.abc import Generator
+from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, override
+from typing import Any, Self, override
 
 import duckdb
 import pyarrow as pa
@@ -149,6 +151,16 @@ class CanonicalStore(Store):
         self._state_conn = duckdb.connect(str(self._state_path))
         self._state_conn.execute("PRAGMA journal_mode=WAL")
         self._init_state_schema()
+
+    @contextmanager
+    def transaction(self) -> Generator[Self]:
+        self._state_conn.execute("BEGIN TRANSACTION")
+        try:
+            yield self
+        except Exception:
+            self._state_conn.execute("ROLLBACK")
+            raise
+        self._state_conn.execute("COMMIT")
 
     def _canonical_path(self, dataset: str) -> Path:
         return self._base / "canonical" / dataset
