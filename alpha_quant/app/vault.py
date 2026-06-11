@@ -26,7 +26,6 @@ class Vault:
         self._manifest_path = self._base / "manifest.db"
         self._base.mkdir(parents=True, exist_ok=True)
         self._conn = duckdb.connect(str(self._manifest_path))
-        self._conn.execute("PRAGMA wal_autocheckpoint='OFF'")
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS manifest ("
             "  fetch_id VARCHAR PRIMARY KEY,"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -39,6 +40,18 @@ def _wait(retry_state: Any) -> float:
                 except ValueError, TypeError:
                     pass
     return min(2 * (2**retry_state.attempt_number), 30)
+
+
+def _parse_date(value: str | None, *fmts: str) -> date | None:
+    if not value:
+        return None
+    formats = fmts or ("%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y")
+    for fmt in formats:
+        try:
+            return datetime.strptime(value.strip(), fmt).date()
+        except ValueError, TypeError:
+            continue
+    return None
 
 
 class BaseConnector:
