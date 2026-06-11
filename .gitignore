@@ -9,6 +9,7 @@ build/
 .mypy_cache/
 .pytest_cache/
 *.toml.user
+config.local.toml
 data/vault/
 data/.HALT
 fixtures/*/

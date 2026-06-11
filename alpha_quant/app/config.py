@@ -256,6 +256,16 @@ def _merge_env_overrides(data: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    result = dict(base)
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
 def load_config(path: str | None = None) -> AppConfig:
     config_path = _resolve_config_path(path)
     try:
@@ -267,6 +277,17 @@ def load_config(path: str | None = None) -> AppConfig:
     except FileNotFoundError as e:
         msg = f"Config file not found: {config_path}"
         raise ConfigError(msg, source=config_path) from e
+
+    # Layer local overrides on top if they exist
+    local_path = Path(config_path).parent / "config.local.toml"
+    if local_path.exists():
+        try:
+            with local_path.open("rb") as f:
+                local_data = tomllib.load(f)
+            data = _deep_merge(data, local_data)
+        except tomllib.TOMLDecodeError as e:
+            msg = f"Invalid TOML in {local_path}: {e}"
+            raise ConfigError(msg, source=str(local_path)) from e
 
     merged = _merge_env_overrides(data)
     try:

@@ -1,0 +1,17 @@
+# Local config overrides
+#
+# Copy this file to config.local.toml (gitignored) and fill in your real secrets.
+# Values here override config.toml at runtime. Environment variables
+# (ALPHA_QUANT_ prefix) take highest precedence.
+#
+# Example:
+#
+# [eodhd]
+# api_key = "your-eodhd-api-key"
+#
+# [alpaca]
+# api_key = "your-alpaca-api-key"
+# secret_key = "your-alpaca-secret-key"
+#
+# [llm]
+# api_key = "your-openrouter-or-openai-key"
