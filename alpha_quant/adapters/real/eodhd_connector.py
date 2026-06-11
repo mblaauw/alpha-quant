@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from alpha_quant.adapters.real.base_connector import BaseConnector
 from alpha_quant.domain.exceptions import DataNormalizationError
@@ -68,6 +68,7 @@ class EODHDConnector(BaseConnector, MarketData, Fundamentals):
             volume=_float(entry.get("volume")) or 0.0,
         )
 
+    @override
     def daily_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
         raw = self._get_json(
             f"eod/{symbol}",
@@ -81,6 +82,7 @@ class EODHDConnector(BaseConnector, MarketData, Fundamentals):
             bars.append(self._parse_bar(entry, symbol))
         return bars
 
+    @override
     def snapshot(self, symbol: str) -> FundamentalsSnapshot:
         raw = self._get_json(f"fundamentals/{symbol}")
         _expect_type(raw, dict, "dict for fundamentals")
@@ -127,6 +129,7 @@ class EODHDConnector(BaseConnector, MarketData, Fundamentals):
             accruals=accruals,
         )
 
+    @override
     def earnings_calendar(self, start: date, end: date) -> list[EarningsEntry]:
         raw = self._get_json(
             "calendar/earnings",

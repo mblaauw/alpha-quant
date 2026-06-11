@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date
-from typing import Any
+from typing import Any, override
 
 import structlog
 
@@ -41,6 +41,7 @@ class AlpacaConnector(BaseConnector, MarketData):
 
         return StockHistoricalDataClient(self._api_key, self._secret_key)
 
+    @override
     def latest_quote(self, symbol: str) -> Quote:
         from alpaca.data.models import Quote as AlpacaQuote
         from alpaca.data.requests import StockLatestQuoteRequest
@@ -64,6 +65,7 @@ class AlpacaConnector(BaseConnector, MarketData):
             ask_size=float(raw.ask_size) if raw.ask_size is not None else None,
         )
 
+    @override
     def trading_calendar(self, start: date, end: date) -> list[TradingDay]:
         params: dict[str, str] = {
             "start": start.isoformat(),

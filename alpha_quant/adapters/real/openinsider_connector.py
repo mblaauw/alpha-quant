@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 from datetime import date, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 from urllib.parse import urlencode
 
 import structlog
@@ -20,6 +20,25 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 SCREENER_URL = "http://openinsider.com/screener"
+
+# Expected OpenInsider HTML structure (as of 2026-06):
+#   <table class="tinytable">
+#     <tbody>
+#       <tr>
+#         <td><a href="...">AAPL</a></td>        <!-- 0: ticker -->
+#         <td>Owner Name</td>                      <!-- 1: owner -->
+#         <td>CEO, Director</td>                   <!-- 2: title -->
+#         <td>D</td>                                <!-- 3: relationship -->
+#         <td>Buy</td>                              <!-- 4: type -->
+#         <td>$150.00</td>                          <!-- 5: price -->
+#         <td>10,000</td>                           <!-- 6: quantity -->
+#         <td>50,000</td>                           <!-- 7: holding -->
+#         <td>2026-06-10</td>                       <!-- 8: date -->
+#         <td>...</td>                              <!-- 9+: other -->
+#       </tr>
+#     </tbody>
+#   </table>
+# Some tables lack <tbody> — fallback to direct tr selector.
 
 
 class OpenInsiderConnector(BaseConnector, InsiderFeed):
@@ -88,17 +107,30 @@ class OpenInsiderConnector(BaseConnector, InsiderFeed):
             return []
 
         transactions: list[InsiderTransaction] = []
+        skip_count = 0
         for row in rows:
             cells = row.css("td")
             if len(cells) < 10:
+                skip_count += 1
                 continue
             try:
                 tx = _row_to_transaction(cells)
                 if tx is not None:
                     transactions.append(tx)
+                else:
+                    skip_count += 1
             except Exception as exc:
                 logger.debug("openinsider_skip_row", error=str(exc))
+                skip_count += 1
                 continue
+
+        if not transactions and skip_count > 0:
+            logger.warning(
+                "openinsider_all_rows_skipped",
+                total_rows=len(rows),
+                skipped=skip_count,
+            )
+
         return transactions
 
     def _cluster_transactions(self, transactions: list[InsiderTransaction]) -> list[InsiderCluster]:
@@ -144,11 +176,13 @@ class OpenInsiderConnector(BaseConnector, InsiderFeed):
 
     # --- Port interface (InsiderFeed) ---
 
+    @override
     def cluster_transactions(self, symbol: str) -> list[InsiderTransaction]:
         html = self._fetch_html(30)
         all_tx = self._parse_transactions(html)
         return [tx for tx in all_tx if tx.symbol.upper() == symbol.upper()]
 
+    @override
     def recent_clusters(self, symbol: str) -> list[InsiderCluster]:
         return [c for c in self._fetch_all_clusters() if c.symbol.upper() == symbol.upper()]
 

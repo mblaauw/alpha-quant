@@ -4,7 +4,7 @@ import re
 from collections import defaultdict
 from datetime import date
 from statistics import mean, stdev
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 import structlog
 
@@ -165,10 +165,12 @@ class RedditSentimentConnector(BaseConnector, SentimentFeed):
 
     # --- Port interface (SentimentFeed) ---
 
+    @override
     def mention_counts(self, symbol: str, days: int = 30) -> list[MentionCount]:
         all_counts = self._fetch_all_mention_counts()
         return [c for c in all_counts if c.symbol.upper() == symbol.upper()]
 
+    @override
     def baseline(self, symbol: str) -> SentimentBaseline:
         counts = self._fetch_all_mention_counts()
         relevant = [c.count for c in counts if c.symbol.upper() == symbol.upper()]
