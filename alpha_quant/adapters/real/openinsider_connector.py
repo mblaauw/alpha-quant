@@ -11,6 +11,7 @@ from selectolax.parser import HTMLParser
 
 from alpha_quant.adapters.real.base_connector import BaseConnector, _parse_date
 from alpha_quant.domain.models import InsiderCluster, InsiderTransaction
+from alpha_quant.ports.insider_feed import InsiderFeed
 
 if TYPE_CHECKING:
     from alpha_quant.app.vault import Vault
@@ -20,7 +21,7 @@ logger = structlog.get_logger()
 SCREENER_URL = "http://openinsider.com/screener"
 
 
-class OpenInsiderConnector(BaseConnector):
+class OpenInsiderConnector(BaseConnector, InsiderFeed):
     def __init__(
         self,
         *,
@@ -133,17 +134,27 @@ class OpenInsiderConnector(BaseConnector):
             clusters.append(cluster)
         return clusters
 
-    def recent_clusters(self, days: int = 30) -> list[InsiderCluster]:
-        html = self._fetch_html(days)
-        transactions = self._parse_transactions(html)
-        return self._cluster_transactions(transactions)
-
     def cluster_for_symbol(self, symbol: str, days: int = 30) -> InsiderCluster | None:
-        clusters = self.recent_clusters(days)
+        clusters = self._fetch_all_clusters(days)
         for c in clusters:
             if c.symbol.upper() == symbol.upper():
                 return c
         return None
+
+    # --- Port interface (InsiderFeed) ---
+
+    def cluster_transactions(self, symbol: str) -> list[InsiderTransaction]:
+        html = self._fetch_html(30)
+        all_tx = self._parse_transactions(html)
+        return [tx for tx in all_tx if tx.symbol.upper() == symbol.upper()]
+
+    def recent_clusters(self, symbol: str) -> list[InsiderCluster]:
+        return [c for c in self._fetch_all_clusters() if c.symbol.upper() == symbol.upper()]
+
+    def _fetch_all_clusters(self, days: int = 30) -> list[InsiderCluster]:
+        html = self._fetch_html(days)
+        transactions = self._parse_transactions(html)
+        return self._cluster_transactions(transactions)
 
 
 def _row_to_transaction(cells: list) -> InsiderTransaction | None:

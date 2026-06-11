@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR-0021](./0021-use-duckdb-for-both-analytical-and-transactional-state.md)
 
 ## Date
 

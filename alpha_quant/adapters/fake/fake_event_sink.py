@@ -8,10 +8,10 @@ class FakeEventSink(EventSink):
     def __init__(self) -> None:
         self.events: list[DomainEvent] = []
 
-    async def emit(self, event: DomainEvent) -> None:
+    def emit(self, event: DomainEvent) -> None:
         self.events.append(event)
 
-    async def query(
+    def query(
         self,
         run_id: str | None = None,
         event_type: str | None = None,
