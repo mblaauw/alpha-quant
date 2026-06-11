@@ -46,6 +46,12 @@ class FundamentalsSnapshot(BaseModel):
     dividend_yield: float | None = None
     sector: str | None = None
     industry: str | None = None
+    operating_cash_flow: float | None = None
+    total_debt: float | None = None
+    total_equity: float | None = None
+    revenue: float | None = None
+    net_income: float | None = None
+    accruals: float | None = None
 
 
 class EarningsEntry(BaseModel):
