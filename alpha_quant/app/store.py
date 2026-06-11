@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import uuid
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -375,6 +376,18 @@ class CanonicalStore:
             "  PRIMARY KEY (symbol, quarantined_date)"
             ")"
         )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS runs ("
+            "  run_id VARCHAR PRIMARY KEY,"
+            "  run_type VARCHAR NOT NULL,"
+            "  config_hash VARCHAR NOT NULL,"
+            "  fixture_version VARCHAR,"
+            "  start_ts TIMESTAMP NOT NULL,"
+            "  end_ts TIMESTAMP,"
+            "  status VARCHAR NOT NULL DEFAULT 'running',"
+            "  manifest_hash VARCHAR"
+            ")"
+        )
         conn.commit()
 
     def save_decision(self, decision: Decision) -> None:
@@ -625,6 +638,56 @@ class CanonicalStore:
             [symbol],
         )
         self._state_conn.commit()
+
+    def register_run(
+        self,
+        run_type: str,
+        config_hash: str,
+        fixture_version: str = "",
+    ) -> str:
+        run_id = uuid.uuid4().hex[:16]
+        self._state_conn.execute(
+            "INSERT INTO runs (run_id, run_type, config_hash, fixture_version, start_ts, status)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            [run_id, run_type, config_hash, fixture_version, datetime.now(), "running"],
+        )
+        self._state_conn.commit()
+        return run_id
+
+    def complete_run(self, run_id: str, status: str = "completed", manifest_hash: str = "") -> None:
+        self._state_conn.execute(
+            "UPDATE runs SET end_ts = ?, status = ?, manifest_hash = ? WHERE run_id = ?",
+            [datetime.now(), status, manifest_hash, run_id],
+        )
+        self._state_conn.commit()
+
+    def list_runs(self, since_date: date | None = None) -> list[dict[str, Any]]:
+        if since_date is not None:
+            rows = self._state_conn.execute(
+                "SELECT run_id, run_type, config_hash, fixture_version,"
+                " start_ts, end_ts, status, manifest_hash"
+                " FROM runs WHERE start_ts >= ? ORDER BY start_ts DESC",
+                [since_date],
+            ).fetchall()
+        else:
+            rows = self._state_conn.execute(
+                "SELECT run_id, run_type, config_hash, fixture_version,"
+                " start_ts, end_ts, status, manifest_hash"
+                " FROM runs ORDER BY start_ts DESC LIMIT 50"
+            ).fetchall()
+        return [
+            {
+                "run_id": r[0],
+                "run_type": r[1],
+                "config_hash": r[2],
+                "fixture_version": r[3],
+                "start_ts": str(r[4]),
+                "end_ts": str(r[5]) if r[5] else None,
+                "status": r[6],
+                "manifest_hash": r[7],
+            }
+            for r in rows
+        ]
 
     def close(self) -> None:
         self._analytical.close()

@@ -1,9 +1,13 @@
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from alpha_quant.app.catalog import compute_manifest_hash
 from alpha_quant.app.config import AppConfig, redact_config
+
+if TYPE_CHECKING:
+    from alpha_quant.app.store import CanonicalStore
 
 
 def run_replay(
@@ -11,9 +15,19 @@ def run_replay(
     from_date: str,
     to_date: str,
     fixture_path: str | None = None,
+    store: CanonicalStore | None = None,
 ) -> dict[str, Any]:
     cfg_redacted = redact_config(config)
     config_hash = hashlib.sha256(json.dumps(cfg_redacted, sort_keys=True).encode()).hexdigest()[:16]
+
+    fixture_hash = ""
+    if fixture_path:
+        fixture_hash = compute_manifest_hash(fixture_path)
+
+    run_id: str | None = None
+    if store is not None:
+        fv = config.data.fixture_version if hasattr(config.data, "fixture_version") else ""
+        run_id = store.register_run("replay", config_hash, fv)
 
     output: dict[str, Any] = {
         "meta": {
@@ -21,7 +35,9 @@ def run_replay(
             "from_date": from_date,
             "to_date": to_date,
             "fixture_path": fixture_path,
+            "fixture_hash": fixture_hash,
             "config_hash": config_hash,
+            "run_id": run_id,
         },
         "system": {
             "python": "3.14",
@@ -49,6 +65,10 @@ def run_replay(
             "completed": 9,
         },
     }
+
+    if store is not None and run_id is not None:
+        store.complete_run(run_id, "golden_pass", fixture_hash)
+
     return output
 
 
