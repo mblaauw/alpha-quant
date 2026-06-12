@@ -201,13 +201,14 @@ vault/{source}/{yyyy}/{mm}/{dd}/{fetch_id}.zst     + vault/manifest.duckdb
 
 Per ADR-0021 (supersedes ADR-0007), Alpha-Quant uses **DuckDB for both analytical and transactional access** — no SQLAlchemy Core or separate SQLite.
 
-**Analytical data → Parquet, queried by DuckDB.** Daily bars, fundamentals snapshots, insider transactions, mention counts: columnar, scan-heavy, append-mostly.
+**Analytical data → Parquet, queried by DuckDB.** Daily bars, fundamentals snapshots, insider transactions, mention counts, corporate actions: columnar, scan-heavy, append-mostly.
 
 ```
 canonical/bars/date=YYYY-MM-DD/part.parquet        # date-partitioned (one small file/day)
 canonical/fundamentals/snapshot_date=.../
 canonical/insider_tx/filed_date=.../
 canonical/mentions/date=.../
+canonical/corp_actions/effective_date=.../
 ```
 
 Date partitioning makes the 50-day tail prune a directory delete and makes as-of queries natural. DuckDB reads parquet globs directly with zero server footprint — and you already know this stack cold from the postgres-connector pipeline (PostgreSQL→DuckDB→Parquet); same pattern, new domain.
@@ -224,9 +225,11 @@ Migration path: local Parquet → MinIO/S3 is behind DuckDB's path config; state
 
 ### 3.5 Zone 4 — Derived state (the incremental engine)
 
-Per-symbol `indicator_state` row: `{ema20, ema50, ema200, rsi_avg_gain, rsi_avg_loss, atr, last_close, last_date, updated_ts}` — all O(1) Wilder/EMA recurrences in plain numpy; no pandas-ta dependency needed because nothing recomputes windows. Plus `month_end_closes` (12 floats/symbol/year) for 12-1 momentum, regime state, and 30-day Reddit mention baselines.
+Per-symbol `indicator_state` row: `{ema20, ema50, ema200, rsi_avg_gain, rsi_avg_loss, atr, last_close, last_date, updated_ts, status}` — all O(1) Wilder/EMA recurrences in plain numpy; no pandas-ta dependency needed because nothing recomputes windows. Plus `month_end_closes` (12 floats/symbol/year) for 12-1 momentum, regime state, and 30-day Reddit mention baselines.
 
 This is what reconciles the 50-day raw tail with 200-day indicators: EMAs update from one stored value; long raw history is unnecessary. Cold start: one-time 250-day backfill per symbol seeds the state (bootstrap does this), then raw bars are pruned to the tail. Integrity check in CI: recompute from full fixture history, compare to incrementally-built state to 1e-6.
+
+**Corporate-action adjustment policy:** The system stores raw (unadjusted) `close` prices. `adj_close` from EODHD is retained in the `bars` schema but not consumed by the indicator engine — the indicator engine uses `close` (point-in-time raw prices). When a corporate action (split, dividend) occurs, the affected symbol's `indicator_state.status` is set to `STALE`, triggering a full backfill from raw bars on the next pipeline run. This is safer than applying adjustment factors to incremental state, since a split's ~50% price jump would corrupt recursive EMA/RSI/ATR despite any adjustment formula. The `adjust_price()` pure function in `domain/corp_actions.py` computes cumulative backwards adjustment factors for backtesting — it multiplies split ratios to produce a factor that makes historical prices comparable to current prices. Dividends are recorded but do not adjust prices (cash dividends don't change the price series structure).
 
 ### 3.6 Validation gates (between every zone)
 

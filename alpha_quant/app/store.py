@@ -17,6 +17,7 @@ from alpha_quant.domain.events import DomainEvent
 from alpha_quant.domain.models import (
     Bar,
     Candidate,
+    CorporateAction,
     Decision,
     Fill,
     FundamentalsSnapshot,
@@ -76,6 +77,13 @@ _CANONICAL_SCHEMAS: dict[str, list[tuple[str, pa.DataType]]] = {
         ("source", pa.string()),
         ("count", pa.int64()),
     ],
+    "corp_actions": [
+        ("symbol", pa.string()),
+        ("effective_date", pa.date32()),
+        ("action_type", pa.string()),
+        ("ratio", pa.float64()),
+        ("amount", pa.float64()),
+    ],
 }
 
 
@@ -125,6 +133,17 @@ def _model_to_pylist(
                 }
                 for m in models
             ]
+        case "corp_actions":
+            return [
+                {
+                    "symbol": m.symbol,
+                    "effective_date": m.effective_date,
+                    "action_type": m.action_type,
+                    "ratio": m.ratio,
+                    "amount": m.amount,
+                }
+                for m in models
+            ]
         case _:
             return [m.model_dump() for m in models]
 
@@ -135,6 +154,7 @@ def _partition_col(model_name: str) -> str:
         "fundamentals": "as_of_date",
         "insider_transactions": "filing_date",
         "mentions": "mention_date",
+        "corp_actions": "effective_date",
     }
     return mapping.get(model_name, "date")
 
@@ -438,8 +458,13 @@ class CanonicalStore(Store):
             "  symbol VARCHAR NOT NULL,"
             "  state_date DATE NOT NULL,"
             "  values JSON NOT NULL,"
+            "  status VARCHAR NOT NULL DEFAULT 'valid',"
             "  PRIMARY KEY (symbol, state_date)"
             ")"
+        )
+        conn.execute(
+            "ALTER TABLE indicator_state ADD COLUMN IF NOT EXISTS status"
+            " VARCHAR NOT NULL DEFAULT 'valid'"
         )
         conn.execute(
             "CREATE TABLE IF NOT EXISTS catalog ("
@@ -709,15 +734,16 @@ class CanonicalStore(Store):
     @override
     def save_indicator_state(self, state: IndicatorState) -> None:
         self._state_conn.execute(
-            "INSERT OR REPLACE INTO indicator_state (symbol, state_date, values) VALUES (?, ?, ?)",
-            [state.symbol, state.date, json.dumps(state.values)],
+            "INSERT OR REPLACE INTO indicator_state"
+            " (symbol, state_date, values, status) VALUES (?, ?, ?, ?)",
+            [state.symbol, state.date, json.dumps(state.values), state.status],
         )
         self._state_conn.commit()
 
     @override
     def load_indicator_state(self, symbol: str, dt: date) -> IndicatorState | None:
         row = self._state_conn.execute(
-            "SELECT symbol, state_date, values"
+            "SELECT symbol, state_date, values, status"
             " FROM indicator_state WHERE symbol = ? AND state_date = ?",
             [symbol, dt],
         ).fetchone()
@@ -727,7 +753,40 @@ class CanonicalStore(Store):
             symbol=row[0],
             date=row[1],
             values=json.loads(row[2]),
+            status=row[3],
         )
+
+    @override
+    def save_corp_actions(self, symbol: str, actions: list[CorporateAction]) -> None:
+        self._write_dataset(actions, "corp_actions")
+
+    @override
+    def load_corp_actions(self, symbol: str) -> list[CorporateAction]:
+        data_path = str(self._canonical_path("corp_actions") / "**" / "*.parquet")
+        pcol = _partition_col("corp_actions")
+        hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
+        try:
+            result = self._analytical.execute(
+                f"""
+                SELECT symbol, "{pcol}" AS effective_date, action_type, ratio, amount
+                FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
+                WHERE symbol = ?
+                ORDER BY "{pcol}"
+                """,
+                [symbol],
+            ).fetchall()
+        except duckdb.CatalogException, duckdb.IOException:
+            return []
+        return [
+            CorporateAction(
+                symbol=r[0],
+                effective_date=r[1],
+                action_type=r[2],
+                ratio=r[3],
+                amount=r[4],
+            )
+            for r in result
+        ]
 
     def add_quarantine(self, symbol: str, reason: str, severity: str = "QUARANTINE") -> None:
         self._state_conn.execute(
@@ -830,5 +889,6 @@ def _dedup_keys(dataset: str) -> str:
         "fundamentals": "symbol, as_of_date",
         "insider_transactions": "symbol, filing_date, transaction_date, transaction_type, owner",
         "mentions": "symbol, mention_date, source",
+        "corp_actions": "symbol, effective_date, action_type",
     }
     return mapping.get(dataset, "rowid")

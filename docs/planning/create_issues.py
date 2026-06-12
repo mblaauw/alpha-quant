@@ -1171,10 +1171,15 @@ def create_issue(issue_data):
         label_args.extend(["--label", label])
 
     cmd = [
-        "gh", "issue", "create",
-        "--repo", REPO,
-        "--title", issue_data["title"],
-        "--body", issue_data["body"],
+        "gh",
+        "issue",
+        "create",
+        "--repo",
+        REPO,
+        "--title",
+        issue_data["title"],
+        "--body",
+        issue_data["body"],
     ] + label_args
 
     result = subprocess.run(cmd, capture_output=True, text=True)

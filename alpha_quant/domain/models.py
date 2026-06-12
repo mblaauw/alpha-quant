@@ -224,9 +224,20 @@ class TickerRecord(BaseModel):
     sic_code: int | None = None
 
 
+class CorporateAction(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    symbol: str
+    effective_date: date
+    action_type: str
+    ratio: float | None = None
+    amount: float | None = None
+
+
 class IndicatorState(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     symbol: str
     date: date
     values: dict[str, float]
+    status: str = "valid"
