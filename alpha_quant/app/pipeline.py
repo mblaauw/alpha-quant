@@ -13,6 +13,7 @@ from alpha_quant.domain.events import (
     CandidatePromoted,
     CandidateScored,
     ConsistencyViolation,
+    DataQuarantined,
     PipelineRunCompleted,
     PipelineRunStarted,
     RegimeChanged,
@@ -29,6 +30,7 @@ from alpha_quant.domain.risk import RiskConfig, evaluate_stops, evaluate_time_st
 from alpha_quant.domain.sizing import SizingConfig, size_position
 from alpha_quant.domain.technical import momentum_score
 from alpha_quant.domain.technical import score as score_technical
+from alpha_quant.domain.validate import validate_bars, validate_indicator_state
 from alpha_quant.ports.store import Store
 
 _LOOKBACK_DAYS = 400
@@ -50,6 +52,7 @@ class RunResult:
     fills: list[Fill]
     events: list[object]
     violations: list[InvariantViolation]
+    halted: bool = False
     prev_equity: float | None = None
     new_equity: float | None = None
 
@@ -86,6 +89,7 @@ def run(
     )
 
     lookback_start = date.fromordinal(run_date.toordinal() - cfg.lookback_days)
+    halted = False
     symbols = list(universe)
     if "SPY" not in symbols:
         symbols.append("SPY")
@@ -127,7 +131,28 @@ def run(
             fills=[],
             events=events,
             violations=[],
+            halted=halted,
         )
+
+    # --- 2. Validate bars ---
+    for symbol, bars in all_bars.items():
+        if not bars:
+            continue
+        results = validate_bars(bars)
+        for vr in results:
+            events.append(
+                DataQuarantined(
+                    event_id=uuid.uuid4().hex[:16],
+                    timestamp=datetime.now(UTC),
+                    run_id=run_id,
+                    source="pipeline",
+                    symbol=symbol,
+                    reason=vr.check,
+                    detail="; ".join(vr.issues),
+                )
+            )
+            if vr.severity == "HALT":
+                halted = True
 
     # --- 3. Derive indicators ---
     indicator_states: dict[str, IndicatorState] = {}
@@ -135,6 +160,22 @@ def run(
         if bars:
             with suppress(Exception):
                 indicator_states[symbol] = backfill_indicator_state(bars)
+
+    # --- 3b. Validate indicators ---
+    for symbol, state in indicator_states.items():
+        results = validate_indicator_state(state)
+        for vr in results:
+            events.append(
+                DataQuarantined(
+                    event_id=uuid.uuid4().hex[:16],
+                    timestamp=datetime.now(UTC),
+                    run_id=run_id,
+                    source="pipeline",
+                    symbol=symbol,
+                    reason=vr.check,
+                    detail="; ".join(vr.issues),
+                )
+            )
 
     # --- 4. Regime ---
     spy_state = indicator_states.get("SPY")
@@ -412,4 +453,5 @@ def run(
         violations=violations,
         prev_equity=prev_equity,
         new_equity=pop_equity_final,
+        halted=halted,
     )
