@@ -39,6 +39,8 @@ class Vault:
             "  dt DATE NOT NULL"
             ")"
         )
+        # Dedup: (source, endpoint, content_hash) — identical payloads
+        # from the same API endpoint are stored once regardless of fetch time.
 
     def store(
         self,
@@ -56,16 +58,17 @@ class Vault:
         if ingest_ts is None:
             ingest_ts = datetime.now(UTC)
 
-        fetch_id = _compute_fetch_id(source, endpoint, params_str, ingest_ts)
+        content_hash = hashlib.sha256(data).hexdigest()
 
         existing = self._conn.execute(
-            "SELECT 1 FROM manifest WHERE fetch_id = ?", (fetch_id,)
+            "SELECT fetch_id FROM manifest WHERE source = ? AND endpoint = ? AND content_hash = ?",
+            (source, endpoint, content_hash),
         ).fetchone()
         if existing is not None:
-            logger.debug("vault_duplicate_skip", fetch_id=fetch_id)
-            return fetch_id
+            logger.debug("vault_duplicate_skip", source=source, endpoint=endpoint)
+            return existing[0]
 
-        content_hash = hashlib.sha256(data).hexdigest()
+        fetch_id = _compute_fetch_id(source, endpoint, params_str, ingest_ts)
         cctx = zstandard.ZstdCompressor(level=3)
         compressed = cctx.compress(data)
 
