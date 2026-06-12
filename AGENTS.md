@@ -1,5 +1,19 @@
 # Alpha Quant — Agent Workflow
 
+## Body Formatting Rule
+
+**Always use `--body-file /tmp/body.md` for multi-line issue/PR bodies.** Never use inline `\n` in `--body "..."` — bash double quotes do not interpret `\n` as newlines, producing raw `\n` text in the GitHub UI.
+
+Template:
+
+```bash
+cat > /tmp/body.md << 'EOF'
+... multi-line content with proper newlines ...
+EOF
+
+gh <command> --body-file /tmp/body.md
+```
+
 ## Full Issue Lifecycle
 
 ### 1. Pick Up Next Issue
@@ -64,11 +78,27 @@ uv run ty check alpha_quant/
 git add -A && git commit -m "<scope>: <title>"
 git push origin <feature-branch-name>
 
+cat > /tmp/pr_body.md << 'EOF'
+## Summary
+
+Completes <scope> (closes #<N>).
+
+### Changes
+
+- Bullet list of what was changed
+
+### Verification
+
+- `ruff check` — All checks passed
+- `ruff format` — All files formatted
+- `ty check` — All checks passed
+EOF
+
 gh pr create \
   --base main \
   --head <feature-branch-name> \
   --title "<scope>: <title>" \
-  --body "## Summary\n\nCompletes <scope> (closes #<N>).\n\n### Changes\n\n- Bullet list of what was changed\n\n### Verification\n\n- \`ruff check\` — All checks passed\n- \`ruff format\` — All files formatted\n- \`ty check\` — All checks passed"
+  --body-file /tmp/pr_body.md
 ```
 
 PR body must include:
@@ -129,7 +159,22 @@ After all fixes are pushed:
 After the code review loop passes (zero issues), update the issue body to check off all completed AC items:
 
 ```bash
-gh issue edit <N> --body "<updated body with [x] checks>"
+cat > /tmp/issue_body.md << 'EOF'
+## Description
+
+<updated description>
+
+## Acceptance Criteria
+
+- [x] <criterion 1>
+- [x] <criterion 2>
+
+## Technical Details
+
+<details if needed>
+EOF
+
+gh issue edit <N> --body-file /tmp/issue_body.md
 ```
 
 ### 8. Squash & Merge
@@ -173,11 +218,41 @@ When the PO calls for a technical refinement, the Software Designer evaluates th
 
 ### 1. PO creates a Refinement Issue (P1.R style)
 
-Issue title: `P1.R: Technical refinement — <scope>`
-Labels: `story, priority/p0, size/m, domain/backend, P1`
-Body includes:
-- Acceptance criteria organized in sections (ADR audit, dependency fitness, duplicate code, architecture consistency, future-proofing)
-- Required outputs: updated ADRs, refactoring punch list (P0/P1/P2), library recommendation report
+Create the issue with a multi-line body using `--body-file`:
+
+```bash
+cat > /tmp/refinement_body.md << 'EOF'
+## Description
+
+<clear description of what to evaluate>
+
+## Acceptance Criteria
+
+### ADR Audit
+- [ ] ...
+
+### Dependency Fitness
+- [ ] ...
+
+### Duplicate Code
+- [ ] ...
+
+### Architecture Consistency
+- [ ] ...
+
+### Future-Proofing
+- [ ] ...
+
+## Technical Details
+
+<details if needed>
+EOF
+
+gh issue create \
+  --title "P1.R: Technical refinement — <scope>" \
+  --label "story,priority/p0,size/m,domain/backend,P1" \
+  --body-file /tmp/refinement_body.md
+```
 
 ### 2. Software Designer completes evaluation
 
