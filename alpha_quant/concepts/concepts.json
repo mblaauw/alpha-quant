@@ -1,0 +1,22 @@
+[
+  {"id": "atr", "title": "What is ATR (Average True Range)?", "difficulty": "beginner"},
+  {"id": "stop-loss", "title": "How Stop-Loss Orders Work", "difficulty": "beginner"},
+  {"id": "regime", "title": "Understanding Market Regimes", "difficulty": "intermediate"},
+  {"id": "rsi", "title": "What is RSI (Relative Strength Index)?", "difficulty": "beginner"},
+  {"id": "macd", "title": "Understanding MACD", "difficulty": "intermediate"},
+  {"id": "drawdown", "title": "What is Drawdown?", "difficulty": "beginner"},
+  {"id": "sharpe", "title": "Sharpe Ratio Explained", "difficulty": "intermediate"},
+  {"id": "moving-averages", "title": "Moving Averages (SMA and EMA)", "difficulty": "beginner"},
+  {"id": "position-sizing", "title": "Position Sizing Fundamentals", "difficulty": "intermediate"},
+  {"id": "risk-management", "title": "Risk Management in Trading", "difficulty": "intermediate"},
+  {"id": "technical-score", "title": "Technical Score Composite", "difficulty": "advanced"},
+  {"id": "momentum", "title": "Momentum Trading", "difficulty": "beginner"},
+  {"id": "composite-ranking", "title": "Composite Ranking System", "difficulty": "advanced"},
+  {"id": "earnings-blackout", "title": "Earnings Blackout Windows", "difficulty": "intermediate"},
+  {"id": "insider-signal", "title": "Insider Trading Signals", "difficulty": "advanced"},
+  {"id": "crowding", "title": "Crowding and Sentiment", "difficulty": "intermediate"},
+  {"id": "fundamental-quality", "title": "Fundamental Quality Gate", "difficulty": "intermediate"},
+  {"id": "backtesting", "title": "Backtesting Strategies", "difficulty": "intermediate"},
+  {"id": "diversification", "title": "Portfolio Diversification", "difficulty": "beginner"},
+  {"id": "ablation", "title": "Ablation Analysis", "difficulty": "advanced"}
+]
