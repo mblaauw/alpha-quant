@@ -16,6 +16,7 @@ from alpha_quant.app._loop import (
     score_candidate,
     size_entry,
 )
+from alpha_quant.domain.ablation import AblationConfig
 from alpha_quant.domain.derive import backfill_indicator_state
 from alpha_quant.domain.events import (
     CandidateBlocked,
@@ -47,6 +48,7 @@ class PipelineConfig:
     run_id: str = ""
     max_positions: int = 10
     lookback_days: int = 400
+    ablation: AblationConfig | None = None
 
 
 @dataclass
