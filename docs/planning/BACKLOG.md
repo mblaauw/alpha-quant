@@ -243,7 +243,7 @@ Create the formal architecture documentation: 18 Architecture Decision Records (
 
 ---
 
-### STORY-0.5.1: Write 18 ADRs covering all technology decisions
+### STORY-0.5.1: Write 26 ADRs covering all technology decisions
 
 **Points:** 8 | **Priority:** P0 | **Status:** 📝
 

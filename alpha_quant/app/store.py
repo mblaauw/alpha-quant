@@ -194,7 +194,6 @@ class CanonicalStore(Store):
 
         self._state_path = self._base / "state.db"
         self._state_conn = duckdb.connect(str(self._state_path))
-        self._state_conn.execute("PRAGMA journal_mode=WAL")
         self._init_state_schema()
 
     @contextmanager
@@ -461,10 +460,6 @@ class CanonicalStore(Store):
             ")"
         )
         conn.execute(
-            "ALTER TABLE indicator_state ADD COLUMN IF NOT EXISTS status"
-            " VARCHAR NOT NULL DEFAULT 'valid'"
-        )
-        conn.execute(
             "CREATE TABLE IF NOT EXISTS catalog ("
             "  dataset VARCHAR NOT NULL,"
             "  version VARCHAR NOT NULL,"
@@ -484,6 +479,20 @@ class CanonicalStore(Store):
             "  cleared_date DATE,"
             "  severity VARCHAR NOT NULL DEFAULT 'QUARANTINE',"
             "  PRIMARY KEY (symbol, quarantined_date)"
+            ")"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS journal_entries ("
+            "  entry_date DATE PRIMARY KEY,"
+            "  content TEXT NOT NULL"
+            ")"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS reports ("
+            "  report_date DATE NOT NULL,"
+            "  report_type VARCHAR NOT NULL,"
+            "  content TEXT NOT NULL,"
+            "  PRIMARY KEY (report_date, report_type)"
             ")"
         )
         conn.execute(
