@@ -106,7 +106,7 @@ Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamli
 
 ## 5. Architecture Decision Records
 
-18 ADRs document every technology and architectural decision.
+26 ADRs document every technology and architectural decision.
 
 | ADR | Title | Key Decision |
 |-----|-------|-------------|

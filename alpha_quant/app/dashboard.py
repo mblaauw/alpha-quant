@@ -20,7 +20,6 @@ def _connect() -> tuple[duckdb.DuckDBPyConnection, duckdb.DuckDBPyConnection]:
     analytical = duckdb.connect()
     state_path = DATA_DIR / "state.db"
     state = duckdb.connect(str(state_path))
-    state.execute("PRAGMA journal_mode=WAL")
     return analytical, state
 
 
@@ -85,7 +84,7 @@ def portfolio_tab(state: duckdb.DuckDBPyConnection) -> None:
 
     positions = _load_positions(state)
     if not positions.empty:
-        st.dataframe(positions, use_container_width=True)
+        st.dataframe(positions, width="stretch")
 
         total_value = positions["market_value"].sum()
         total_pl = positions["unrealized_pl"].sum()

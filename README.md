@@ -82,7 +82,7 @@ CONNECTORS          RAW VAULT          CANONICAL STORE        DECISION ENGINE
 |----------|-------------|
 | [Design Specification](DESIGN.md) | Full system design (v1.2) |
 | [Architecture Diagrams](docs/architecture/README.md) | C4 model (LikeC4) |
-| [ADR Log](docs/adr/README.md) | 21 Architecture Decision Records |
+| [ADR Log](docs/adr/README.md) | 21 Architecture Decision Records → now 26 |
 | [Backlog](docs/planning/BACKLOG.md) | Full project backlog |
 | [Roadmap](docs/planning/ROADMAP.md) | Implementation roadmap |
 

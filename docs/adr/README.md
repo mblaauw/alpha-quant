@@ -30,6 +30,8 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0022](./0022-use-paper-portfolio-engine.md) | Use Paper Portfolio Engine as Authoritative State Manager | Accepted | 2026-06-12 |
 | [0023](./0023-use-pipeline-orchestrator.md) | Use Pipeline Orchestrator for Daily Run Sequencing | Accepted | 2026-06-12 |
 | [0024](./0024-use-self-consistency-invariants.md) | Use Self-Consistency Invariants for Portfolio Integrity | Accepted | 2026-06-12 |
+| [0025](./0025-use-sec-connector-sqlite-cache.md) | Use SQLite Cache for SEC Connector | Accepted | 2026-06-12 |
+| [0026](./0026-use-content-addressed-vault.md) | Use Content-Addressed Vault for Raw Data Storage | Accepted | 2026-06-12 |
 
 ## Status Meanings
 
