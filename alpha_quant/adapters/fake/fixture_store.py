@@ -18,6 +18,7 @@ from alpha_quant.domain.models import (
     PortfolioSnapshot,
     Position,
 )
+from alpha_quant.domain.reporting import ReportEntry
 from alpha_quant.ports.store import Store
 
 
@@ -30,6 +31,7 @@ class FixtureStore(Store):
         self._events: list[DomainEvent] = []
         self._portfolio_snapshots: list[PortfolioSnapshot] = []
         self._journals: dict[date, JournalEntry] = {}
+        self._reports: dict[tuple[date, str], ReportEntry] = {}
 
     @contextmanager
     def transaction(self) -> Generator[Self]:
@@ -143,3 +145,11 @@ class FixtureStore(Store):
     @override
     def load_journal(self, dt: date) -> JournalEntry | None:
         return self._journals.get(dt)
+
+    @override
+    def save_report(self, report: ReportEntry) -> None:
+        self._reports[(report.date, report.report_type)] = report
+
+    @override
+    def load_report(self, dt: date, report_type: str) -> ReportEntry | None:
+        return self._reports.get((dt, report_type))
