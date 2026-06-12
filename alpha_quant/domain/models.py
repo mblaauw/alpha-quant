@@ -74,7 +74,7 @@ class InsiderTransaction(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     symbol: str
-    filing_date: date
+    filing_date: date | None = None
     transaction_date: date | None = None
     owner: str
     title: str | None = None

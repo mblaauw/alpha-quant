@@ -108,7 +108,7 @@ def _tx_to_table(tx: list[InsiderTransaction]) -> pa.Table:
     return pa.table(
         {
             "symbol": [t.symbol for t in tx],
-            "filing_date": [t.filing_date.isoformat() for t in tx],
+            "filing_date": [t.filing_date.isoformat() if t.filing_date else None for t in tx],
             "transaction_date": [
                 t.transaction_date.isoformat() if t.transaction_date else None for t in tx
             ],
