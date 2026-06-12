@@ -70,6 +70,8 @@ def _compute_accrual_ratio(fundamentals: FundamentalsSnapshot) -> float | None:
 
 
 def _estimate_total_assets(fundamentals: FundamentalsSnapshot) -> float | None:
+    if fundamentals.total_liabilities is not None and fundamentals.total_equity is not None:
+        return fundamentals.total_liabilities + fundamentals.total_equity
     debt = fundamentals.total_debt
     equity = fundamentals.total_equity
     if debt is None or equity is None:
@@ -93,6 +95,7 @@ def _all_missing(fundamentals: FundamentalsSnapshot) -> bool:
         v is None
         for v in [
             fundamentals.operating_cash_flow,
+            fundamentals.total_liabilities,
             fundamentals.total_debt,
             fundamentals.total_equity,
             fundamentals.net_income,

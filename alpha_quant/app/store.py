@@ -58,6 +58,7 @@ _CANONICAL_SCHEMAS: dict[str, list[tuple[str, pa.DataType]]] = {
         ("sector", pa.string()),
         ("industry", pa.string()),
         ("operating_cash_flow", pa.float64()),
+        ("total_liabilities", pa.float64()),
         ("total_debt", pa.float64()),
         ("total_equity", pa.float64()),
         ("revenue", pa.float64()),
