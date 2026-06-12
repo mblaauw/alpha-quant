@@ -12,12 +12,13 @@ def check(
     symbol: str,
     target_date: date,
     earnings_calendar: list[EarningsEntry],
+    window_days: int = 3,
 ) -> BlackoutVerdict:
     report = _next_earnings(symbol, earnings_calendar)
     if report is None:
         return "PASS"
 
-    blackout_start = _trading_days_before(report, 3)
+    blackout_start = _trading_days_before(report, window_days)
     if blackout_start <= target_date < report:
         return "BLOCK"
 

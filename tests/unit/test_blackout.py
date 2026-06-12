@@ -87,3 +87,12 @@ class TestCheck:
             ],
         )
         assert result == "BLOCK"
+
+    def test_custom_window_days(self) -> None:
+        result = check(
+            "AAPL",
+            date(2026, 6, 19),
+            [_earnings("AAPL", date(2026, 6, 25))],
+            window_days=4,
+        )
+        assert result == "BLOCK"

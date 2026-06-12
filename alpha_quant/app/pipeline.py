@@ -17,6 +17,7 @@ from alpha_quant.app._loop import (
     size_entry,
 )
 from alpha_quant.domain.ablation import AblationConfig
+from alpha_quant.domain.degradation import DegradationStatus, m3_threshold_multiplier
 from alpha_quant.domain.derive import backfill_indicator_state
 from alpha_quant.domain.events import (
     CandidateBlocked,
@@ -73,11 +74,13 @@ def run(
     risk_config: RiskConfig | None = None,
     sizing_config: SizingConfig | None = None,
     prev_equity: float | None = None,
+    degradation: DegradationStatus | None = None,
 ) -> RunResult:
     cfg = config or PipelineConfig()
     fc = fill_config or FillConfig()
     rc = risk_config or RiskConfig()
     sc = sizing_config or SizingConfig()
+    deg = degradation or DegradationStatus()
 
     run_id = cfg.run_id or uuid.uuid4().hex[:16]
     events: list[object] = []
@@ -290,8 +293,9 @@ def run(
             cscore = cand.composite_score
 
             gate_block: str | None = None
+            gate_threshold = 0.5 * m3_threshold_multiplier(deg)
 
-            if cscore < 0.5:
+            if cscore < gate_threshold:
                 gate_block = "composite_below_threshold"
 
             if gate_block:

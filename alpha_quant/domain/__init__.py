@@ -7,6 +7,11 @@ from alpha_quant.domain.ablation import (
 )
 from alpha_quant.domain.crowding import CrowdingVerdict
 from alpha_quant.domain.crowding import evaluate as evaluate_crowding
+from alpha_quant.domain.degradation import (
+    DegradationStatus,
+    blackout_window_days,
+    m3_threshold_multiplier,
+)
 from alpha_quant.domain.events import (
     BaseDomainEvent,
     BookMarked,
@@ -80,6 +85,9 @@ __all__ = [
     "evaluate_insider",
     "CrowdingVerdict",
     "evaluate_crowding",
+    "DegradationStatus",
+    "blackout_window_days",
+    "m3_threshold_multiplier",
     "AblationConfig",
     "AblationComparison",
     "NO_INSIDER_CONFIG",
