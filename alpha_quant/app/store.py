@@ -5,7 +5,7 @@ import shutil
 import uuid
 from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, Self, override
 
@@ -838,7 +838,7 @@ class CanonicalStore(Store):
         self._state_conn.execute(
             "INSERT INTO runs (run_id, run_type, config_hash, fixture_version, start_ts, status)"
             " VALUES (?, ?, ?, ?, ?, ?)",
-            [run_id, run_type, config_hash, fixture_version, datetime.now(), "running"],
+            [run_id, run_type, config_hash, fixture_version, datetime.now(UTC), "running"],
         )
         self._state_conn.commit()
         return run_id
@@ -846,7 +846,7 @@ class CanonicalStore(Store):
     def complete_run(self, run_id: str, status: str = "completed", manifest_hash: str = "") -> None:
         self._state_conn.execute(
             "UPDATE runs SET end_ts = ?, status = ?, manifest_hash = ? WHERE run_id = ?",
-            [datetime.now(), status, manifest_hash, run_id],
+            [datetime.now(UTC), status, manifest_hash, run_id],
         )
         self._state_conn.commit()
 
