@@ -12,7 +12,6 @@ history_years = 3
 include_benchmarks = ["SPY", "^VIX"]
 
 [data]
-raw_tail_days = 50
 indicator_state = true
 staleness_halt_hours = 30
 fixture_version = "fx-2026-06-v1"

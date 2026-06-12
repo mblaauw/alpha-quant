@@ -360,33 +360,6 @@ class CanonicalStore(Store):
     def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
         return self.read_bars(symbol, start, end)
 
-    def prune(self, tail_days: int = 50) -> None:
-        cutoff = date.today()
-        for dataset in _CANONICAL_SCHEMAS:
-            data_path = self._canonical_path(dataset)
-            if not data_path.exists():
-                continue
-            pcol = _partition_col(dataset)
-            removed = 0
-            for partition_dir in sorted(data_path.iterdir()):
-                if not partition_dir.is_dir() or not partition_dir.name.startswith(f"{pcol}="):
-                    continue
-                dt_str = partition_dir.name.split("=", 1)[1]
-                try:
-                    dt = date.fromisoformat(dt_str)
-                except ValueError:
-                    continue
-                if (cutoff - dt).days > tail_days:
-                    shutil.rmtree(partition_dir, ignore_errors=True)
-                    removed += 1
-            if removed:
-                logger.info(
-                    "store_prune",
-                    dataset=dataset,
-                    removed_partitions=removed,
-                    tail_days=tail_days,
-                )
-
     # ---- State Store (SQLite via DuckDB) ----
 
     def _init_state_schema(self) -> None:
