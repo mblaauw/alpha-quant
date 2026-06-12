@@ -133,6 +133,7 @@ class LLMConfig(BaseModel):
     provider: str = "openrouter"
     model: str = "anthropic/claude-sonnet-4"
     base_url: str = ""
+    api_key: SecretStr = SecretStr("")
     timeout_s: int = 30
 
     @field_validator("timeout_s")
