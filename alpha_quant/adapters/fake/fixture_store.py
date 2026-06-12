@@ -10,6 +10,7 @@ from alpha_quant.domain.models import (
     Bar,
     CorporateAction,
     Decision,
+    EarningsEntry,
     Fill,
     IndicatorState,
     Order,
@@ -98,4 +99,12 @@ class FixtureStore(Store):
 
     @override
     def load_corp_actions(self, symbol: str) -> list[CorporateAction]:
+        return []
+
+    @override
+    def save_earnings(self, symbol: str, entries: list[EarningsEntry]) -> None:
+        pass
+
+    @override
+    def load_earnings(self, symbol: str) -> list[EarningsEntry]:
         return []
