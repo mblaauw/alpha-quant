@@ -1,0 +1,40 @@
+from __future__ import annotations
+
+from datetime import date, timedelta
+from typing import Literal
+
+from alpha_quant.domain.models import EarningsEntry
+
+BlackoutVerdict = Literal["BLOCK", "PASS"]
+
+
+def check(
+    symbol: str,
+    target_date: date,
+    earnings_calendar: list[EarningsEntry],
+) -> BlackoutVerdict:
+    report = _next_earnings(symbol, earnings_calendar)
+    if report is None:
+        return "PASS"
+
+    blackout_start = _trading_days_before(report, 3)
+    if blackout_start <= target_date < report:
+        return "BLOCK"
+
+    return "PASS"
+
+
+def _next_earnings(symbol: str, calendar: list[EarningsEntry]) -> date | None:
+    upcoming = [e.date for e in calendar if e.symbol.upper() == symbol.upper()]
+    if not upcoming:
+        return None
+    return min(upcoming)
+
+
+def _trading_days_before(dt: date, n: int) -> date:
+    result = dt
+    while n > 0:
+        result -= timedelta(days=1)
+        if result.weekday() < 5:
+            n -= 1
+    return result
