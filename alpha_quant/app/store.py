@@ -943,7 +943,10 @@ def _dedup_keys(dataset: str) -> str:
     mapping = {
         "bars": "symbol, date",
         "fundamentals": "symbol, as_of_date",
-        "insider_transactions": "symbol, filing_date, transaction_date, transaction_type, owner",
+        "insider_transactions": (
+            "symbol, filing_date, transaction_date, transaction_type,"
+            " owner, shares_traded, price, shares_held"
+        ),
         "mentions": "symbol, mention_date, source",
         "corp_actions": "symbol, effective_date, action_type",
         "earnings": "symbol, date",
