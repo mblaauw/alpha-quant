@@ -22,6 +22,8 @@ from alpha_quant.domain.events import (
     StopAdjusted,
     TimeStopTriggered,
 )
+from alpha_quant.domain.insider_signal import InsiderVerdict
+from alpha_quant.domain.insider_signal import evaluate as evaluate_insider
 from alpha_quant.domain.models import (
     Bar,
     Candidate,
@@ -65,6 +67,8 @@ __all__ = [
     "Decision",
     "IndicatorState",
     "UniverseMember",
+    "InsiderVerdict",
+    "evaluate_insider",
     "Regime",
     "REGIME_MULTIPLIERS",
     "RISK_ON",
