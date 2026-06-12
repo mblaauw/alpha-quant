@@ -134,6 +134,7 @@ def validate_fundamentals(snapshot: FundamentalsSnapshot) -> list[ValidationResu
         (snapshot.eps_ttm, "eps_ttm"),
         (snapshot.dividend_yield, "dividend_yield"),
         (snapshot.operating_cash_flow, "operating_cash_flow"),
+        (snapshot.total_liabilities, "total_liabilities"),
         (snapshot.total_debt, "total_debt"),
         (snapshot.total_equity, "total_equity"),
         (snapshot.revenue, "revenue"),
@@ -146,6 +147,8 @@ def validate_fundamentals(snapshot: FundamentalsSnapshot) -> list[ValidationResu
         issues.append(f"market_cap <= 0 ({snapshot.market_cap})")
     if snapshot.total_debt is not None and snapshot.total_debt < 0:
         issues.append(f"total_debt < 0 ({snapshot.total_debt})")
+    if snapshot.total_liabilities is not None and snapshot.total_liabilities < 0:
+        issues.append(f"total_liabilities < 0 ({snapshot.total_liabilities})")
 
     if issues:
         results.append(

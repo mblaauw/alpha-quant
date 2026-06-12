@@ -122,6 +122,7 @@ class EODHDConnector(BaseConnector, MarketData, Fundamentals):
             sector=(general.get("Sector") or "").strip() or None,
             industry=(general.get("Industry") or "").strip() or None,
             operating_cash_flow=op_cf,
+            total_liabilities=_float(bq.get("totalLiabilities")),
             total_debt=_float(bq.get("totalDebt")),
             total_equity=_float(bq.get("totalEquity")),
             revenue=_float(iq.get("revenue")),
