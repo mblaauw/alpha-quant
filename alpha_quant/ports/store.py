@@ -8,6 +8,7 @@ from alpha_quant.domain.models import (
     Bar,
     CorporateAction,
     Decision,
+    EarningsEntry,
     Fill,
     IndicatorState,
     Order,
@@ -70,3 +71,9 @@ class Store(ABC):
 
     @abstractmethod
     def load_corp_actions(self, symbol: str) -> list[CorporateAction]: ...
+
+    @abstractmethod
+    def save_earnings(self, symbol: str, entries: list[EarningsEntry]) -> None: ...
+
+    @abstractmethod
+    def load_earnings(self, symbol: str) -> list[EarningsEntry]: ...

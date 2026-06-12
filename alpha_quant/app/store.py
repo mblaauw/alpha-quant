@@ -19,6 +19,7 @@ from alpha_quant.domain.models import (
     Candidate,
     CorporateAction,
     Decision,
+    EarningsEntry,
     Fill,
     FundamentalsSnapshot,
     IndicatorState,
@@ -84,6 +85,14 @@ _CANONICAL_SCHEMAS: dict[str, list[tuple[str, pa.DataType]]] = {
         ("ratio", pa.float64()),
         ("amount", pa.float64()),
     ],
+    "earnings": [
+        ("symbol", pa.string()),
+        ("date", pa.date32()),
+        ("eps_estimate", pa.float64()),
+        ("eps_actual", pa.float64()),
+        ("revenue_estimate", pa.float64()),
+        ("revenue_actual", pa.float64()),
+    ],
 }
 
 
@@ -144,6 +153,18 @@ def _model_to_pylist(
                 }
                 for m in models
             ]
+        case "earnings":
+            return [
+                {
+                    "symbol": m.symbol,
+                    "date": m.date,
+                    "eps_estimate": m.eps_estimate,
+                    "eps_actual": m.eps_actual,
+                    "revenue_estimate": m.revenue_estimate,
+                    "revenue_actual": m.revenue_actual,
+                }
+                for m in models
+            ]
         case _:
             return [m.model_dump() for m in models]
 
@@ -155,6 +176,7 @@ def _partition_col(model_name: str) -> str:
         "insider_transactions": "filing_date",
         "mentions": "mention_date",
         "corp_actions": "effective_date",
+        "earnings": "date",
     }
     return mapping.get(model_name, "date")
 
@@ -788,6 +810,40 @@ class CanonicalStore(Store):
             for r in result
         ]
 
+    @override
+    def save_earnings(self, symbol: str, entries: list[EarningsEntry]) -> None:
+        self._write_dataset(entries, "earnings")
+
+    @override
+    def load_earnings(self, symbol: str) -> list[EarningsEntry]:
+        data_path = str(self._canonical_path("earnings") / "**" / "*.parquet")
+        pcol = _partition_col("earnings")
+        hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
+        try:
+            result = self._analytical.execute(
+                f"""
+                SELECT symbol, "{pcol}" AS date, eps_estimate, eps_actual,
+                       revenue_estimate, revenue_actual
+                FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
+                WHERE symbol = ?
+                ORDER BY "{pcol}"
+                """,
+                [symbol],
+            ).fetchall()
+        except duckdb.CatalogException, duckdb.IOException:
+            return []
+        return [
+            EarningsEntry(
+                symbol=r[0],
+                date=r[1],
+                eps_estimate=r[2],
+                eps_actual=r[3],
+                revenue_estimate=r[4],
+                revenue_actual=r[5],
+            )
+            for r in result
+        ]
+
     def add_quarantine(self, symbol: str, reason: str, severity: str = "QUARANTINE") -> None:
         self._state_conn.execute(
             "INSERT OR REPLACE INTO quarantine (symbol, reason, quarantined_date, severity)"
@@ -890,5 +946,6 @@ def _dedup_keys(dataset: str) -> str:
         "insider_transactions": "symbol, filing_date, transaction_date, transaction_type, owner",
         "mentions": "symbol, mention_date, source",
         "corp_actions": "symbol, effective_date, action_type",
+        "earnings": "symbol, date",
     }
     return mapping.get(dataset, "rowid")
