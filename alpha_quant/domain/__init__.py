@@ -1,3 +1,10 @@
+from alpha_quant.domain.ablation import (
+    NO_CROWDING_VETO_CONFIG,
+    NO_INSIDER_CONFIG,
+    AblationComparison,
+    AblationConfig,
+    compute_ablation_comparison,
+)
 from alpha_quant.domain.crowding import CrowdingVerdict
 from alpha_quant.domain.crowding import evaluate as evaluate_crowding
 from alpha_quant.domain.events import (
@@ -73,6 +80,11 @@ __all__ = [
     "evaluate_insider",
     "CrowdingVerdict",
     "evaluate_crowding",
+    "AblationConfig",
+    "AblationComparison",
+    "NO_INSIDER_CONFIG",
+    "NO_CROWDING_VETO_CONFIG",
+    "compute_ablation_comparison",
     "Regime",
     "REGIME_MULTIPLIERS",
     "RISK_ON",
