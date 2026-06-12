@@ -59,6 +59,7 @@ from alpha_quant.domain.models import (
     TradingDay,
     UniverseMember,
 )
+from alpha_quant.domain.narration import NarrationContext, PositionNarration, build
 from alpha_quant.domain.regime import CAUTION, REGIME_MULTIPLIERS, RISK_OFF, RISK_ON, Regime, detect
 
 __all__ = [
@@ -88,6 +89,9 @@ __all__ = [
     "DegradationStatus",
     "blackout_window_days",
     "m3_threshold_multiplier",
+    "NarrationContext",
+    "PositionNarration",
+    "build",
     "AblationConfig",
     "AblationComparison",
     "NO_INSIDER_CONFIG",
