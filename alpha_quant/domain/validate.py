@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import numpy as np
@@ -160,7 +160,7 @@ def validate_fundamentals(snapshot: FundamentalsSnapshot) -> list[ValidationResu
 def validate_staleness(
     last_update: datetime, threshold: timedelta, symbol: str = ""
 ) -> list[ValidationResult]:
-    age = datetime.now(last_update.tzinfo if last_update.tzinfo else None) - last_update
+    age = datetime.now(UTC) - last_update
     if age > threshold:
         return [
             ValidationResult(

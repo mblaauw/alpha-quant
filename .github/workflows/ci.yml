@@ -76,3 +76,13 @@ jobs:
             echo "$RESULT"
             exit 1
           fi
+
+      - name: Verify no bare datetime.now() without UTC
+        run: |
+          RESULT=$(grep -rn "datetime\.now(" alpha_quant/ --include="*.py" \
+            --exclude="alpha_quant/adapters/real/clock.py" | grep -v "now(UTC)" || true)
+          if [ -n "$RESULT" ]; then
+            echo "::error::datetime.now() called without UTC. Use datetime.now(UTC)."
+            echo "$RESULT"
+            exit 1
+          fi
