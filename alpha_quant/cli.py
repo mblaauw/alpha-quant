@@ -103,10 +103,16 @@ def cmd_journal(args: argparse.Namespace) -> None:
 
 
 def cmd_ask(args: argparse.Namespace) -> None:
-    config = load_config(args.config)
-    print("[alpha-quant] ask: not yet implemented (planned for P4.8 ask command)")
-    if args.verbose_config:
-        print(json.dumps(redact_config(config), indent=2, default=str))
+    from pathlib import Path
+
+    from alpha_quant.app.store import CanonicalStore
+    from alpha_quant.domain.ask import ask
+
+    query = " ".join(args.query)
+    store = CanonicalStore(base_path=Path("data"))
+    concepts_dir = Path(__file__).resolve().parent / "concepts"
+    result = ask(query, store, concepts_dir=concepts_dir)
+    print(result)
 
 
 def cmd_report(args: argparse.Namespace) -> None:
