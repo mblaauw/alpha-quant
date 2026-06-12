@@ -6,10 +6,19 @@ from datetime import date
 
 import numpy as np
 
+from alpha_quant.app._loop import (
+    compute_atr,
+    detect_regime_and_multiplier,
+    ensure_spy,
+    evaluate_risk_actions,
+    get_date_bars,
+    load_all_bars,
+    score_candidate,
+    size_entry,
+)
 from alpha_quant.domain.derive import backfill_indicator_state, update_indicator_state
 from alpha_quant.domain.fills import FillConfig, fill_entry_order, fill_stop_loss
 from alpha_quant.domain.models import (
-    Bar,
     Candidate,
     Decision,
     Fill,
@@ -18,11 +27,8 @@ from alpha_quant.domain.models import (
     Position,
 )
 from alpha_quant.domain.ranking import rank as rank_candidates
-from alpha_quant.domain.regime import detect as detect_regime
-from alpha_quant.domain.risk import RiskConfig, evaluate_stops, evaluate_time_stop
-from alpha_quant.domain.sizing import SizingConfig, size_position
-from alpha_quant.domain.technical import momentum_score
-from alpha_quant.domain.technical import score as score_technical
+from alpha_quant.domain.risk import RiskConfig
+from alpha_quant.domain.sizing import SizingConfig
 from alpha_quant.ports.store import Store
 
 _LOOKBACK_DAYS = 400
@@ -136,15 +142,8 @@ def run_backtest(
     sc = sizing_config or SizingConfig()
 
     lookback_start = date.fromordinal(config.start_date.toordinal() - _LOOKBACK_DAYS)
-    symbols = list(config.symbols)
-    if "SPY" not in symbols:
-        symbols.append("SPY")
-
-    all_bars: dict[str, list[Bar]] = {}
-    for symbol in symbols:
-        bars = store.load_bars(symbol, lookback_start, config.end_date)
-        if bars:
-            all_bars[symbol] = bars
+    symbols = ensure_spy(config.symbols)
+    all_bars = load_all_bars(store, symbols, lookback_start, config.end_date)
 
     trading_dates = _trading_dates(store, config.start_date, config.end_date)
     if not trading_dates or not all_bars.get("SPY"):
@@ -169,11 +168,7 @@ def run_backtest(
     entry_dates: dict[str, date] = {}
 
     for trade_date in trading_dates:
-        date_bars: dict[str, Bar] = {}
-        for symbol, bars in all_bars.items():
-            day_bars = [b for b in bars if b.date == trade_date]
-            if day_bars:
-                date_bars[symbol] = day_bars[0]
+        date_bars = get_date_bars(all_bars, trade_date)
 
         spy_bar = date_bars.get("SPY")
         if spy_bar is None:
@@ -199,14 +194,13 @@ def run_backtest(
             if bar is None:
                 continue
             state = indicator_states.get(sym)
-            atr = state.values.get("atr", 0.0) if state else 0.0
-            if np.isnan(atr):
-                atr = 0.0
-            highest = max(pos.entry_price or 0.0, bar.high)
-
-            risk_actions = evaluate_stops(pos, bar, atr, highest, rc)
-            risk_actions.extend(
-                evaluate_time_stop(pos, entry_dates.get(sym, trade_date), trade_date, rc)
+            risk_actions = evaluate_risk_actions(
+                pos,
+                bar,
+                state,
+                rc,
+                entry_dates.get(sym, trade_date),
+                trade_date,
             )
 
             if risk_actions:
@@ -231,16 +225,7 @@ def run_backtest(
         # --- Entries ---
         if len(positions) < config.max_positions:
             spy_state = indicator_states.get("SPY")
-            if spy_state is not None:
-                regime = detect_regime(
-                    spy_state,
-                    vix_level=15.0,
-                    breadth=0.6,
-                )
-            else:
-                regime = "CAUTION"
-            regime_map = {"RISK_ON": 1.0, "CAUTION": 0.5, "RISK_OFF": 0.0}
-            regime_mult = regime_map.get(regime, 0.5)
+            regime, regime_mult = detect_regime_and_multiplier(spy_state)
 
             candidates: list[Candidate] = []
             for symbol in config.symbols:
@@ -248,27 +233,12 @@ def run_backtest(
                 state = indicator_states.get(symbol)
                 if bar is None or state is None:
                     continue
-                price = bar.close
-                vals = state.values
-                if np.isnan(vals.get("rsi", np.nan)):
+                if np.isnan(state.values.get("rsi", np.nan)):
                     continue
 
                 bars_to_date = [b for b in all_bars.get(symbol, []) if b.date <= trade_date]
-                tech = score_technical(bars_to_date, state)
-
-                momentum_scr = momentum_score(bars_to_date, bar.close)
-                tech_scr = tech.score
-                composite = 0.70 * tech_scr + 0.30 * momentum_scr
-
                 candidates.append(
-                    Candidate(
-                        symbol=symbol,
-                        date=trade_date,
-                        scores={"technical": tech_scr, "momentum": momentum_scr},
-                        composite_score=min(1.0, composite),
-                        regime=regime,
-                        gate_results={"fundamental": True, "blackout": True},
-                    )
+                    score_candidate(symbol, bars_to_date, bar, state, trade_date, regime),
                 )
 
             current_positions = list(positions.values())
@@ -281,18 +251,16 @@ def run_backtest(
                 if bar is None or state is None:
                     continue
                 prev_close = last_close.get(cand.symbol, 0.0)
-                atr_val = state.values.get("atr", bar.close * 0.02)
-                if np.isnan(atr_val) or atr_val <= 0:
-                    atr_val = bar.close * 0.02
+                atr_val = compute_atr(state, bar.close)
 
                 total_equity = cash + sum(
                     p.quantity * prices.get(p.symbol, 0.0) for p in positions.values()
                 )
 
-                sized = size_position(total_equity, bar.close, atr_val, regime_mult, 1.0, sc)
-                final_shares = sized.shares
-                if final_shares <= 0:
+                sized = size_entry(total_equity, bar.close, atr_val, regime_mult, sc)
+                if sized is None:
                     continue
+                final_shares = sized.shares
 
                 order_id = uuid.uuid4().hex[:16]
                 order = Order(
