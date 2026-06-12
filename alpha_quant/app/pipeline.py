@@ -7,6 +7,15 @@ from datetime import UTC, date, datetime
 
 import numpy as np
 
+from alpha_quant.app._loop import (
+    compute_atr,
+    detect_regime_and_multiplier,
+    ensure_spy,
+    evaluate_risk_actions,
+    get_bar_for_date,
+    score_candidate,
+    size_entry,
+)
 from alpha_quant.domain.derive import backfill_indicator_state
 from alpha_quant.domain.events import (
     CandidateBlocked,
@@ -24,12 +33,8 @@ from alpha_quant.domain.fills import FillConfig, fill_stop_loss
 from alpha_quant.domain.invariants import InvariantViolation
 from alpha_quant.domain.models import Bar, Candidate, Decision, Fill, IndicatorState, Position
 from alpha_quant.domain.ranking import rank as rank_candidates
-from alpha_quant.domain.regime import REGIME_MULTIPLIERS
-from alpha_quant.domain.regime import detect as detect_regime
-from alpha_quant.domain.risk import RiskConfig, evaluate_stops, evaluate_time_stop
-from alpha_quant.domain.sizing import SizingConfig, size_position
-from alpha_quant.domain.technical import momentum_score
-from alpha_quant.domain.technical import score as score_technical
+from alpha_quant.domain.risk import RiskConfig
+from alpha_quant.domain.sizing import SizingConfig
 from alpha_quant.domain.validate import validate_bars, validate_indicator_state
 from alpha_quant.ports.store import Store
 
@@ -90,9 +95,7 @@ def run(
 
     lookback_start = date.fromordinal(run_date.toordinal() - cfg.lookback_days)
     halted = False
-    symbols = list(universe)
-    if "SPY" not in symbols:
-        symbols.append("SPY")
+    symbols = ensure_spy(universe)
 
     all_bars: dict[str, list[Bar]] = {}
     for symbol in symbols:
@@ -180,10 +183,7 @@ def run(
     # --- 4. Regime ---
     spy_state = indicator_states.get("SPY")
     prev_regime = _REGIME_CACHE.get("current", "CAUTION")
-    if spy_state is not None:
-        regime = detect_regime(spy_state, vix_level=15.0, breadth=0.6)
-    else:
-        regime = "CAUTION"
+    regime, regime_mult = detect_regime_and_multiplier(spy_state)
     _REGIME_CACHE["current"] = regime
     if regime != prev_regime:
         events.append(
@@ -196,8 +196,6 @@ def run(
                 current=regime,
             )
         )
-    regime_mult = REGIME_MULTIPLIERS.get(regime, 0.5)
-
     prices: dict[str, float] = {}
     for symbol in symbols:
         bars = all_bars.get(symbol, [])
@@ -213,21 +211,11 @@ def run(
     for sym, pos in positions_map.items():
         if pos.quantity <= 0:
             continue
-        bar = None
-        for b in all_bars.get(sym, []):
-            if b.date == run_date:
-                bar = b
-                break
+        bar = get_bar_for_date(all_bars, sym, run_date)
         if bar is None:
             continue
         state = indicator_states.get(sym)
-        atr = state.values.get("atr", 0.0) if state else 0.0
-        if np.isnan(atr):
-            atr = 0.0
-        highest = max(pos.entry_price or 0.0, bar.high)
-
-        risk_actions = evaluate_stops(pos, bar, atr, highest, rc)
-        risk_actions.extend(evaluate_time_stop(pos, run_date, run_date, rc))
+        risk_actions = evaluate_risk_actions(pos, bar, state, rc, run_date, run_date)
 
         for action in risk_actions:
             exit_order_id = f"{sym}_exit_{run_id[:8]}"
@@ -287,11 +275,7 @@ def run(
     if slots > 0 and regime_mult > 0:
         candidates: list[Candidate] = []
         for symbol in universe:
-            bar = None
-            for b in all_bars.get(symbol, []):
-                if b.date == run_date:
-                    bar = b
-                    break
+            bar = get_bar_for_date(all_bars, symbol, run_date)
             state = indicator_states.get(symbol)
             if bar is None or state is None:
                 continue
@@ -300,14 +284,10 @@ def run(
                 continue
 
             bars_to_date = [b for b in all_bars.get(symbol, []) if b.date <= run_date]
-            tech = score_technical(bars_to_date, state)
-            mom = momentum_score(bars_to_date, bar.close)
-            tech_scr = tech.score
-            composite = 0.70 * tech_scr + 0.30 * mom
-            cscore = min(1.0, composite)
+            cand = score_candidate(symbol, bars_to_date, bar, state, run_date, regime)
+            cscore = cand.composite_score
 
             gate_block: str | None = None
-            gate_results: dict[str, bool] = {"fundamental": True, "blackout": True}
 
             if cscore < 0.5:
                 gate_block = "composite_below_threshold"
@@ -325,16 +305,7 @@ def run(
                     )
                 )
             else:
-                candidates.append(
-                    Candidate(
-                        symbol=symbol,
-                        date=run_date,
-                        scores={"technical": tech_scr, "momentum": mom},
-                        composite_score=cscore,
-                        regime=regime,
-                        gate_results=gate_results,
-                    )
-                )
+                candidates.append(cand)
                 events.append(
                     CandidateScored(
                         event_id=uuid.uuid4().hex[:16],
@@ -343,7 +314,10 @@ def run(
                         source="pipeline",
                         symbol=symbol,
                         composite_score=cscore,
-                        components={"technical": tech_scr, "momentum": mom},
+                        components={
+                            "technical": cand.scores["technical"],
+                            "momentum": cand.scores["momentum"],
+                        },
                     )
                 )
 
@@ -351,35 +325,28 @@ def run(
         ranked = rank_candidates(candidates, cfg.max_positions, len(current_positions))
 
         for cand in ranked[:slots]:
-            bar = None
-            for b in all_bars.get(cand.symbol, []):
-                if b.date == run_date:
-                    bar = b
-                    break
+            bar = get_bar_for_date(all_bars, cand.symbol, run_date)
             state = indicator_states.get(cand.symbol)
             if bar is None or state is None:
                 continue
-            price = bar.close
-            atr_val = state.values.get("atr", price * 0.02)
-            if np.isnan(atr_val) or atr_val <= 0:
-                atr_val = price * 0.02
+            atr_val = compute_atr(state, bar.close)
 
             pop_equity = (prev_equity or 100_000.0) + cash_adjust
-            sized = size_position(pop_equity, price, atr_val, regime_mult, 1.0, sc)
-            final_shares = sized.shares
-            if final_shares <= 0:
+            sized = size_entry(pop_equity, bar.close, atr_val, regime_mult, sc)
+            if sized is None:
                 continue
-            cost = round(final_shares * price, 2)
+            final_shares = sized.shares
+            cost = round(final_shares * bar.close, 2)
 
             decision_id = uuid.uuid4().hex[:16]
-            stop_price = round(price - rc.stop_atr_mult * atr_val, 2)
+            stop_price = round(bar.close - rc.stop_atr_mult * atr_val, 2)
 
             pos = Position(
                 symbol=cand.symbol,
                 quantity=float(final_shares),
-                entry_price=price,
-                avg_cost=price,
-                current_price=price,
+                entry_price=bar.close,
+                avg_cost=bar.close,
+                current_price=bar.close,
                 stop_price=stop_price,
                 market_value=cost,
                 decision_id=decision_id,
