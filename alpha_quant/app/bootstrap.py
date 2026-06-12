@@ -43,10 +43,11 @@ def _generate_bars(symbol: str, start: date, end: date) -> list[Bar]:
     return bars
 
 
-def _generate_fundamentals(symbol: str) -> FundamentalsSnapshot:
+def _generate_fundamentals(symbol: str, ref_date: date | None = None) -> FundamentalsSnapshot:
+    today = ref_date or date.today()
     return FundamentalsSnapshot(
         symbol=symbol,
-        as_of_date=date.today(),
+        as_of_date=today,
         market_cap=50_000_000_000 + _det(symbol, 2_000_000_000_000),
         pe_ratio=15.0 + _det(symbol, 30),
         eps_ttm=2.0 + _det(symbol, 10),
@@ -56,9 +57,12 @@ def _generate_fundamentals(symbol: str) -> FundamentalsSnapshot:
     )
 
 
-def _generate_earnings(symbol: str, years: int) -> list[EarningsEntry]:
+def _generate_earnings(
+    symbol: str, years: int, ref_date: date | None = None
+) -> list[EarningsEntry]:
+    today = ref_date or date.today()
     entries: list[EarningsEntry] = []
-    for y in range(date.today().year - years, date.today().year + 1):
+    for y in range(today.year - years, today.year + 1):
         for q in range(1, 5):
             entries.append(
                 EarningsEntry(
@@ -71,12 +75,13 @@ def _generate_earnings(symbol: str, years: int) -> list[EarningsEntry]:
     return entries
 
 
-def _generate_insider_tx(symbol: str) -> list[InsiderTransaction]:
+def _generate_insider_tx(symbol: str, ref_date: date | None = None) -> list[InsiderTransaction]:
+    today = ref_date or date.today()
     return [
         InsiderTransaction(
             symbol=symbol,
-            filing_date=date.today() - timedelta(days=d),
-            transaction_date=date.today() - timedelta(days=d + 2),
+            filing_date=today - timedelta(days=d),
+            transaction_date=today - timedelta(days=d + 2),
             owner=f"exec_{i % 5 + 1}",
             title="Officer",
             transaction_type="Buy" if i % 3 != 0 else "Sell",
@@ -88,11 +93,12 @@ def _generate_insider_tx(symbol: str) -> list[InsiderTransaction]:
     ]
 
 
-def _generate_mentions(symbol: str) -> list[MentionCount]:
+def _generate_mentions(symbol: str, ref_date: date | None = None) -> list[MentionCount]:
+    today = ref_date or date.today()
     return [
         MentionCount(
             symbol=symbol,
-            date=date.today() - timedelta(days=d),
+            date=today - timedelta(days=d),
             source="reddit",
             count=10 + _det(f"m-{symbol}-{d}", 200),
         )
@@ -105,9 +111,10 @@ def run_bootstrap(
     vault_base: Path,
     fixture_base: Path,
     fixture_only: bool = False,
+    ref_date: date | None = None,
 ) -> dict[str, Any]:
     cfg = config.bootstrap
-    today = date.today()
+    today = ref_date or date.today()
     start = date(today.year - cfg.history_years, today.month, today.day)
 
     all_symbols = list(cfg.symbols) + list(cfg.include_benchmarks)
@@ -122,10 +129,10 @@ def run_bootstrap(
     for symbol in all_symbols:
         bars = _generate_bars(symbol, start, today)
         all_bars[symbol] = bars
-        all_fundamentals[symbol] = _generate_fundamentals(symbol)
-        all_earnings.extend(_generate_earnings(symbol, cfg.history_years))
-        all_insider[symbol] = _generate_insider_tx(symbol)
-        all_mentions[symbol] = _generate_mentions(symbol)
+        all_fundamentals[symbol] = _generate_fundamentals(symbol, ref_date=today)
+        all_earnings.extend(_generate_earnings(symbol, cfg.history_years, ref_date=today))
+        all_insider[symbol] = _generate_insider_tx(symbol, ref_date=today)
+        all_mentions[symbol] = _generate_mentions(symbol, ref_date=today)
 
         if not fixture_only:
             vault = Vault(vault_base)

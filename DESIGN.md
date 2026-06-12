@@ -170,7 +170,7 @@ Parameter budget unchanged: **max 3 tunable parameters**, walk-forward only.
                                                               sees ports only
 ```
 
-Properties: re-parseable forever (vault keeps every raw byte), reproducible (everything downstream is a deterministic function of the vault), prunable (raw bars trimmed to the 50-day tail without losing derived capability), and swappable (fixture adapters plug in at the ACCESS layer for replay/CI).
+Properties: re-parseable forever (vault keeps every raw byte), reproducible (everything downstream is a deterministic function of the vault), and swappable (fixture adapters plug in at the ACCESS layer for replay/CI).
 
 ### 3.2 Zone 1 — Connectors
 
@@ -238,7 +238,7 @@ This is what reconciles full raw history with 200-day indicators: EMAs update fr
 
 `alpha-quant bootstrap` reads `[bootstrap]` config: fetches `history_years` of daily bars, fundamentals snapshots, earnings dates, OpenInsider history for the 50 listed symbols + SPY + VIX proxy; writes vault → canonical → seeds indicator_state; then freezes a **fixture bundle** (parquet + manifest.json with content hashes, pinned as `fixture_version`).
 
-The default 50 are curated for behavioral coverage, not preference: steady large-cap trenders, high-beta names, at least one meme-prone ticker, an earnings-gap case, a recent split, a delisting/rename (exercises SEC-map hygiene), plus engineered synthetic overlays in the fixture copy only (a missing-bar day, a stale-feed day, a z>3 mention spike). Swap the list in config at will; re-bootstrap regenerates everything deterministically.
+The default 50 are curated for behavioral coverage, not preference: steady large-cap trenders, high-beta names, at least one meme-prone ticker, an earnings-gap case, a recent split, a delisting/rename (exercises SEC-map hygiene). *(Synthetic overlays for missing-bar, stale-feed, and z>3 mention spike scenarios deferred — see P3+ backlog.)* Swap the list in config at will; re-bootstrap regenerates everything deterministically.
 
 Development speeds: domain unit tests (ms) → full-DAG replay over fixtures (seconds–minutes for 3 simulated years) → real daily runs (only for connector/feed reality).
 
@@ -301,7 +301,7 @@ The paper book (§9) is the FULL system. Alongside it, shadow books — RULES_ON
 
 ### 9.1 The paper book is the portfolio
 
-There is no external broker. `app/paper.py` maintains the authoritative portfolio in SQLite: cash, positions, orders, fills, equity curve — all written transactionally with their Decision lineage. Alpaca contributes *information only* (latest quotes for marking and fill realism; trading calendar); the `alpaca-py` trading module is never imported (lint-enforced).
+There is no external broker. `app/paper.py` maintains the authoritative portfolio in DuckDB (via the Store port): cash, positions, orders, fills, equity curve — all written transactionally with their Decision lineage. Alpaca contributes *information only* (latest quotes for marking and fill realism; trading calendar); the `alpaca-py` trading module is never imported (lint-enforced).
 
 What this removes: broker reconciliation, order-rejection handling, partial-fill plumbing, API-key risk on the execution path. What it forfeits (stated honestly, also to the user via a concept card): real fill competition, real spreads at size, exchange halts, borrow/locate realities. Paper results are therefore an **upper bound** on live performance — the monthly report says so explicitly.
 
@@ -317,7 +317,7 @@ Daily-bar discipline; decisions at close of day *T*, executions at *T+1*:
 
 ### 9.3 Self-consistency (replaces broker reconciliation)
 
-Nightly assertion set over the SQLite book: `cash + Σ(position marks) == equity_curve point`; every position traces to fills; every fill to an order; every order to a Decision; no orphans. A violation is a **software bug, full halt** — stricter than broker reconciliation ever was, because there is no counterparty to blame.
+Nightly assertion set over the portfolio state: `cash + Σ(position marks) == equity_curve point`; every position traces to fills; every fill to an order; every order to a Decision; no orphans. A violation is a **software bug, full halt** — stricter than broker reconciliation ever was, because there is no counterparty to blame.
 
 ### 9.4 Path to live (explicitly out of v1)
 

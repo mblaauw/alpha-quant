@@ -25,8 +25,11 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0017](./0017-use-golden-replay-ci.md) | Use Golden Replay as the Primary CI Strategy | Accepted | 2026-06-10 |
 | [0018](./0018-use-bootstrap-fixture-workflow.md) | Use Bootstrap + Fixture Bundle Developer Workflow | Accepted | 2026-06-10 |
 | [0019](./0019-use-astral-tooling-ruff-ty.md) | Use Astral Development Tooling (ruff + ty) | Accepted | 2026-06-10 |
-| [0020](./0020-use-duckdb-for-vault-manifest.md) | Use DuckDB for the Vault Manifest (Dual Use) | Proposed | 2026-06-11 |
+| [0020](./0020-use-duckdb-for-vault-manifest.md) | Use DuckDB for the Vault Manifest (Dual Use) | Accepted | 2026-06-11 |
 | [0021](./0021-use-duckdb-for-both-analytical-and-transactional-state.md) | Use DuckDB for Both Analytical and Transactional State | Accepted | 2026-06-11 |
+| [0022](./0022-use-paper-portfolio-engine.md) | Use Paper Portfolio Engine as Authoritative State Manager | Accepted | 2026-06-12 |
+| [0023](./0023-use-pipeline-orchestrator.md) | Use Pipeline Orchestrator for Daily Run Sequencing | Accepted | 2026-06-12 |
+| [0024](./0024-use-self-consistency-invariants.md) | Use Self-Consistency Invariants for Portfolio Integrity | Accepted | 2026-06-12 |
 
 ## Status Meanings
 

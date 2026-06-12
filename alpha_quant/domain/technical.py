@@ -32,7 +32,7 @@ def score(bars: list[Bar], indicator: IndicatorState) -> TechnicalScore:
     }
 
     trend_s = _trend_score(close, vals)
-    momentum_s = _momentum_score(bars, close)
+    momentum_s = momentum_score(bars, close)
     rsi_s = _rsi_score(vals)
     macd_s = _macd_score(vals)
     volume_s = _volume_score(bars)
@@ -64,7 +64,7 @@ def _trend_score(close: float, vals: dict[str, float]) -> float:
     return 0.0
 
 
-def _momentum_score(bars: list[Bar], close: float) -> float:
+def momentum_score(bars: list[Bar], close: float) -> float:
     n = len(bars)
     if n < 2:
         return 0.3

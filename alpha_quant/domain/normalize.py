@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import re
-from collections import defaultdict
 from datetime import UTC, date, datetime
 from statistics import mean, stdev
 from typing import Any
@@ -23,70 +22,6 @@ from alpha_quant.domain.models import (
 )
 
 logger = structlog.get_logger()
-
-_COMMON_WORDS: set[str] = {
-    "AI",
-    "AM",
-    "APR",
-    "AT",
-    "ATM",
-    "AUG",
-    "CEO",
-    "CFO",
-    "COO",
-    "CTO",
-    "DD",
-    "DEC",
-    "DJT",
-    "DM",
-    "DOE",
-    "EU",
-    "EV",
-    "FEB",
-    "FO",
-    "GO",
-    "IAN",
-    "IMO",
-    "IRL",
-    "IT",
-    "JAN",
-    "JUL",
-    "JUN",
-    "LA",
-    "LOL",
-    "MAR",
-    "MAY",
-    "MO",
-    "NOV",
-    "NTA",
-    "NY",
-    "OCT",
-    "OH",
-    "OK",
-    "OMG",
-    "OP",
-    "OR",
-    "PE",
-    "PM",
-    "RH",
-    "ROI",
-    "SA",
-    "SEC",
-    "SEP",
-    "SO",
-    "TA",
-    "TL",
-    "TLDR",
-    "TV",
-    "UK",
-    "USA",
-    "USD",
-    "VIP",
-    "VS",
-    "YE",
-    "YTD",
-    "YOLO",
-}
 
 _BAR_DATE_FMT = "%Y-%m-%d"
 _EARNINGS_DATE_FMT = "%Y-%m-%d"
@@ -295,9 +230,12 @@ def normalize_alpaca_quote(raw: bytes | str, symbol: str) -> Quote | None:
         except (ValueError, TypeError) as exc:
             logger.warning("normalize_alpaca_quote_invalid_timestamp", error=str(exc))
 
+    if timestamp is None:
+        return None
+
     return Quote(
         symbol=symbol,
-        timestamp=timestamp.astimezone(UTC) if timestamp is not None else datetime.now(UTC),
+        timestamp=timestamp.astimezone(UTC),
         price=mid,
         bid=bid,
         ask=ask,
@@ -430,48 +368,6 @@ def normalize_openinsider_html(raw: bytes | str) -> list[InsiderTransaction] | N
             logger.debug("normalize_openinsider_skip_row", error=str(exc))
             continue
     return transactions if transactions else None
-
-
-def normalize_reddit_mentions(
-    raw: bytes | str, symbols: list[str], subreddit: str = "reddit", today: date | None = None
-) -> list[MentionCount] | None:
-    try:
-        data = json.loads(raw)
-    except (json.JSONDecodeError, ValueError, TypeError) as exc:
-        logger.warning("normalize_reddit_mentions_parse_failed", error=str(exc))
-        return None
-
-    children = data.get("data", {}).get("children", [])
-    if not isinstance(children, list):
-        logger.warning("normalize_reddit_mentions_no_children")
-        return None
-
-    posts = [c["data"] for c in children if isinstance(c, dict) and isinstance(c.get("data"), dict)]
-
-    patterns = {
-        sym: re.compile(rf"\b{re.escape(sym)}\b", re.IGNORECASE)
-        for sym in symbols
-        if sym not in _COMMON_WORDS
-    }
-
-    counts: dict[str, int] = defaultdict(int)
-    for post in posts:
-        title = (post.get("title") or "") or ""
-        selftext = (post.get("selftext") or "") or ""
-        text = f"{title} {selftext}".upper()
-        for sym, pattern in patterns.items():
-            matches = pattern.findall(text)
-            if matches:
-                counts[sym] += len(matches)
-
-    if today is None:
-        return None
-    results = [
-        MentionCount(symbol=sym, date=today, source=subreddit, count=count)
-        for sym, count in counts.items()
-        if count > 0
-    ]
-    return results if results else None
 
 
 def calculate_sentiment_baseline(counts: list[MentionCount], symbol: str) -> SentimentBaseline:

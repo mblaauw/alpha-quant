@@ -27,6 +27,7 @@ from alpha_quant.domain.regime import REGIME_MULTIPLIERS
 from alpha_quant.domain.regime import detect as detect_regime
 from alpha_quant.domain.risk import RiskConfig, evaluate_stops, evaluate_time_stop
 from alpha_quant.domain.sizing import SizingConfig, size_position
+from alpha_quant.domain.technical import momentum_score
 from alpha_quant.domain.technical import score as score_technical
 from alpha_quant.ports.store import Store
 
@@ -51,30 +52,6 @@ class RunResult:
     violations: list[InvariantViolation]
     prev_equity: float | None = None
     new_equity: float | None = None
-
-
-def _momentum_score(bars: list[Bar], close: float) -> float:
-    n = len(bars)
-    if n < 2:
-        return 0.3
-    lookback = min(63, n - 1)
-    prev_close = bars[-(lookback + 1)].close
-    if prev_close <= 0:
-        return 0.0
-    ret = (close - prev_close) / prev_close
-    if ret > 0.20:
-        return 1.0
-    if ret > 0.10:
-        return 0.8
-    if ret > 0.05:
-        return 0.6
-    if ret > 0.0:
-        return 0.5
-    if ret > -0.05:
-        return 0.3
-    if ret > -0.15:
-        return 0.1
-    return 0.0
 
 
 def run(
@@ -283,7 +260,7 @@ def run(
 
             bars_to_date = [b for b in all_bars.get(symbol, []) if b.date <= run_date]
             tech = score_technical(bars_to_date, state)
-            mom = _momentum_score(bars_to_date, bar.close)
+            mom = momentum_score(bars_to_date, bar.close)
             tech_scr = tech.score
             composite = 0.70 * tech_scr + 0.30 * mom
             cscore = min(1.0, composite)

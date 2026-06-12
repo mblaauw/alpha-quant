@@ -25,6 +25,7 @@ from alpha_quant.domain.events import (
 from alpha_quant.domain.models import (
     Bar,
     Candidate,
+    CorporateAction,
     Decision,
     EarningsEntry,
     Fill,
@@ -34,6 +35,7 @@ from alpha_quant.domain.models import (
     InsiderTransaction,
     MentionCount,
     Order,
+    PortfolioSnapshot,
     Position,
     Quote,
     SentimentBaseline,
@@ -46,6 +48,8 @@ from alpha_quant.domain.regime import CAUTION, REGIME_MULTIPLIERS, RISK_OFF, RIS
 __all__ = [
     "Bar",
     "Candidate",
+    "CorporateAction",
+    "PortfolioSnapshot",
     "Quote",
     "TradingDay",
     "FundamentalsSnapshot",

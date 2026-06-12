@@ -13,6 +13,7 @@ from alpha_quant.domain.ranking import rank as rank_candidates
 from alpha_quant.domain.regime import detect as detect_regime
 from alpha_quant.domain.risk import RiskConfig, evaluate_stops, evaluate_time_stop
 from alpha_quant.domain.sizing import SizingConfig, size_position
+from alpha_quant.domain.technical import momentum_score
 from alpha_quant.domain.technical import score as score_technical
 from alpha_quant.ports.store import Store
 
@@ -103,30 +104,6 @@ def _compute_metrics(
         win_rate=round(win_rate * 100, 1),
         avg_hold_days=round(avg_hold_days, 1),
     )
-
-
-def _momentum_score(bars: list[Bar], close: float) -> float:
-    n = len(bars)
-    if n < 2:
-        return 0.3
-    lookback = min(63, n - 1)
-    prev_close = bars[-(lookback + 1)].close
-    if prev_close <= 0:
-        return 0.0
-    ret = (close - prev_close) / prev_close
-    if ret > 0.20:
-        return 1.0
-    if ret > 0.10:
-        return 0.8
-    if ret > 0.05:
-        return 0.6
-    if ret > 0.0:
-        return 0.5
-    if ret > -0.05:
-        return 0.3
-    if ret > -0.15:
-        return 0.1
-    return 0.0
 
 
 def _trading_dates(store: Store, start: date, end: date) -> list[date]:
@@ -265,7 +242,7 @@ def run_backtest(
                 bars_to_date = [b for b in all_bars.get(symbol, []) if b.date <= trade_date]
                 tech = score_technical(bars_to_date, state)
 
-                momentum_scr = _momentum_score(bars_to_date, bar.close)
+                momentum_scr = momentum_score(bars_to_date, bar.close)
                 tech_scr = tech.score
                 composite = 0.70 * tech_scr + 0.30 * momentum_scr
 
