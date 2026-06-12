@@ -103,7 +103,6 @@ history_years = 3
 include_benchmarks = ["SPY", "^VIX"]
 
 [data]
-raw_tail_days = 50
 indicator_state = true
 staleness_halt_hours = 30
 fixture_version = "fx-2026-06-v1"
@@ -211,7 +210,7 @@ canonical/mentions/date=.../
 canonical/corp_actions/effective_date=.../
 ```
 
-Date partitioning makes the 50-day tail prune a directory delete and makes as-of queries natural. DuckDB reads parquet globs directly with zero server footprint — and you already know this stack cold from the postgres-connector pipeline (PostgreSQL→DuckDB→Parquet); same pattern, new domain.
+Date partitioning makes as-of-date queries natural. DuckDB reads parquet globs directly with zero server footprint — and you already know this stack cold from the postgres-connector pipeline (PostgreSQL→DuckDB→Parquet); same pattern, new domain. (The 50-day tail prune was removed in P2.RO — storage cost was negligible and the prune created a real risk of insufficient history for indicator backfill after corporate actions.)
 
 **Transactional state → DuckDB (direct).** Decisions, orders, fills, positions, equity curves, events, concept_log, indicator_state, catalog. Single-writer, ACID via DuckDB's per-connection transactions. DuckDB's SQLite scanner bridges to `.db` files for state tables.
 
@@ -227,7 +226,7 @@ Migration path: local Parquet → MinIO/S3 is behind DuckDB's path config; state
 
 Per-symbol `indicator_state` row: `{ema20, ema50, ema200, rsi_avg_gain, rsi_avg_loss, atr, last_close, last_date, updated_ts, status}` — all O(1) Wilder/EMA recurrences in plain numpy; no pandas-ta dependency needed because nothing recomputes windows. Plus `month_end_closes` (12 floats/symbol/year) for 12-1 momentum, regime state, and 30-day Reddit mention baselines.
 
-This is what reconciles the 50-day raw tail with 200-day indicators: EMAs update from one stored value; long raw history is unnecessary. Cold start: one-time 250-day backfill per symbol seeds the state (bootstrap does this), then raw bars are pruned to the tail. Integrity check in CI: recompute from full fixture history, compare to incrementally-built state to 1e-6.
+This is what reconciles full raw history with 200-day indicators: EMAs update from one stored value; long raw history is unnecessary. Cold start: one-time 250-day backfill per symbol seeds the state (bootstrap does this). Integrity check in CI: recompute from full fixture history, compare to incrementally-built state to 1e-6.
 
 **Corporate-action adjustment policy:** The system stores raw (unadjusted) `close` prices. `adj_close` from EODHD is retained in the `bars` schema but not consumed by the indicator engine — the indicator engine uses `close` (point-in-time raw prices). When a corporate action (split, dividend) occurs, the affected symbol's `indicator_state.status` is set to `STALE`, triggering a full backfill from raw bars on the next pipeline run. This is safer than applying adjustment factors to incremental state, since a split's ~50% price jump would corrupt recursive EMA/RSI/ATR despite any adjustment formula. The `adjust_price()` pure function in `domain/corp_actions.py` computes cumulative backwards adjustment factors for backtesting — it multiplies split ratios to produce a factor that makes historical prices comparable to current prices. Dividends are recorded but do not adjust prices (cash dividends don't change the price series structure).
 

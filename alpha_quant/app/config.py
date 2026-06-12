@@ -21,17 +21,9 @@ class BootstrapConfig(BaseModel):
 
 
 class DataConfig(BaseModel):
-    raw_tail_days: int = 50
     indicator_state: bool = True
     staleness_halt_hours: int = 30
     fixture_version: str = "fx-2026-06-v1"
-
-    @field_validator("raw_tail_days")
-    @classmethod
-    def _raw_tail_days_bounds(cls, v: int) -> int:
-        if not 5 <= v <= 500:
-            raise ValueError("raw_tail_days must be between 5 and 500")
-        return v
 
     @field_validator("staleness_halt_hours")
     @classmethod
