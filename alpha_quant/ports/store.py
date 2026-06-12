@@ -16,6 +16,7 @@ from alpha_quant.domain.models import (
     PortfolioSnapshot,
     Position,
 )
+from alpha_quant.domain.reporting import ReportEntry
 
 
 class Store(ABC):
@@ -91,3 +92,9 @@ class Store(ABC):
 
     @abstractmethod
     def load_journal(self, dt: date) -> JournalEntry | None: ...
+
+    @abstractmethod
+    def save_report(self, report: ReportEntry) -> None: ...
+
+    @abstractmethod
+    def load_report(self, dt: date, report_type: str) -> ReportEntry | None: ...

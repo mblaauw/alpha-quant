@@ -7,7 +7,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any, Self, override
+from typing import Any, Self, cast, override
 
 import duckdb
 import pyarrow as pa
@@ -30,6 +30,7 @@ from alpha_quant.domain.models import (
     PortfolioSnapshot,
     Position,
 )
+from alpha_quant.domain.reporting import ReportEntry, ReportType
 from alpha_quant.ports.store import Store
 
 logger = structlog.get_logger()
@@ -945,6 +946,28 @@ class CanonicalStore(Store):
         if row is None:
             return None
         return JournalEntry(date=dt, content=row[0])
+
+    @override
+    def save_report(self, report: ReportEntry) -> None:
+        self._state_conn.execute(
+            "INSERT OR REPLACE INTO reports (report_date, report_type, content) VALUES (?, ?, ?)",
+            [report.date.isoformat(), report.report_type, report.content],
+        )
+        self._state_conn.commit()
+
+    @override
+    def load_report(self, dt: date, report_type: str) -> ReportEntry | None:
+        row = self._state_conn.execute(
+            "SELECT content FROM reports WHERE report_date = ? AND report_type = ?",
+            [dt.isoformat(), report_type],
+        ).fetchone()
+        if row is None:
+            return None
+        return ReportEntry(
+            date=dt,
+            report_type=cast("ReportType", report_type),
+            content=row[0],
+        )
 
     def close(self) -> None:
         self._analytical.close()

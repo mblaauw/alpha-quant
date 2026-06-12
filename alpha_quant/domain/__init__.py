@@ -62,6 +62,7 @@ from alpha_quant.domain.models import (
 )
 from alpha_quant.domain.narration import NarrationContext, PositionNarration, build
 from alpha_quant.domain.regime import CAUTION, REGIME_MULTIPLIERS, RISK_OFF, RISK_ON, Regime, detect
+from alpha_quant.domain.reporting import ReportEntry, generate_monthly, generate_weekly
 
 __all__ = [
     "Bar",
@@ -92,6 +93,9 @@ __all__ = [
     "m3_threshold_multiplier",
     "JournalEntry",
     "generate_journal",
+    "ReportEntry",
+    "generate_weekly",
+    "generate_monthly",
     "NarrationContext",
     "PositionNarration",
     "build",
