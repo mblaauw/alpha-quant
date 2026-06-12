@@ -38,6 +38,7 @@ from alpha_quant.domain.events import (
 )
 from alpha_quant.domain.insider_signal import InsiderVerdict
 from alpha_quant.domain.insider_signal import evaluate as evaluate_insider
+from alpha_quant.domain.journal import JournalEntry, generate_journal
 from alpha_quant.domain.models import (
     Bar,
     Candidate,
@@ -89,6 +90,8 @@ __all__ = [
     "DegradationStatus",
     "blackout_window_days",
     "m3_threshold_multiplier",
+    "JournalEntry",
+    "generate_journal",
     "NarrationContext",
     "PositionNarration",
     "build",
