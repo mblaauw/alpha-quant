@@ -55,8 +55,18 @@ class TestSizePosition:
 
     def test_risk_at_stop_calculation(self) -> None:
         result = size_position(100_000.0, 100.0, 2.0, 1.0, 1.0)
-        expected_risk = result.notional * (2.0 * 2.0 / 100.0)
-        assert result.risk_at_stop == expected_risk
+        assert result.risk_at_stop == 600.0
+
+    def test_uncapped_notional_risks_budget(self) -> None:
+        result = size_position(
+            100_000.0,
+            200.0,
+            5.0,
+            1.0,
+            1.0,
+            _config(max_position_pct=0.5),
+        )
+        assert result.risk_at_stop == 1000.0
 
     def test_default_capped_by_empty(self) -> None:
         ps = PositionSize(shares=10, notional=1_000.0, risk_at_stop=20.0)

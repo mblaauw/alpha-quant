@@ -41,7 +41,7 @@ def size_position(
         return PositionSize(shares=0, notional=0.0, risk_at_stop=0.0, capped_by=["multiplier_zero"])
 
     risk_notional = equity * cfg.risk_per_trade_pct * regime_mult * dd_mult
-    base_notional = risk_notional / (cfg.stop_atr_mult * atr)
+    base_notional = risk_notional * price / (cfg.stop_atr_mult * atr)
 
     max_notional = equity * cfg.max_position_pct
     if base_notional > max_notional:
