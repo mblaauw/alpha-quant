@@ -12,6 +12,7 @@ build/
 config.local.toml
 vault/
 data/.HALT
+data/state.db
 fixtures/*/
 !fixtures/fx-*
 !fixtures/golden/

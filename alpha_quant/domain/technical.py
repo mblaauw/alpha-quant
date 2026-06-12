@@ -23,16 +23,14 @@ def score(bars: list[Bar], indicator: IndicatorState) -> TechnicalScore:
         return TechnicalScore(0.0)
 
     weights = {
-        "trend": 0.25,
-        "momentum": 0.20,
-        "rsi": 0.20,
-        "macd": 0.15,
-        "volume": 0.10,
-        "atr": 0.10,
+        "trend": 0.3125,
+        "rsi": 0.25,
+        "macd": 0.1875,
+        "volume": 0.125,
+        "atr": 0.125,
     }
 
     trend_s = _trend_score(close, vals)
-    momentum_s = momentum_score(bars, close)
     rsi_s = _rsi_score(vals)
     macd_s = _macd_score(vals)
     volume_s = _volume_score(bars)
@@ -40,7 +38,6 @@ def score(bars: list[Bar], indicator: IndicatorState) -> TechnicalScore:
 
     composite = (
         trend_s * weights["trend"]
-        + momentum_s * weights["momentum"]
         + rsi_s * weights["rsi"]
         + macd_s * weights["macd"]
         + volume_s * weights["volume"]
