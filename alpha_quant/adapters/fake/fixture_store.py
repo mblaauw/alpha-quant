@@ -6,6 +6,7 @@ from datetime import date, datetime
 from typing import Self, override
 
 from alpha_quant.domain.events import DomainEvent
+from alpha_quant.domain.journal import JournalEntry
 from alpha_quant.domain.models import (
     Bar,
     CorporateAction,
@@ -28,6 +29,7 @@ class FixtureStore(Store):
         self._positions: list[Position] = []
         self._events: list[DomainEvent] = []
         self._portfolio_snapshots: list[PortfolioSnapshot] = []
+        self._journals: dict[date, JournalEntry] = {}
 
     @contextmanager
     def transaction(self) -> Generator[Self]:
@@ -133,3 +135,11 @@ class FixtureStore(Store):
         if not self._portfolio_snapshots:
             return None
         return max(self._portfolio_snapshots, key=lambda s: s.date)
+
+    @override
+    def save_journal(self, entry: JournalEntry) -> None:
+        self._journals[entry.date] = entry
+
+    @override
+    def load_journal(self, dt: date) -> JournalEntry | None:
+        return self._journals.get(dt)

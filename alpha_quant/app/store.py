@@ -14,6 +14,7 @@ import pyarrow as pa
 import structlog
 
 from alpha_quant.domain.events import DomainEvent
+from alpha_quant.domain.journal import JournalEntry
 from alpha_quant.domain.models import (
     Bar,
     Candidate,
@@ -926,6 +927,24 @@ class CanonicalStore(Store):
             }
             for r in rows
         ]
+
+    @override
+    def save_journal(self, entry: JournalEntry) -> None:
+        self._state_conn.execute(
+            "INSERT OR REPLACE INTO journal_entries (entry_date, content) VALUES (?, ?)",
+            [entry.date.isoformat(), entry.content],
+        )
+        self._state_conn.commit()
+
+    @override
+    def load_journal(self, dt: date) -> JournalEntry | None:
+        row = self._state_conn.execute(
+            "SELECT content FROM journal_entries WHERE entry_date = ?",
+            [dt.isoformat()],
+        ).fetchone()
+        if row is None:
+            return None
+        return JournalEntry(date=dt, content=row[0])
 
     def close(self) -> None:
         self._analytical.close()

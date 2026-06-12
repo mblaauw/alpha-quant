@@ -4,6 +4,7 @@ from datetime import date, datetime
 from typing import Self
 
 from alpha_quant.domain.events import DomainEvent
+from alpha_quant.domain.journal import JournalEntry
 from alpha_quant.domain.models import (
     Bar,
     CorporateAction,
@@ -84,3 +85,9 @@ class Store(ABC):
 
     @abstractmethod
     def load_latest_portfolio_snapshot(self) -> PortfolioSnapshot | None: ...
+
+    @abstractmethod
+    def save_journal(self, entry: JournalEntry) -> None: ...
+
+    @abstractmethod
+    def load_journal(self, dt: date) -> JournalEntry | None: ...
