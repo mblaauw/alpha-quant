@@ -1,7 +1,8 @@
 <div align="center">
 
-![Alpha-Quant Logo](docs/assets/logo.svg)
-
+<div align="center">
+  <img src="docs/assets/logo.png" alt="Alpha-Quant Logo" width="200">
+</div>
 # Alpha-Quant
 
 Deterministic, daily-cadence, long-only equity trading system
