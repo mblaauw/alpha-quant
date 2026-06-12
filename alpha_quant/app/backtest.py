@@ -7,8 +7,16 @@ from datetime import date
 import numpy as np
 
 from alpha_quant.domain.derive import backfill_indicator_state, update_indicator_state
-from alpha_quant.domain.fills import FillConfig
-from alpha_quant.domain.models import Bar, Candidate, Decision, Fill, IndicatorState, Position
+from alpha_quant.domain.fills import FillConfig, fill_entry_order, fill_stop_loss
+from alpha_quant.domain.models import (
+    Bar,
+    Candidate,
+    Decision,
+    Fill,
+    IndicatorState,
+    Order,
+    Position,
+)
 from alpha_quant.domain.ranking import rank as rank_candidates
 from alpha_quant.domain.regime import detect as detect_regime
 from alpha_quant.domain.risk import RiskConfig, evaluate_stops, evaluate_time_stop
@@ -152,6 +160,7 @@ def run_backtest(
     equity_curve: list[float] = []
     daily_returns: list[float] = []
     prev_equity: float | None = None
+    last_close: dict[str, float] = {}
 
     trade_count: int = 0
     win_count: int = 0
@@ -201,10 +210,15 @@ def run_backtest(
             )
 
             if risk_actions:
-                sell_price = max(bar.open * 0.99, bar.low)
-                proceeds = round(pos.quantity * sell_price, 2)
-                pl = round((sell_price - pos.avg_cost) * pos.quantity, 2)
+                fill = fill_stop_loss(pos, bar, order_id=f"{sym}_stop", config=fill_config)
+                if fill is None:
+                    continue
+                sell_price = fill.price
+                qty = abs(fill.quantity)
+                proceeds = round(qty * sell_price, 2)
+                pl = round((sell_price - pos.avg_cost) * qty, 2)
                 cash += proceeds
+                all_fills.append(fill)
                 trade_count += 1
                 if pl > 0:
                     win_count += 1
@@ -266,35 +280,47 @@ def run_backtest(
                 state = indicator_states.get(cand.symbol)
                 if bar is None or state is None:
                     continue
-                price = bar.close
-                atr_val = state.values.get("atr", price * 0.02)
+                prev_close = last_close.get(cand.symbol, 0.0)
+                atr_val = state.values.get("atr", bar.close * 0.02)
                 if np.isnan(atr_val) or atr_val <= 0:
-                    atr_val = price * 0.02
+                    atr_val = bar.close * 0.02
 
                 total_equity = cash + sum(
                     p.quantity * prices.get(p.symbol, 0.0) for p in positions.values()
                 )
 
-                sized = size_position(total_equity, price, atr_val, regime_mult, 1.0, sc)
+                sized = size_position(total_equity, bar.close, atr_val, regime_mult, 1.0, sc)
                 final_shares = sized.shares
                 if final_shares <= 0:
                     continue
-                cost = round(final_shares * price, 2)
+
+                order_id = uuid.uuid4().hex[:16]
+                order = Order(
+                    order_id=order_id,
+                    symbol=cand.symbol,
+                    action="buy",
+                    quantity=float(final_shares),
+                    order_type="market",
+                    status="submitted",
+                )
+                fill = fill_entry_order(order, bar, prev_close, config=fill_config)
+                if fill is None:
+                    continue
+                fill_price = fill.price
+                cost = round(float(final_shares) * fill_price, 2)
                 if cost > cash:
-                    final_shares = int(cash / price)
-                    if final_shares <= 0:
-                        continue
-                    cost = round(final_shares * price, 2)
+                    continue
 
                 cash -= cost
-                stop_price = round(price - rc.stop_atr_mult * atr_val, 2)
+                all_fills.append(fill)
+                stop_price = round(fill_price - rc.stop_atr_mult * atr_val, 2)
 
                 pos = Position(
                     symbol=cand.symbol,
                     quantity=float(final_shares),
-                    entry_price=price,
-                    avg_cost=price,
-                    current_price=price,
+                    entry_price=fill_price,
+                    avg_cost=fill_price,
+                    current_price=fill_price,
                     stop_price=stop_price,
                     market_value=cost,
                     decision_id=uuid.uuid4().hex[:16],
@@ -316,6 +342,10 @@ def run_backtest(
             daily_returns.append((equity - prev_equity) / prev_equity)
         prev_equity = equity
         equity_curve.append(equity)
+
+        for symbol, bar in date_bars.items():
+            last_close[symbol] = bar.close
+
         steps.append(
             BacktestStep(
                 date=trade_date,
