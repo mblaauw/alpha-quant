@@ -1,3 +1,5 @@
+from alpha_quant.domain.crowding import CrowdingVerdict
+from alpha_quant.domain.crowding import evaluate as evaluate_crowding
 from alpha_quant.domain.events import (
     BaseDomainEvent,
     BookMarked,
@@ -69,6 +71,8 @@ __all__ = [
     "UniverseMember",
     "InsiderVerdict",
     "evaluate_insider",
+    "CrowdingVerdict",
+    "evaluate_crowding",
     "Regime",
     "REGIME_MULTIPLIERS",
     "RISK_ON",
