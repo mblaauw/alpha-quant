@@ -14,6 +14,7 @@ from alpha_quant.domain.models import (
     Fill,
     IndicatorState,
     Order,
+    PortfolioSnapshot,
     Position,
 )
 from alpha_quant.ports.store import Store
@@ -22,6 +23,11 @@ from alpha_quant.ports.store import Store
 class FixtureStore(Store):
     def __init__(self) -> None:
         self._bars: dict[tuple[str, date], list[Bar]] = {}
+        self._orders: dict[str, Order] = {}
+        self._fills: dict[str, list[Fill]] = {}
+        self._positions: list[Position] = []
+        self._events: list[DomainEvent] = []
+        self._portfolio_snapshots: list[PortfolioSnapshot] = []
 
     @contextmanager
     def transaction(self) -> Generator[Self]:
@@ -51,31 +57,35 @@ class FixtureStore(Store):
 
     @override
     def save_order(self, order: Order) -> None:
-        pass
+        self._orders[order.order_id] = order
 
     @override
     def load_order(self, order_id: str) -> Order | None:
-        return None
+        return self._orders.get(order_id)
 
     @override
     def save_fill(self, fill: Fill) -> None:
-        pass
+        self._fills.setdefault(fill.order_id, []).append(fill)
 
     @override
     def load_fills(self, order_id: str) -> list[Fill]:
-        return []
+        return self._fills.get(order_id, [])
 
     @override
     def save_position(self, position: Position) -> None:
-        pass
+        existing = [i for i, p in enumerate(self._positions) if p.symbol == position.symbol]
+        if existing:
+            self._positions[existing[0]] = position
+        else:
+            self._positions.append(position)
 
     @override
     def load_positions(self) -> list[Position]:
-        return []
+        return list(self._positions)
 
     @override
     def save_event(self, event: DomainEvent) -> None:
-        pass
+        self._events.append(event)
 
     @override
     def load_events(
@@ -83,7 +93,12 @@ class FixtureStore(Store):
         event_type: str | None = None,
         since: datetime | None = None,
     ) -> list[DomainEvent]:
-        return []
+        result = list(self._events)
+        if event_type:
+            result = [e for e in result if e.event_type == event_type]
+        if since:
+            result = [e for e in result if e.timestamp >= since]
+        return result
 
     @override
     def save_indicator_state(self, state: IndicatorState) -> None:
@@ -108,3 +123,13 @@ class FixtureStore(Store):
     @override
     def load_earnings(self, symbol: str) -> list[EarningsEntry]:
         return []
+
+    @override
+    def save_portfolio_snapshot(self, snapshot: PortfolioSnapshot) -> None:
+        self._portfolio_snapshots.append(snapshot)
+
+    @override
+    def load_latest_portfolio_snapshot(self) -> PortfolioSnapshot | None:
+        if not self._portfolio_snapshots:
+            return None
+        return max(self._portfolio_snapshots, key=lambda s: s.date)

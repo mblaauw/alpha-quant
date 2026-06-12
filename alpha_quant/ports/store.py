@@ -12,6 +12,7 @@ from alpha_quant.domain.models import (
     Fill,
     IndicatorState,
     Order,
+    PortfolioSnapshot,
     Position,
 )
 
@@ -77,3 +78,9 @@ class Store(ABC):
 
     @abstractmethod
     def load_earnings(self, symbol: str) -> list[EarningsEntry]: ...
+
+    @abstractmethod
+    def save_portfolio_snapshot(self, snapshot: PortfolioSnapshot) -> None: ...
+
+    @abstractmethod
+    def load_latest_portfolio_snapshot(self) -> PortfolioSnapshot | None: ...

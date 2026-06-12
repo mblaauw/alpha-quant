@@ -26,6 +26,7 @@ from alpha_quant.domain.models import (
     InsiderTransaction,
     MentionCount,
     Order,
+    PortfolioSnapshot,
     Position,
 )
 from alpha_quant.ports.store import Store
@@ -816,6 +817,25 @@ class CanonicalStore(Store):
             )
             for r in result
         ]
+
+    @override
+    def save_portfolio_snapshot(self, snapshot: PortfolioSnapshot) -> None:
+        self._state_conn.execute(
+            "INSERT OR REPLACE INTO equity_curve"
+            " (equity_date, equity, cash, nav)"
+            " VALUES (?, ?, ?, ?)",
+            [snapshot.date, snapshot.equity, snapshot.cash, snapshot.equity],
+        )
+        self._state_conn.commit()
+
+    @override
+    def load_latest_portfolio_snapshot(self) -> PortfolioSnapshot | None:
+        row = self._state_conn.execute(
+            "SELECT equity_date, cash, equity FROM equity_curve ORDER BY equity_date DESC LIMIT 1"
+        ).fetchone()
+        if row is None:
+            return None
+        return PortfolioSnapshot(date=row[0], cash=row[1], equity=row[2])
 
     def add_quarantine(self, symbol: str, reason: str, severity: str = "QUARANTINE") -> None:
         self._state_conn.execute(

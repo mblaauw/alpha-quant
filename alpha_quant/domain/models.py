@@ -241,3 +241,11 @@ class IndicatorState(BaseModel):
     date: date
     values: dict[str, float]
     status: str = "valid"
+
+
+class PortfolioSnapshot(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    date: date
+    cash: float
+    equity: float
