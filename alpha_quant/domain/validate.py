@@ -5,6 +5,7 @@ from typing import Any
 
 import numpy as np
 
+from alpha_quant.app.calendar import next_market_day
 from alpha_quant.domain.models import Bar, FundamentalsSnapshot, IndicatorState
 
 _isnan = np.isnan
@@ -69,8 +70,10 @@ def validate_bars(bars: list[Bar]) -> list[ValidationResult]:
                     return_spikes.append(f"{bar.date} return={ret * 100:.1f}%")
 
             gap = (bar.date - prev.date).days
-            if gap > 4:
-                date_gaps.append(f"{prev.date} to {bar.date} ({gap} days)")
+            expected_next = next_market_day(prev.date)
+            expected_gap = (expected_next - prev.date).days
+            if gap > expected_gap + 1:
+                date_gaps.append(f"{prev.date} to {bar.date} ({gap}d, expected {expected_gap}d)")
 
     if nan_issues:
         results.append(
