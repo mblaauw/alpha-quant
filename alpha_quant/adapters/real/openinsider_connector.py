@@ -142,7 +142,12 @@ class OpenInsiderConnector(BaseConnector, InsiderFeed):
         for symbol, txs in groups.items():
             if not txs:
                 continue
-            dates = [tx.transaction_date or tx.filing_date for tx in txs]
+            dated_txs = [
+                tx for tx in txs if tx.transaction_date is not None or tx.filing_date is not None
+            ]
+            if not dated_txs:
+                continue
+            dates = [tx.transaction_date or tx.filing_date for tx in dated_txs]
             prices = [tx.price for tx in txs if tx.price is not None]
 
             net_shares = sum(tx.shares_traded for tx in txs)
@@ -224,7 +229,7 @@ def _row_to_transaction(cells: list) -> InsiderTransaction | None:
 
     return InsiderTransaction(
         symbol=ticker,
-        filing_date=tx_date or date.today(),
+        filing_date=tx_date,
         transaction_date=tx_date,
         owner=owner or "Unknown",
         title=title,
