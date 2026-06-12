@@ -8,6 +8,7 @@ from typing import Self, override
 from alpha_quant.domain.events import DomainEvent
 from alpha_quant.domain.models import (
     Bar,
+    CorporateAction,
     Decision,
     Fill,
     IndicatorState,
@@ -90,3 +91,11 @@ class FixtureStore(Store):
     @override
     def load_indicator_state(self, symbol: str, dt: date) -> IndicatorState | None:
         return None
+
+    @override
+    def save_corp_actions(self, symbol: str, actions: list[CorporateAction]) -> None:
+        pass
+
+    @override
+    def load_corp_actions(self, symbol: str) -> list[CorporateAction]:
+        return []

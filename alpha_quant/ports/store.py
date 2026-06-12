@@ -6,6 +6,7 @@ from typing import Self
 from alpha_quant.domain.events import DomainEvent
 from alpha_quant.domain.models import (
     Bar,
+    CorporateAction,
     Decision,
     Fill,
     IndicatorState,
@@ -63,3 +64,9 @@ class Store(ABC):
 
     @abstractmethod
     def load_indicator_state(self, symbol: str, dt: date) -> IndicatorState | None: ...
+
+    @abstractmethod
+    def save_corp_actions(self, symbol: str, actions: list[CorporateAction]) -> None: ...
+
+    @abstractmethod
+    def load_corp_actions(self, symbol: str) -> list[CorporateAction]: ...
