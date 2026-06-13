@@ -128,3 +128,10 @@ class BaseConnector:
 
     def close(self) -> None:
         self._client.close()
+
+    def check_connection(self) -> bool:
+        try:
+            resp = self._client.get(self._base_url, timeout=5.0)
+            return resp.status_code < 500
+        except Exception:
+            return False

@@ -107,6 +107,14 @@ class SECConnector(BaseConnector):
         self._cache_conn.close()
         super().close()
 
+    @override
+    def check_connection(self) -> bool:
+        try:
+            resp = self._client.get(SEC_TICKERS_URL, timeout=10.0)
+            return resp.status_code < 500
+        except Exception:
+            return False
+
 
 def _parse_tickers(raw: dict[str, Any]) -> dict[str, TickerRecord] | None:
     if not isinstance(raw, dict):

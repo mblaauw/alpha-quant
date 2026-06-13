@@ -43,10 +43,45 @@ def _configure_logging() -> None:
 
 
 def cmd_run(args: argparse.Namespace) -> None:
+    from pathlib import Path
+
+    from alpha_quant.app.factory import (
+        create_clock,
+        create_fundamentals,
+        create_insider_feed,
+        create_market_data,
+        create_sentiment_feed,
+    )
+    from alpha_quant.app.vault import Vault
+
     config = load_config(args.config)
-    print("[alpha-quant] run: not yet implemented (planned for P2.14 Daily pipeline orchestrator)")
+    config.data.mode = args.mode
+
+    vault = None
+    if config.data.mode == "live":
+        vault = Vault(base_path=Path("vault"))
+
+    clock = create_clock(config)
+    market_data = create_market_data(config, vault)
+    fundamentals = create_fundamentals(config, vault)
+    insider = create_insider_feed(config, vault)
+    sentiment = create_sentiment_feed(config, vault)
+
+    print(
+        f"[alpha-quant] run: mode={config.data.mode},"
+        f" {type(market_data).__name__},"
+        f" {type(fundamentals).__name__},"
+        f" {type(insider).__name__},"
+        f" {type(sentiment).__name__},"
+        f" {type(clock).__name__}"
+    )
     if args.verbose_config:
         print(json.dumps(redact_config(config), indent=2, default=str))
+
+
+def _check_connection(source: str, ok: bool) -> None:
+    status = "OK" if ok else "FAIL"
+    print(f"  {source}: {status}")
 
 
 def cmd_replay(args: argparse.Namespace) -> None:
@@ -123,7 +158,35 @@ def cmd_report(args: argparse.Namespace) -> None:
 
 
 def cmd_status(args: argparse.Namespace) -> None:
+    from pathlib import Path
+
+    from alpha_quant.adapters.real.base_connector import BaseConnector
+    from alpha_quant.app.factory import (
+        create_fundamentals,
+        create_insider_feed,
+        create_market_data,
+        create_sec_connector,
+        create_sentiment_feed,
+    )
+    from alpha_quant.app.vault import Vault
+
     config = load_config(args.config)
+
+    if args.check_connections:
+        vault = Vault(base_path=Path("vault")) if config.data.mode == "live" else None
+        connectors: list[tuple[str, object]] = [
+            ("market_data", create_market_data(config, vault)),
+            ("fundamentals", create_fundamentals(config, vault)),
+            ("insider_feed", create_insider_feed(config, vault)),
+            ("sentiment_feed", create_sentiment_feed(config, vault)),
+            ("sec", create_sec_connector(config, vault)),
+        ]
+        print("[alpha-quant] connections:")
+        for name, conn in connectors:
+            ok = conn.check_connection() if isinstance(conn, BaseConnector) else True
+            _check_connection(name, ok)
+        return
+
     if args.show_config:
         if args.json:
             print(json.dumps(redact_config(config), indent=2, default=str))
@@ -234,6 +297,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_report.set_defaults(func=cmd_report)
 
     p_status = sub.add_parser("status", help="Full system status")
+    p_status.add_argument(
+        "--check-connections",
+        action="store_true",
+        dest="check_connections",
+        help="Ping each data source",
+    )
     p_status.add_argument(
         "--json",
         action="store_true",

@@ -13,6 +13,7 @@ config.local.toml
 vault/
 data/.HALT
 data/state.db
+*.sqlite
 fixtures/*/
 !fixtures/fx-*
 !fixtures/golden/
