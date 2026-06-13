@@ -169,6 +169,12 @@ class TestEvaluateDrawdown:
         result = evaluate_drawdown([-100.0])
         assert result.multiplier == 1.0
 
+    def test_rolling_window_avoids_old_peak(self) -> None:
+        curve = [200.0, 100.0, 105.0, 98.0]
+        cfg = RiskConfig(dd_ladder=[[0.05, 0.5]], dd_window_days=3)
+        result = evaluate_drawdown(curve, config=cfg)
+        assert pytest.approx(result.multiplier) == 0.5
+
 
 class TestEvaluateDailyLoss:
     def test_loss_exceeds_halt(self) -> None:

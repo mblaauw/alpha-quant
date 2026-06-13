@@ -32,7 +32,7 @@ class FakeBroker(Broker):
             order_id=filled.order_id,
             symbol=order.symbol,
             quantity=order.quantity,
-            price=filled.avg_fill_price,
+            price=filled.avg_fill_price or 0.0,
             timestamp=datetime.now(UTC),
         )
         self._fills.append(fill)

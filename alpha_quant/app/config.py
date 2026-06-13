@@ -109,6 +109,7 @@ class RiskConfig(BaseModel):
     partial_take_at_r: float = 2.0
     time_stop_days: int = 30
     dd_ladder: list[list[float]] = [[0.10, 0.5], [0.15, 0.0]]
+    dd_window_days: int = 0
     daily_loss_halt_pct: float = 0.03
 
     @field_validator("stop_atr_mult", "trail_after_r", "partial_take_at_r")

@@ -24,6 +24,7 @@ class RiskConfig(BaseModel):
     partial_take_at_r: float = 2.0
     time_stop_days: int = 30
     dd_ladder: list[list[float]] = Field(default_factory=lambda: [[0.10, 0.5], [0.15, 0.0]])
+    dd_window_days: int = 0
     daily_loss_halt_pct: float = 0.03
 
 
@@ -133,7 +134,11 @@ def evaluate_drawdown(
     if not equity_curve:
         return DrawdownVerdict(multiplier=1.0)
 
-    peak = max(equity_curve)
+    if cfg.dd_window_days > 0:
+        window = equity_curve[-cfg.dd_window_days :]
+        peak = max(window)
+    else:
+        peak = max(equity_curve)
     current = equity_curve[-1]
     if peak <= 0:
         return DrawdownVerdict(multiplier=1.0)
