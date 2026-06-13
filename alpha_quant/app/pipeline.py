@@ -17,6 +17,7 @@ from alpha_quant.app._loop import (
     score_candidate,
     size_entry,
 )
+from alpha_quant.app.halt import write_halt
 from alpha_quant.domain.ablation import AblationConfig
 from alpha_quant.domain.degradation import DegradationStatus, m3_threshold_multiplier
 from alpha_quant.domain.derive import backfill_indicator_state
@@ -158,6 +159,7 @@ def run(
             )
             if vr.severity == "HALT":
                 halted = True
+                write_halt(reason=vr.check, run_id=run_id)
 
     # --- 3. Derive indicators ---
     indicator_states: dict[str, IndicatorState] = {}
