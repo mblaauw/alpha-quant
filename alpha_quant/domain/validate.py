@@ -5,7 +5,7 @@ from typing import Any
 
 import numpy as np
 
-from alpha_quant.app.calendar import next_market_day
+from alpha_quant.domain.calendar import next_market_day
 from alpha_quant.domain.models import Bar, FundamentalsSnapshot, IndicatorState
 
 _isnan = np.isnan

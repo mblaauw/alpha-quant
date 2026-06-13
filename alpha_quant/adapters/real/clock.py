@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime
 from typing import override
 
-from alpha_quant.app.calendar import prev_market_day
+from alpha_quant.domain.calendar import prev_market_day
 from alpha_quant.ports.clock import Clock
 
 
