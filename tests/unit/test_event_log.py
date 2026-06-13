@@ -28,7 +28,9 @@ class _FakeStore:
 
 
 def _event(name: str = "test") -> PipelineRunStarted:
-    return PipelineRunStarted(timestamp=datetime.now(UTC), run_id="test", source="test", mode="daily")  # noqa: E501
+    return PipelineRunStarted(
+        timestamp=datetime.now(UTC), run_id="test", source="test", mode="daily"
+    )  # noqa: E501
 
 
 class TestEventLog:

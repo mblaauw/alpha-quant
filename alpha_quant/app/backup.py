@@ -6,6 +6,7 @@ import shutil
 import tarfile
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import structlog
 import zstandard
@@ -20,8 +21,8 @@ _RETENTION_DAILY = 30
 _RETENTION_MONTHLY = 12
 
 
-def _load_config_for_backup(config_path: str | None = None) -> object:
-    from alpha_quant.app.config import load_config
+def _load_config_for_backup(config_path: str | None = None) -> Any:
+    from alpha_quant.app.config import load_config, AppConfig
 
     return load_config(config_path)
 

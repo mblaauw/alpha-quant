@@ -129,6 +129,19 @@ class TestFillEntryOrder:
         fill = fill_entry_order(order, bar, prev_close=100.0)
         assert fill is None
 
+    def test_gap_exactly_at_threshold_passes(self) -> None:
+        order = _order()
+        bar = _bar(open_v=100.5)
+        fill = fill_entry_order(order, bar, prev_close=100.0)
+        assert fill is not None
+
+    def test_gap_just_above_threshold_fails(self) -> None:
+        order = _order()
+        bar = _bar(open_v=100.5)
+        cfg = FillConfig(max_gap_pct=0.004)
+        fill = fill_entry_order(order, bar, prev_close=100.0, config=cfg)
+        assert fill is None
+
     def test_gap_above_custom_threshold_fails(self) -> None:
         order = _order()
         bar = _bar(open_v=100.2)
