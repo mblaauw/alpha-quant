@@ -18,6 +18,13 @@ def evaluate(
     as_of_date: date,
 ) -> CrowdingVerdict:
     if blocked_until is not None and as_of_date < blocked_until:
+        if z_score is not None and z_score > 3:
+            extended = max(blocked_until, as_of_date + timedelta(days=14))
+            return CrowdingVerdict(
+                blocked=True,
+                blocked_until=extended,
+                reason=f"z-score {z_score:.2f} extended block until {extended}",
+            )
         return CrowdingVerdict(
             blocked=True,
             blocked_until=blocked_until,
