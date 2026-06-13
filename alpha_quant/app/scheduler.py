@@ -113,6 +113,7 @@ def run_daily_pipeline(
             risk_config=risk_config,
             sizing_config=sizing_config,
             prev_equity=prev_equity,
+            prev_regime="CAUTION",
         )
 
         status = "completed"
