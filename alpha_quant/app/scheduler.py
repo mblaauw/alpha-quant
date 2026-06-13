@@ -16,6 +16,9 @@ from alpha_quant.app.pipeline import PipelineConfig
 from alpha_quant.app.pipeline import run as run_pipeline
 from alpha_quant.app.store import CanonicalStore
 from alpha_quant.domain.calendar import is_market_day
+from alpha_quant.domain.fills import FillConfig
+from alpha_quant.domain.risk import RiskConfig as DomainRiskConfig
+from alpha_quant.domain.sizing import SizingConfig
 
 if TYPE_CHECKING:
     from apscheduler.schedulers.blocking import BlockingScheduler
@@ -85,12 +88,30 @@ def run_daily_pipeline(
         symbols=len(universe),
     )
 
+    fill_config = FillConfig(slippage_bps=float(config.paper.slippage_bps))
+    risk_config = DomainRiskConfig(
+        stop_atr_mult=config.risk.stop_atr_mult,
+        trail_after_r=config.risk.trail_after_r,
+        partial_take_at_r=config.risk.partial_take_at_r,
+        time_stop_days=config.risk.time_stop_days,
+        dd_ladder=config.risk.dd_ladder,
+        daily_loss_halt_pct=config.risk.daily_loss_halt_pct,
+    )
+    sizing_config = SizingConfig(
+        risk_per_trade_pct=config.portfolio.risk_per_trade_pct,
+        max_position_pct=config.portfolio.max_position_pct,
+        max_gross_exposure=config.portfolio.max_gross_exposure,
+    )
+
     try:
         result = run_pipeline(
             run_date=run_date,
             store=store,
             universe=universe,
             config=pipeline_cfg,
+            fill_config=fill_config,
+            risk_config=risk_config,
+            sizing_config=sizing_config,
             prev_equity=prev_equity,
         )
 
