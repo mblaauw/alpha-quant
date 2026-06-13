@@ -170,8 +170,53 @@ def cmd_replay(args: argparse.Namespace) -> None:
 
 
 def cmd_backtest(args: argparse.Namespace) -> None:
+    from datetime import date
+    from pathlib import Path
+
+    from alpha_quant.app.backtest import BacktestConfig, run_backtest
+    from alpha_quant.app.store import CanonicalStore
+    from alpha_quant.domain.fills import FillConfig
+    from alpha_quant.domain.risk import RiskConfig as DomainRiskConfig
+    from alpha_quant.domain.sizing import SizingConfig
+
     config = load_config(args.config)
-    print("[alpha-quant] backtest: not yet implemented (planned for P2.13 Backtester)")
+    store = CanonicalStore(base_path=Path("data"))
+    from_date = date.fromisoformat(args.from_date)
+    to_date = date.fromisoformat(args.to_date)
+    fill_config = FillConfig(slippage_bps=float(config.paper.slippage_bps))
+    risk_config = DomainRiskConfig(
+        stop_atr_mult=config.risk.stop_atr_mult,
+        trail_after_r=config.risk.trail_after_r,
+        partial_take_at_r=config.risk.partial_take_at_r,
+        time_stop_days=config.risk.time_stop_days,
+        dd_ladder=config.risk.dd_ladder,
+        daily_loss_halt_pct=config.risk.daily_loss_halt_pct,
+    )
+    sizing_config = SizingConfig(
+        risk_per_trade_pct=config.portfolio.risk_per_trade_pct,
+        max_position_pct=config.portfolio.max_position_pct,
+        max_gross_exposure=config.portfolio.max_gross_exposure,
+    )
+    bt_config = BacktestConfig(
+        start_date=from_date,
+        end_date=to_date,
+        initial_equity=config.paper.starting_equity,
+        symbols=config.bootstrap.symbols + config.bootstrap.include_benchmarks,
+    )
+    result = run_backtest(
+        config=bt_config,
+        store=store,
+        fill_config=fill_config,
+        risk_config=risk_config,
+        sizing_config=sizing_config,
+    )
+    print(
+        f"[alpha-quant] backtest: {from_date} → {to_date},"
+        f" {result.metrics.total_return_pct:.1f}% return,"
+        f" {result.metrics.sharpe:.2f} sharpe,"
+        f" {result.metrics.max_drawdown_pct:.1f}% max dd,"
+        f" {result.metrics.num_trades} trades"
+    )
     if args.verbose_config:
         print(json.dumps(redact_config(config), indent=2, default=str))
 
@@ -200,8 +245,22 @@ def cmd_bootstrap(args: argparse.Namespace) -> None:
 
 
 def cmd_journal(args: argparse.Namespace) -> None:
+    from pathlib import Path
+
+    from alpha_quant.app.store import CanonicalStore
+
     config = load_config(args.config)
-    print("[alpha-quant] journal: not yet implemented (planned for P4.5 Daily journal generator)")
+    store = CanonicalStore(base_path=Path("data"))
+    runs = store.list_runs()
+    if not runs:
+        print("[alpha-quant] journal: no runs found")
+    else:
+        for r in runs[:10]:
+            print(
+                f"  {str(r.get('start_ts', ''))[:10]}"
+                f"  {r.get('run_id', '')[:8]}"
+                f"  {r.get('status', '')}"
+            )
     if args.verbose_config:
         print(json.dumps(redact_config(config), indent=2, default=str))
 
@@ -220,8 +279,20 @@ def cmd_ask(args: argparse.Namespace) -> None:
 
 
 def cmd_report(args: argparse.Namespace) -> None:
+    from pathlib import Path
+
+    from alpha_quant.app.store import CanonicalStore
+
     config = load_config(args.config)
-    print("[alpha-quant] report: not yet implemented (planned for P4.6 Weekly & monthly reports)")
+    store = CanonicalStore(base_path=Path("data"))
+    snap = store.load_latest_portfolio_snapshot()
+    if snap is not None:
+        print(f"[alpha-quant] report ({args.type}):")
+        print(f"  equity: {snap.equity:.2f}")
+        print(f"  cash: {snap.cash:.2f}")
+        print(f"  date: {snap.date}")
+    else:
+        print("[alpha-quant] report: no portfolio data found")
     if args.verbose_config:
         print(json.dumps(redact_config(config), indent=2, default=str))
 
