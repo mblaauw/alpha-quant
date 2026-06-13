@@ -1,26 +1,22 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from pydantic import BaseModel, ConfigDict, Field
 
 
-@dataclass
-class SizingConfig:
+class SizingConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
     risk_per_trade_pct: float = 0.01
     max_position_pct: float = 0.15
     max_gross_exposure: float = 0.80
     stop_atr_mult: float = 2.0
 
 
-@dataclass
-class PositionSize:
+class PositionSize(BaseModel):
+    model_config = ConfigDict(frozen=True)
     shares: int
     notional: float
     risk_at_stop: float
-    capped_by: list[str] | None = None
-
-    def __post_init__(self) -> None:
-        if self.capped_by is None:
-            self.capped_by = []
+    capped_by: list[str] = Field(default_factory=list)
 
 
 def size_position(

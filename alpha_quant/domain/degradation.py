@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from pydantic import BaseModel, ConfigDict
 
 
-@dataclass
-class DegradationStatus:
+class DegradationStatus(BaseModel):
+    model_config = ConfigDict(frozen=True)
     insider_degraded: bool = False
     crowding_degraded: bool = False
     fundamentals_degraded: bool = False

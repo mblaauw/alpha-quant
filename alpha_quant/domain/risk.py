@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from datetime import date
 from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from alpha_quant.domain.models import Bar, Position
 
@@ -16,18 +17,18 @@ ActionType = Literal[
 ]
 
 
-@dataclass
-class RiskConfig:
+class RiskConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
     stop_atr_mult: float = 2.0
     trail_after_r: float = 1.0
     partial_take_at_r: float = 2.0
     time_stop_days: int = 30
-    dd_ladder: list[list[float]] = field(default_factory=lambda: [[0.10, 0.5], [0.15, 0.0]])
+    dd_ladder: list[list[float]] = Field(default_factory=lambda: [[0.10, 0.5], [0.15, 0.0]])
     daily_loss_halt_pct: float = 0.03
 
 
-@dataclass
-class RiskAction:
+class RiskAction(BaseModel):
+    model_config = ConfigDict(frozen=True)
     action_type: ActionType
     symbol: str
     shares: float  # 0 = full exit, >0 = partial reduce
@@ -35,10 +36,10 @@ class RiskAction:
     price: float | None = None  # new stop price for trail_stop
 
 
-@dataclass
-class DrawdownVerdict:
+class DrawdownVerdict(BaseModel):
+    model_config = ConfigDict(frozen=True)
     multiplier: float
-    actions: list[RiskAction] = field(default_factory=list)
+    actions: list[RiskAction] = Field(default_factory=list)
 
 
 def evaluate_stops(
