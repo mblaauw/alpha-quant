@@ -102,3 +102,18 @@ class TestRank:
         assert result
         expected = max(0.0, min(1.0, round(0.7 * 0.8 + 0.3 * 0.5, 4)))
         assert result[0].composite_score == expected
+
+    def test_sector_concentration_limit(self) -> None:
+        c1 = _candidate("AAPL", technical=0.9, momentum=0.9)
+        c2 = _candidate("MSFT", technical=0.8, momentum=0.8)
+        c3 = _candidate("GOOGL", technical=0.7, momentum=0.7)
+        sector_map = {"AAPL": "tech", "MSFT": "tech", "GOOGL": "tech"}
+        result = rank(
+            [c1, c2, c3],
+            max_positions=10,
+            current_count=0,
+            sector_map=sector_map,
+            max_sector_pct=0.25,
+        )
+        # 10 slots * 0.25 = max 2 per sector, so should cap at 2
+        assert len(result) <= 2

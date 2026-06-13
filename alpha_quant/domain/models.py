@@ -140,6 +140,7 @@ class Candidate(BaseModel):
     regime: str
     gate_results: dict[str, bool]
     block_reason: str | None = None
+    sector: str | None = None
 
 
 class Order(BaseModel):
