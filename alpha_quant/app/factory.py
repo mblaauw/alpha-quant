@@ -4,6 +4,7 @@ from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from alpha_quant.adapters.fake.canned_llm import CannedLLM
 from alpha_quant.adapters.fake.fixture_fundamentals import FixtureFundamentals
 from alpha_quant.adapters.fake.fixture_insider_feed import FixtureInsiderFeed
 from alpha_quant.adapters.fake.fixture_market_data import FixtureMarketData
@@ -12,6 +13,7 @@ from alpha_quant.adapters.fake.virtual_clock import VirtualClock
 from alpha_quant.adapters.real.alpaca_connector import AlpacaConnector
 from alpha_quant.adapters.real.clock import SystemClock
 from alpha_quant.adapters.real.eodhd_connector import EODHDConnector
+from alpha_quant.adapters.real.llm_adapter import OpenAILikeLLM
 from alpha_quant.adapters.real.openinsider_connector import OpenInsiderConnector
 from alpha_quant.adapters.real.reddit_sentiment_connector import RedditSentimentConnector
 from alpha_quant.adapters.real.sec_connector import SECConnector
@@ -19,6 +21,7 @@ from alpha_quant.app.config import AppConfig
 from alpha_quant.ports.clock import Clock
 from alpha_quant.ports.fundamentals import Fundamentals
 from alpha_quant.ports.insider_feed import InsiderFeed
+from alpha_quant.ports.llm import LLM
 from alpha_quant.ports.market_data import MarketData
 from alpha_quant.ports.sentiment_feed import SentimentFeed
 
@@ -86,6 +89,12 @@ def create_sec_connector(
         cache_path=cache_path or "sec_cache.sqlite",
         vault=vault,
     )
+
+
+def create_llm(config: AppConfig) -> LLM:
+    if config.data.mode == "live":
+        return OpenAILikeLLM(config=config.llm)
+    return CannedLLM()
 
 
 def create_clock(config: AppConfig) -> Clock:
