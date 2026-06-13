@@ -112,7 +112,6 @@ class PaperPortfolio:
 
             self._emit(
                 OrderSimulated(
-                    event_id=uuid.uuid4().hex[:16],
                     timestamp=self._now(),
                     run_id=self._run_id,
                     source="paper",
@@ -121,7 +120,6 @@ class PaperPortfolio:
             )
             self._emit(
                 FillBooked(
-                    event_id=uuid.uuid4().hex[:16],
                     timestamp=self._now(),
                     run_id=self._run_id,
                     source="paper",
@@ -216,7 +214,6 @@ class PaperPortfolio:
 
                 self._emit(
                     PartialTaken(
-                        event_id=uuid.uuid4().hex[:16],
                         timestamp=self._now(),
                         run_id=self._run_id,
                         source="paper",

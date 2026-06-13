@@ -93,7 +93,6 @@ def run(
     now = datetime.now(UTC)
     events.append(
         PipelineRunStarted(
-            event_id=uuid.uuid4().hex[:16],
             timestamp=now,
             run_id=run_id,
             source="pipeline",
@@ -115,8 +114,6 @@ def run(
             logger.exception("bar_load_failed", symbol=symbol)
             events.append(
                 SourceDegraded(
-                    event_id=uuid.uuid4().hex[:16],
-                    timestamp=datetime.now(UTC),
                     run_id=run_id,
                     source="pipeline",
                     source_name=symbol,
@@ -128,8 +125,6 @@ def run(
         duration = (datetime.now(UTC) - now).total_seconds()
         events.append(
             PipelineRunCompleted(
-                event_id=uuid.uuid4().hex[:16],
-                timestamp=datetime.now(UTC),
                 run_id=run_id,
                 source="pipeline",
                 duration_s=duration,
@@ -154,8 +149,6 @@ def run(
         for vr in results:
             events.append(
                 DataQuarantined(
-                    event_id=uuid.uuid4().hex[:16],
-                    timestamp=datetime.now(UTC),
                     run_id=run_id,
                     source="pipeline",
                     symbol=symbol,
@@ -181,8 +174,6 @@ def run(
         for vr in results:
             events.append(
                 DataQuarantined(
-                    event_id=uuid.uuid4().hex[:16],
-                    timestamp=datetime.now(UTC),
                     run_id=run_id,
                     source="pipeline",
                     symbol=symbol,
@@ -199,8 +190,6 @@ def run(
     if regime != prev_regime:
         events.append(
             RegimeChanged(
-                event_id=uuid.uuid4().hex[:16],
-                timestamp=datetime.now(UTC),
                 run_id=run_id,
                 source="pipeline",
                 previous=prev_regime,
@@ -268,8 +257,6 @@ def run(
             )
             events.append(
                 StopAdjusted(
-                    event_id=uuid.uuid4().hex[:16],
-                    timestamp=datetime.now(UTC),
                     run_id=run_id,
                     source="pipeline",
                     symbol=sym,
@@ -307,8 +294,6 @@ def run(
             if gate_block:
                 events.append(
                     CandidateBlocked(
-                        event_id=uuid.uuid4().hex[:16],
-                        timestamp=datetime.now(UTC),
                         run_id=run_id,
                         source="pipeline",
                         symbol=symbol,
@@ -320,8 +305,6 @@ def run(
                 candidates.append(cand)
                 events.append(
                     CandidateScored(
-                        event_id=uuid.uuid4().hex[:16],
-                        timestamp=datetime.now(UTC),
                         run_id=run_id,
                         source="pipeline",
                         symbol=symbol,
@@ -377,8 +360,6 @@ def run(
             )
             events.append(
                 CandidatePromoted(
-                    event_id=uuid.uuid4().hex[:16],
-                    timestamp=datetime.now(UTC),
                     run_id=run_id,
                     source="pipeline",
                     symbol=cand.symbol,
@@ -400,8 +381,6 @@ def run(
             violations.append(inv)
             events.append(
                 ConsistencyViolation(
-                    event_id=uuid.uuid4().hex[:16],
-                    timestamp=datetime.now(UTC),
                     run_id=run_id,
                     source="pipeline",
                     check=inv.check,
@@ -414,8 +393,6 @@ def run(
     duration = (datetime.now(UTC) - now).total_seconds()
     events.append(
         PipelineRunCompleted(
-            event_id=uuid.uuid4().hex[:16],
-            timestamp=datetime.now(UTC),
             run_id=run_id,
             source="pipeline",
             duration_s=duration,
