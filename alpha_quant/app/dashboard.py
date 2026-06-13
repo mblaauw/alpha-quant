@@ -23,9 +23,10 @@ def _connect() -> tuple[duckdb.DuckDBPyConnection, duckdb.DuckDBPyConnection]:
     return analytical, state
 
 
-def _load_equity_curve(state: duckdb.DuckDBPyConnection) -> pd.DataFrame:
+def _load_equity_curve(state: duckdb.DuckDBPyConnection, book: str = "PAPER") -> pd.DataFrame:
     return state.execute(
-        "SELECT equity_date, equity, cash FROM equity_curve ORDER BY equity_date"
+        "SELECT equity_date, equity, cash FROM equity_curve WHERE book = ? ORDER BY equity_date",
+        [book],
     ).fetchdf()
 
 

@@ -262,3 +262,4 @@ class PortfolioSnapshot(BaseModel):
     date: date
     cash: float
     equity: float
+    book: str = "PAPER"
