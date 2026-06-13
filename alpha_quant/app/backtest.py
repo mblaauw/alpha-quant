@@ -17,6 +17,7 @@ from alpha_quant.app._loop import (
     score_candidate,
     size_entry,
 )
+from alpha_quant.domain.ablation import compute_spy_buy_and_hold
 from alpha_quant.domain.derive import backfill_indicator_state, update_indicator_state
 from alpha_quant.domain.fills import FillConfig, fill_entry_order, fill_stop_loss
 from alpha_quant.domain.models import (
@@ -54,6 +55,10 @@ class BacktestMetrics:
     num_trades: int = 0
     win_rate: float = 0.0
     avg_hold_days: float = 0.0
+    spy_return_pct: float | None = None
+    spy_cagr: float | None = None
+    spy_max_dd_pct: float | None = None
+    spy_sharpe: float | None = None
 
 
 @dataclass
@@ -79,6 +84,8 @@ def _compute_metrics(
     num_trades: int,
     win_rate: float,
     avg_hold_days: float,
+    spy_curve: list[float] | None = None,
+    spy_returns: list[float] | None = None,
 ) -> BacktestMetrics:
     if len(equity_curve) < 2:
         return BacktestMetrics()
@@ -109,6 +116,25 @@ def _compute_metrics(
     down_std = np.std(downside) if len(downside) > 0 else np.std(daily_returns)
     sortino = float(np.mean(daily_returns) / down_std * af)
 
+    spy_r = spy_c = spy_d = spy_sh = None
+    if spy_curve and len(spy_curve) >= 2:
+        spy_initial, spy_final = spy_curve[0], spy_curve[-1]
+        spy_r = round((spy_final - spy_initial) / spy_initial * 100, 2)
+        spy_years = len(spy_curve) / 252.0
+        spy_c = (
+            round(
+                ((1.0 + (spy_final - spy_initial) / spy_initial) ** (1.0 / spy_years) - 1.0) * 100,
+                2,
+            )
+            if spy_years > 0
+            else 0.0
+        )  # noqa: E501
+        spy_peak = np.maximum.accumulate(spy_curve)
+        spy_dd = (spy_curve - spy_peak) / spy_peak
+        spy_d = round(float(np.min(spy_dd)) * 100, 2)
+        if spy_returns and len(spy_returns) >= 2 and np.std(spy_returns) >= 1e-10:
+            spy_sh = round(float(np.mean(spy_returns) / np.std(spy_returns) * np.sqrt(252.0)), 3)
+
     return BacktestMetrics(
         total_return_pct=round(total_return * 100, 2),
         cagr=round(cagr * 100, 2),
@@ -118,6 +144,10 @@ def _compute_metrics(
         num_trades=num_trades,
         win_rate=round(win_rate * 100, 1),
         avg_hold_days=round(avg_hold_days, 1),
+        spy_return_pct=spy_r,
+        spy_cagr=spy_c,
+        spy_max_dd_pct=spy_d,
+        spy_sharpe=spy_sh,
     )
 
 
@@ -326,7 +356,18 @@ def run_backtest(
 
     win_rate = win_count / trade_count if trade_count > 0 else 0.0
     avg_hold = hold_days_total / hold_trade_count if hold_trade_count > 0 else 0.0
-    metrics = _compute_metrics(equity_curve, daily_returns, trade_count, win_rate, avg_hold)
+
+    spy_curve = compute_spy_buy_and_hold(
+        all_bars.get("SPY", []), config.start_date, config.end_date, config.initial_equity
+    )  # noqa: E501
+    spy_returns = []
+    for i in range(1, len(spy_curve)):
+        if spy_curve[i - 1] > 0:
+            spy_returns.append((spy_curve[i] - spy_curve[i - 1]) / spy_curve[i - 1])
+
+    metrics = _compute_metrics(
+        equity_curve, daily_returns, trade_count, win_rate, avg_hold, spy_curve, spy_returns
+    )  # noqa: E501
 
     return BacktestResult(
         config=config,
