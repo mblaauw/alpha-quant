@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import uuid
-from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
 import numpy as np
+import structlog
 
 from alpha_quant.app._loop import (
     compute_atr,
@@ -39,6 +39,8 @@ from alpha_quant.domain.risk import RiskConfig
 from alpha_quant.domain.sizing import SizingConfig
 from alpha_quant.domain.validate import validate_bars, validate_indicator_state
 from alpha_quant.ports.store import Store
+
+logger = structlog.get_logger()
 
 _LOOKBACK_DAYS = 400
 _REGIME_CACHE: dict[str, str] = {}
@@ -109,6 +111,7 @@ def run(
             if bars:
                 all_bars[symbol] = bars
         except Exception:
+            logger.exception("bar_load_failed", symbol=symbol)
             events.append(
                 SourceDegraded(
                     event_id=uuid.uuid4().hex[:16],
@@ -166,8 +169,10 @@ def run(
     indicator_states: dict[str, IndicatorState] = {}
     for symbol, bars in all_bars.items():
         if bars:
-            with suppress(Exception):
+            try:
                 indicator_states[symbol] = backfill_indicator_state(bars)
+            except Exception:
+                logger.exception("indicator_backfill_failed", symbol=symbol)
 
     # --- 3b. Validate indicators ---
     for symbol, state in indicator_states.items():
