@@ -136,6 +136,14 @@ class TestFillEntryOrder:
         fill = fill_entry_order(order, bar, prev_close=100.0, config=cfg)
         assert fill is None
 
+    def test_partial_fill_reduces_quantity(self) -> None:
+        order = _order(quantity=100.0)
+        bar = _bar(open_v=100.2)
+        cfg = FillConfig(max_fill_pct=0.5)
+        fill = fill_entry_order(order, bar, prev_close=99.9, config=cfg)
+        assert fill is not None
+        assert fill.quantity == 50
+
 
 class TestFillStopLoss:
     def test_stop_hit(self) -> None:
