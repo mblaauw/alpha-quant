@@ -100,8 +100,23 @@ class CanonicalStore(Store):
 
     # ---- State Store (DuckDB) ----
 
+    SCHEMA_VERSION: int = 1
+
     def _init_state_schema(self) -> None:
         conn = self._state_conn
+        conn.execute("CREATE TABLE IF NOT EXISTS schema_version (  version INTEGER NOT NULL)")
+        row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
+        current_version = row[0] if row and row[0] else 0
+        if current_version > 0 and current_version != self.SCHEMA_VERSION:
+            logger.warning(
+                "schema_version_mismatch",
+                current=current_version,
+                expected=self.SCHEMA_VERSION,
+            )
+        conn.execute(
+            "INSERT INTO schema_version (version) VALUES (?)",
+            [self.SCHEMA_VERSION],
+        )
         conn.execute(
             "CREATE TABLE IF NOT EXISTS decisions ("
             "  decision_id VARCHAR,"
