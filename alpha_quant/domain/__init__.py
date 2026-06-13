@@ -1,9 +1,13 @@
 from alpha_quant.domain.ablation import (
     NO_CROWDING_VETO_CONFIG,
     NO_INSIDER_CONFIG,
+    RULES_ONLY_CONFIG,
     AblationComparison,
     AblationConfig,
+    ShadowBook,
+    ShadowFillResult,
     compute_ablation_comparison,
+    compute_spy_buy_and_hold,
 )
 from alpha_quant.domain.crowding import CrowdingVerdict
 from alpha_quant.domain.crowding import evaluate as evaluate_crowding
@@ -101,9 +105,13 @@ __all__ = [
     "build",
     "AblationConfig",
     "AblationComparison",
+    "ShadowBook",
+    "ShadowFillResult",
+    "RULES_ONLY_CONFIG",
     "NO_INSIDER_CONFIG",
     "NO_CROWDING_VETO_CONFIG",
     "compute_ablation_comparison",
+    "compute_spy_buy_and_hold",
     "Regime",
     "REGIME_MULTIPLIERS",
     "RISK_ON",

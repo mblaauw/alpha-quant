@@ -133,10 +133,11 @@ class FixtureStore(Store):
         self._portfolio_snapshots.append(snapshot)
 
     @override
-    def load_latest_portfolio_snapshot(self) -> PortfolioSnapshot | None:
-        if not self._portfolio_snapshots:
+    def load_latest_portfolio_snapshot(self, book: str = "PAPER") -> PortfolioSnapshot | None:
+        matching = [s for s in self._portfolio_snapshots if s.book == book]
+        if not matching:
             return None
-        return max(self._portfolio_snapshots, key=lambda s: s.date)
+        return max(matching, key=lambda s: s.date)
 
     @override
     def save_journal(self, entry: JournalEntry) -> None:

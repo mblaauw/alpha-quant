@@ -427,11 +427,17 @@ class CanonicalStore(Store):
         )
         conn.execute(
             "CREATE TABLE IF NOT EXISTS equity_curve ("
-            "  equity_date DATE PRIMARY KEY,"
+            "  equity_date DATE NOT NULL,"
             "  equity DOUBLE NOT NULL,"
             "  cash DOUBLE NOT NULL DEFAULT 0,"
-            "  nav DOUBLE NOT NULL DEFAULT 0"
+            "  nav DOUBLE NOT NULL DEFAULT 0,"
+            "  book VARCHAR NOT NULL DEFAULT 'PAPER',"
+            "  PRIMARY KEY (equity_date, book)"
             ")"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_equity_curve_book "
+            "ON equity_curve (book, equity_date DESC)"
         )
         conn.execute(
             "CREATE TABLE IF NOT EXISTS events ("
@@ -832,22 +838,26 @@ class CanonicalStore(Store):
 
     @override
     def save_portfolio_snapshot(self, snapshot: PortfolioSnapshot) -> None:
+        book = snapshot.book or "PAPER"
         self._state_conn.execute(
             "INSERT OR REPLACE INTO equity_curve"
-            " (equity_date, equity, cash, nav)"
-            " VALUES (?, ?, ?, ?)",
-            [snapshot.date, snapshot.equity, snapshot.cash, snapshot.equity],
+            " (equity_date, equity, cash, nav, book)"
+            " VALUES (?, ?, ?, ?, ?)",
+            [snapshot.date, snapshot.equity, snapshot.cash, snapshot.equity, book],
         )
         self._state_conn.commit()
 
     @override
-    def load_latest_portfolio_snapshot(self) -> PortfolioSnapshot | None:
+    def load_latest_portfolio_snapshot(self, book: str = "PAPER") -> PortfolioSnapshot | None:
         row = self._state_conn.execute(
-            "SELECT equity_date, cash, equity FROM equity_curve ORDER BY equity_date DESC LIMIT 1"
+            "SELECT equity_date, cash, equity FROM equity_curve"
+            " WHERE book = ?"
+            " ORDER BY equity_date DESC LIMIT 1",
+            [book],
         ).fetchone()
         if row is None:
             return None
-        return PortfolioSnapshot(date=row[0], cash=row[1], equity=row[2])
+        return PortfolioSnapshot(date=row[0], cash=row[1], equity=row[2], book=book)
 
     def add_quarantine(self, symbol: str, reason: str, severity: str = "QUARANTINE") -> None:
         self._state_conn.execute(
