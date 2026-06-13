@@ -15,6 +15,26 @@ def _mock_config() -> object:
         symbols = ["AAPL"]
         include_benchmarks = ["SPY"]
 
+    class _FakePortfolio:
+        risk_per_trade_pct = 0.01
+        max_position_pct = 0.15
+        max_gross_exposure = 0.80
+        max_positions = 8
+        max_sector_positions = 2
+
+    class _FakePaper:
+        starting_equity = 100_000.0
+        slippage_bps = 5
+        spread_model = "half_spread_estimate"
+
+    class _FakeRisk:
+        stop_atr_mult = 2.0
+        trail_after_r = 1.0
+        partial_take_at_r = 2.0
+        time_stop_days = 30
+        dd_ladder = [[0.10, 0.5], [0.15, 0.0]]
+        daily_loss_halt_pct = 0.03
+
     class _FakeConnector:
         pass
 
@@ -24,6 +44,9 @@ def _mock_config() -> object:
         {
             "data": _FakeData(),
             "bootstrap": _FakeBootstrap(),
+            "portfolio": _FakePortfolio(),
+            "paper": _FakePaper(),
+            "risk": _FakeRisk(),
             "connector": _FakeConnector(),
             "model_dump": lambda self, **kwargs: {
                 "data": {"mode": "live", "fixture_version": "v1"},
