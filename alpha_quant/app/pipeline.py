@@ -27,6 +27,8 @@ from alpha_quant.domain.events import (
     CandidateScored,
     ConsistencyViolation,
     DataQuarantined,
+    ErrorOccurred,
+    IndicatorStateUpdated,
     PipelineRunCompleted,
     PipelineRunStarted,
     RegimeChanged,
@@ -112,7 +114,7 @@ def run(
             bars = store.load_bars(symbol, lookback_start, run_date)
             if bars:
                 all_bars[symbol] = bars
-        except Exception:
+        except Exception as e:
             logger.exception("bar_load_failed", symbol=symbol)
             events.append(
                 SourceDegraded(
@@ -120,6 +122,14 @@ def run(
                     source="pipeline",
                     source_name=symbol,
                     fallback="skip",
+                )
+            )
+            events.append(
+                ErrorOccurred(
+                    run_id=run_id,
+                    source="pipeline",
+                    error=str(e),
+                    context={"symbol": symbol, "operation": "bar_load"},
                 )
             )
 
@@ -168,8 +178,24 @@ def run(
         if bars:
             try:
                 indicator_states[symbol] = backfill_indicator_state(bars)
-            except Exception:
+                events.append(
+                    IndicatorStateUpdated(
+                        run_id=run_id,
+                        source="pipeline",
+                        symbol=symbol,
+                        indicator_count=len(bars),
+                    )
+                )
+            except Exception as e:
                 logger.exception("indicator_backfill_failed", symbol=symbol)
+                events.append(
+                    ErrorOccurred(
+                        run_id=run_id,
+                        source="pipeline",
+                        error=str(e),
+                        context={"symbol": symbol, "operation": "indicator_backfill"},
+                    )
+                )
 
     # --- 3b. Validate indicators ---
     for symbol, state in indicator_states.items():
