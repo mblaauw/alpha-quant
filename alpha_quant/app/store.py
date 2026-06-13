@@ -288,14 +288,14 @@ class CanonicalStore(Store):
 
             self._analytical.execute("DROP TABLE IF EXISTS _merged")
 
-            # Remove affected partitions from final location
-            for p_dir in affected_partitions:
-                shutil.rmtree(p_dir, ignore_errors=True)
-
-            # Move merged partitions from temp to final
+            # Move merged partitions from temp to final first (atomic rename on same filesystem)
             for p_dir in tmp_path.iterdir():
                 if p_dir.is_dir():
                     shutil.move(str(p_dir), str(data_path / p_dir.name))
+
+            # Now remove old affected partitions — safe because new data is already in place
+            for p_dir in affected_partitions:
+                shutil.rmtree(p_dir, ignore_errors=True)
 
             # Clean up temp directory
             shutil.rmtree(tmp_path, ignore_errors=True)
