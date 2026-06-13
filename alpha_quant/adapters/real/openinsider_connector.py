@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections import Counter
 from datetime import date, timedelta
 from typing import TYPE_CHECKING, override
@@ -10,8 +9,10 @@ import structlog
 from selectolax.parser import HTMLParser
 
 from alpha_quant.adapters.real.base_connector import BaseConnector
+from alpha_quant.domain._normalize_helpers import (
+    _row_to_transaction,
+)
 from alpha_quant.domain.models import InsiderCluster, InsiderTransaction
-from alpha_quant.domain.normalize import _parse_date
 from alpha_quant.ports.insider_feed import InsiderFeed
 
 if TYPE_CHECKING:
@@ -195,74 +196,3 @@ class OpenInsiderConnector(BaseConnector, InsiderFeed):
         html = self._fetch_html(days)
         transactions = self._parse_transactions(html)
         return self._cluster_transactions(transactions)
-
-
-def _row_to_transaction(cells: list) -> InsiderTransaction | None:
-    ticker_el = cells[0].css_first("a")
-    if ticker_el is None:
-        return None
-    ticker = ticker_el.text(strip=True).upper()
-    if not ticker:
-        return None
-
-    owner = _cell_text(cells, 1)
-    title = _cell_text(cells, 2)
-
-    rel = _cell_text(cells, 3).lower()
-    rel = _parse_relationship(rel)
-
-    tx_type = _cell_text(cells, 4).strip().lower()
-    if tx_type and tx_type not in ("buy", "sell"):
-        return None
-
-    price_text = _cell_text(cells, 5)
-    price = _parse_number(price_text)
-
-    qty_text = _cell_text(cells, 6)
-    qty = _parse_number(qty_text)
-
-    date_text = _cell_text(cells, 8)
-    tx_date = _parse_date(date_text)
-
-    if not ticker or qty is None:
-        return None
-
-    return InsiderTransaction(
-        symbol=ticker,
-        filing_date=tx_date,
-        transaction_date=tx_date,
-        owner=owner or "Unknown",
-        title=title,
-        transaction_type=("Buy" if tx_type == "buy" else "Sell"),
-        shares_traded=qty if tx_type == "buy" else -qty,
-        price=price,
-    )
-
-
-def _cell_text(cells: list, index: int) -> str:
-    if index >= len(cells):
-        return ""
-    return cells[index].text(strip=True)
-
-
-def _parse_number(text: str | None) -> float | None:
-    if not text:
-        return None
-    cleaned = re.sub(r"[^\d.,-]", "", text)
-    cleaned = cleaned.replace(",", "")
-    try:
-        return float(cleaned)
-    except ValueError, TypeError:
-        return None
-
-
-def _parse_relationship(rel: str) -> str:
-    if not rel:
-        return ""
-    if "officer" in rel and "director" in rel:
-        return "officer,director"
-    if "officer" in rel:
-        return "officer"
-    if "director" in rel:
-        return "director"
-    return rel
