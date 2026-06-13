@@ -91,13 +91,8 @@ def _rsi_score(vals: dict[str, float]) -> float:
     rsi = vals.get("rsi")
     if rsi is None or _isnan(rsi):
         return 0.3
-    if 45.0 <= rsi <= 70.0:
-        return 1.0
-    if 40.0 <= rsi <= 75.0:
-        return 0.7
-    if 30.0 <= rsi <= 80.0:
-        return 0.4
-    return 0.1
+    diff = abs(rsi - 52.0)
+    return max(0.0, round(1.0 * np.exp(-((diff / 22.0) ** 2)), 4))
 
 
 def _macd_score(vals: dict[str, float]) -> float:
