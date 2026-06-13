@@ -4,7 +4,14 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
-from alpha_quant.domain.events import DomainEvent, FillBooked, OrderSimulated, PartialTaken
+from alpha_quant.domain.events import (
+    BookMarked,
+    DomainEvent,
+    DrawdownLadderTripped,
+    FillBooked,
+    OrderSimulated,
+    PartialTaken,
+)
 from alpha_quant.domain.fills import FillConfig, fill_entry_order, fill_partial_take, fill_stop_loss
 from alpha_quant.domain.invariants import InvariantViolation, check_invariants
 from alpha_quant.domain.models import (
@@ -149,6 +156,14 @@ class PaperPortfolio:
             if is_global:
                 if action.action_type == "drawdown_cut":
                     mult = action.price or 0.0
+                    self._emit(
+                        DrawdownLadderTripped(
+                            run_id=self._run_id,
+                            source="paper",
+                            drawdown_pct=0.0,
+                            action=action.reason,
+                        )
+                    )
                     for pos in positions.values():
                         if pos.quantity <= 0:
                             continue
@@ -321,6 +336,14 @@ class PaperPortfolio:
         equity = round(self._cash + total_mark, 2)
         snap = PortfolioSnapshot(date=run_date, cash=self._cash, equity=equity)
         self._store.save_portfolio_snapshot(snap)
+        self._emit(
+            BookMarked(
+                run_id=self._run_id,
+                source="paper",
+                book="PAPER",
+                equity=equity,
+            )
+        )
         return snap
 
     def self_consistency_check(self) -> list[InvariantViolation]:
