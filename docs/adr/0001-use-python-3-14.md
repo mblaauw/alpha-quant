@@ -29,7 +29,7 @@ Key considerations:
 
 - **Option A: Python 3.12 LTS** — Conservative, widest wheel support, supported until Oct 2028
 - **Option B: Python 3.13** — Free-threaded mode available, but still experimental
-- **Option C: Python 3.14** — Latest stable, t-string support; all core libraries shipping 3.14 wheels
+- **Option C: Python 3.14** — Latest stable, improved exception groups, improved typing features; all core libraries shipping 3.14 wheels
 
 ## Decision Outcome
 
@@ -45,7 +45,7 @@ Rationale:
 
 ### Positive Consequences
 
-- Access to t-strings and other 3.14 quality-of-life features
+- Access to Python 3.14 quality-of-life features (improved error messages, exception groups)
 - CI matches the development environment exactly
 
 ### Negative Consequences

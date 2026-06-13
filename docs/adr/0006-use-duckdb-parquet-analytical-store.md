@@ -12,7 +12,7 @@ Accepted
 
 Alpha-Quant needs to store and query analytical data: daily bars (OHLCV), fundamentals snapshots, insider transactions, and mention counts. Access patterns are columnar (scan a field across 50 symbols), date-partitioned (50-day tail), and append-mostly (new data daily).
 
-DESIGN.md §3.4 specifies a split-store architecture: analytical data → Parquet/DuckDB, transactional state → SQLite.
+DESIGN.md §3.4 specifies a split-store architecture: analytical data → Parquet/DuckDB, transactional state → DuckDB (per ADR-0021).
 
 ## Decision Drivers
 
@@ -49,7 +49,7 @@ Rationale:
 
 ### Negative Consequences
 
-- Two storage systems to manage (DuckDB + SQLite) instead of one — but the access patterns justify it (DESIGN §3.4)
+- Two storage systems to manage (DuckDB + Parquet) instead of one — but the access patterns justify it (DESIGN §3.4)
 - Parquet files are not human-readable in a terminal (but DuckDB CLI can query them)
 - DuckDB is not designed for concurrent writership (single-writer is fine for daily batch writes)
 

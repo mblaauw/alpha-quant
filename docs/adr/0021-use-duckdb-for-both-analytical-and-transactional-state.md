@@ -47,12 +47,16 @@ Rationale:
 2. DuckDB's SQL covers everything needed: Parquet reads, transactional CRUD, and analytical window queries
 3. No benefit to adding a second database interface for the single-writer pipeline
 
-### Consequences
+### Positive Consequences
 
 - ADR-0007 is **Superseded** by this ADR
 - `pyproject.toml` does not include `sqlalchemy` (already removed)
 - Future migration to PostgreSQL for transactional state is still behind the `Store` port interface — DuckDB is an implementation detail
 - Backup is: `cp` the DuckDB state file + rsync the Parquet partition directory
+
+### Negative Consequences
+
+- (None identified at this time)
 
 ## References
 

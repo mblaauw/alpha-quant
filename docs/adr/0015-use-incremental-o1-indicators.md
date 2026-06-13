@@ -17,7 +17,7 @@ This ADR documents the *how* at the architecture level, while ADR-0008 documents
 ## Decision Drivers
 
 - O(1) per indicator per symbol per day: no window scans, no database reads of historical bars
-- Stateful: indicator state persists in SQLite between pipeline runs
+- Stateful: indicator state persists in DuckDB (state.db) between pipeline runs
 - Cold start: bootstrap does a one-time 250-day backfill to seed the state
 - Integrity verification: CI recomputes from full fixture history and compares to incremental state (1e-6 tolerance)
 - The 50-day tail pattern only works if indicators are maintained incrementally
