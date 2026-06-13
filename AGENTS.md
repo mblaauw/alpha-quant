@@ -95,18 +95,23 @@ Branch naming: `<scope>-<description>` (e.g. `port-interfaces-p0.2`, `fake-adapt
 - Follow existing code conventions (type hints, imports, patterns)
 - Use `typing.Protocol` for ports or `abc.ABC` + `@abstractmethod` as specified
 - All data models use `pydantic.BaseModel` with `frozen=True`
-- Verify the code at every step (or use `make check`, `make format`, `make type` as aliases):
+- Verify the code at every step (or use `make check`, `make format`, `make type`, `make test` as aliases):
 
 ```bash
-uv run ruff check alpha_quant/
-uv run ruff format alpha_quant/
-uv run ty check alpha_quant/
-uv run pytest tests/ -q
+make check    # ruff check
+make format   # ruff format
+make type     # ty check
+make test     # pytest tests/ -q
 ```
 
-- If golden replay fixture behavior changes, re-bless the golden hash:
+If golden replay fixture behavior changes, re-bless the golden hash:
   ```bash
   make bless-golden
+  ```
+  
+For first-time fixture setup:
+  ```bash
+  make bootstrap
   ```
 
 ### 5. Create PR
