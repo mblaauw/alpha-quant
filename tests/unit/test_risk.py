@@ -23,8 +23,8 @@ def _bar(
         symbol="AAPL",
         date=date(2026, 6, 11),
         open=open_v,
-        high=high,
-        low=low,
+        high=max(high, open_v, close),
+        low=min(low, open_v, close),
         close=close,
         volume=1_000_000,
     )
@@ -49,7 +49,7 @@ def _position(
 class TestEvaluateStops:
     def test_stop_hit_returns_action(self) -> None:
         pos = _position(avg_cost=100.0, stop_price=90.0)
-        bar = _bar(high=95.0, low=85.0)
+        bar = _bar(open_v=92.0, high=95.0, low=85.0)
         result = evaluate_stops(pos, bar, atr=5.0, highest_since_entry=100.0)
         assert len(result) == 1
         assert result[0].action_type == "stop"
@@ -70,7 +70,7 @@ class TestEvaluateStops:
 
     def test_trail_tightens_as_price_rallies(self) -> None:
         pos = _position(avg_cost=100.0, stop_price=90.0)
-        bar = _bar(high=125.0, low=105.0)
+        bar = _bar(open_v=115.0, high=125.0, low=105.0)
         result = evaluate_stops(pos, bar, atr=5.0, highest_since_entry=120.0)
         assert len(result) == 1
         assert result[0].action_type == "trail_stop"
@@ -78,7 +78,7 @@ class TestEvaluateStops:
     def test_partial_take_triggers_when_no_stop(self) -> None:
         config = RiskConfig(partial_take_at_r=2.0)
         pos = _position(avg_cost=100.0, stop_price=90.0)
-        bar = _bar(high=125.0, low=120.0)
+        bar = _bar(open_v=122.0, high=125.0, low=120.0, close=122.0)
         result = evaluate_stops(pos, bar, atr=5.0, highest_since_entry=100.0, config=config)
         assert any(a.action_type == "partial_take" for a in result)
 
@@ -100,7 +100,7 @@ class TestEvaluateStops:
     def test_partial_take_qty_is_half(self) -> None:
         config = RiskConfig(partial_take_at_r=1.0)
         pos = _position(quantity=100.0, avg_cost=100.0, stop_price=80.0)
-        bar = _bar(high=120.0, low=115.0)
+        bar = _bar(open_v=118.0, high=120.0, low=115.0)
         result = evaluate_stops(pos, bar, atr=5.0, highest_since_entry=100.0, config=config)
         partials = [a for a in result if a.action_type == "partial_take"]
         if partials:

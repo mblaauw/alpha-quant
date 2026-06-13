@@ -18,6 +18,18 @@ class Bar(BaseModel):
     volume: float
     adj_close: float | None = None
 
+    @model_validator(mode="after")
+    def _validate_bar_relationships(self) -> Self:
+        if not (self.low <= self.close <= self.high):
+            raise ValueError(
+                f"low ({self.low}) <= close ({self.close}) <= high ({self.high}) violated"
+            )
+        if not (self.low <= self.open <= self.high):
+            raise ValueError(
+                f"low ({self.low}) <= open ({self.open}) <= high ({self.high}) violated"
+            )
+        return self
+
 
 class Quote(BaseModel):
     model_config = ConfigDict(frozen=True)
