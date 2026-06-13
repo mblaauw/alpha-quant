@@ -64,6 +64,14 @@ def get_date_bars(
     return result
 
 
+def bars_up_to(
+    all_bars: dict[str, list[Bar]],
+    symbol: str,
+    dt: date,
+) -> list[Bar]:
+    return [b for b in all_bars.get(symbol, []) if b.date <= dt]
+
+
 def detect_regime_and_multiplier(
     spy_state: IndicatorState | None,
 ) -> tuple[str, float]:

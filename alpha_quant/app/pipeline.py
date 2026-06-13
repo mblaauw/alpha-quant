@@ -8,6 +8,7 @@ import numpy as np
 import structlog
 
 from alpha_quant.app._loop import (
+    bars_up_to,
     compute_atr,
     detect_regime_and_multiplier,
     ensure_spy,
@@ -293,7 +294,7 @@ def run(
             if np.isnan(vals.get("rsi", np.nan)):
                 continue
 
-            bars_to_date = [b for b in all_bars.get(symbol, []) if b.date <= run_date]
+            bars_to_date = bars_up_to(all_bars, symbol, run_date)
             cand = score_candidate(symbol, bars_to_date, bar, state, run_date, regime)
             cscore = cand.composite_score
 

@@ -7,6 +7,7 @@ from datetime import date
 import numpy as np
 
 from alpha_quant.app._loop import (
+    bars_up_to,
     compute_atr,
     detect_regime_and_multiplier,
     ensure_spy,
@@ -236,7 +237,7 @@ def run_backtest(
                 if np.isnan(state.values.get("rsi", np.nan)):
                     continue
 
-                bars_to_date = [b for b in all_bars.get(symbol, []) if b.date <= trade_date]
+                bars_to_date = bars_up_to(all_bars, symbol, trade_date)
                 candidates.append(
                     score_candidate(symbol, bars_to_date, bar, state, trade_date, regime),
                 )
