@@ -12,6 +12,7 @@ def _fundamentals(**kwargs: float | None) -> FundamentalsSnapshot:
         as_of_date=date(2026, 6, 11),
         market_cap=kwargs.get("market_cap", 3_000_000_000_000.0),
         operating_cash_flow=kwargs.get("ocf", 100_000_000_000.0),
+        total_liabilities=kwargs.get("total_liabilities", 250_000_000_000.0),
         total_debt=kwargs.get("total_debt", 50_000_000_000.0),
         total_equity=kwargs.get("total_equity", 200_000_000_000.0),
         net_income=kwargs.get("net_income", 50_000_000_000.0),
@@ -32,6 +33,7 @@ class TestEvaluate:
     def test_all_missing_passes_degraded(self) -> None:
         f = _fundamentals(
             ocf=None,
+            total_liabilities=None,
             total_debt=None,
             total_equity=None,
             net_income=None,
@@ -118,6 +120,28 @@ class TestEvaluate:
         )
         assert result.passed is False
         assert ";" in result.reason
+
+    def test_accrual_skipped_when_liabilities_missing(self) -> None:
+        f = _fundamentals(
+            total_liabilities=None,
+            total_debt=100_000_000_000.0,
+            total_equity=200_000_000_000.0,
+            accruals=50_000_000_000.0,
+        )
+        result = evaluate(f)
+        assert result.passed is True
+        assert result.passed_degraded is True
+        assert "accrual" in result.reason.lower()
+
+    def test_accrual_computed_with_liabilities(self) -> None:
+        f = _fundamentals(
+            total_liabilities=300_000_000_000.0,
+            total_equity=200_000_000_000.0,
+            accruals=50_000_000_000.0,
+        )
+        result = evaluate(f)
+        assert result.passed is False
+        assert "accrual" in result.reason
 
     def test_quality_verdict_repr(self) -> None:
         v = QualityVerdict(passed=True)
