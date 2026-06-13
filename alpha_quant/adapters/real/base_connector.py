@@ -36,7 +36,7 @@ def _wait(retry_state: Any) -> float:
             if retry_after is not None:
                 try:
                     return float(retry_after)
-                except ValueError, TypeError:
+                except (ValueError, TypeError):  # fmt: skip
                     pass
     return min(2 * (2**retry_state.attempt_number), 30)
 

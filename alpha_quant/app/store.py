@@ -242,7 +242,7 @@ class CanonicalStore(Store):
                 dt = date.fromisoformat(p_dir.name.split("=", 1)[1])
                 if min_date <= dt <= max_date:
                     affected_partitions.append(p_dir)
-            except ValueError, IndexError:
+            except (ValueError, IndexError):  # fmt: skip
                 continue
 
         self._analytical.register("_new_data", new_table)
@@ -789,7 +789,7 @@ class CanonicalStore(Store):
                 """,
                 [symbol],
             ).fetchall()
-        except duckdb.CatalogException, duckdb.IOException:
+        except (duckdb.CatalogException, duckdb.IOException):  # fmt: skip
             return []
         return [
             CorporateAction(
@@ -822,7 +822,7 @@ class CanonicalStore(Store):
                 """,
                 [symbol],
             ).fetchall()
-        except duckdb.CatalogException, duckdb.IOException:
+        except (duckdb.CatalogException, duckdb.IOException):  # fmt: skip
             return []
         return [
             EarningsEntry(
