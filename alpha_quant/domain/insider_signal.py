@@ -74,7 +74,12 @@ def evaluate(
     combined = officers | directors
     cluster_size = len(combined)
 
-    if cluster_size < min_cluster_size or total_value < min_cluster_value:
+    effective_min = (
+        min(max(market_cap * 0.0001, min_cluster_value), 10_000_000.0)
+        if market_cap and market_cap > 0
+        else min_cluster_value
+    )  # noqa: E501
+    if cluster_size < min_cluster_size or total_value < effective_min:
         sell_penalty = _sell_penalty(sell_txns)
         score = -sell_penalty if sell_penalty > 0 else 0.0
         return InsiderVerdict(

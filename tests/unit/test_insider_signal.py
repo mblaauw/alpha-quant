@@ -118,6 +118,16 @@ class TestEvaluate:
         result = evaluate("AAPL", txns, as_of_date=date(2026, 6, 11))
         assert result.score > 0.0
 
+    def test_market_cap_scales_threshold(self) -> None:
+        txns = [
+            _tx(owner="owner1", title="CEO", shares=10_000, price=150.0),
+            _tx(owner="owner2", title="CFO", shares=10_000, price=150.0),
+        ]
+        result_small = evaluate("AAPL", txns, as_of_date=date(2026, 6, 11), market_cap=10_000_000.0)
+        result_large = evaluate("AAPL", txns, as_of_date=date(2026, 6, 11), market_cap=1_000_000_000_000.0)
+        assert result_small.score > 0.0
+        assert result_large.score == 0.0
+
     def test_insider_verdict_default_reason(self) -> None:
         v = InsiderVerdict(score=0.0)
         assert v.score == 0.0
