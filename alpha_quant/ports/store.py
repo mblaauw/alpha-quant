@@ -19,55 +19,14 @@ from alpha_quant.domain.models import (
 from alpha_quant.domain.reporting import ReportEntry
 
 
-class Store(ABC):
-    @abstractmethod
-    def transaction(self) -> AbstractContextManager[Self]: ...
+class BarStore(ABC):
+    """Bar data read/write interface."""
 
     @abstractmethod
     def save_bars(self, symbol: str, bars: list[Bar]) -> None: ...
 
     @abstractmethod
     def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]: ...
-
-    @abstractmethod
-    def save_decision(self, decision: Decision) -> None: ...
-
-    @abstractmethod
-    def load_decisions(self, symbol: str, since: date) -> list[Decision]: ...
-
-    @abstractmethod
-    def save_order(self, order: Order) -> None: ...
-
-    @abstractmethod
-    def load_order(self, order_id: str) -> Order | None: ...
-
-    @abstractmethod
-    def save_fill(self, fill: Fill) -> None: ...
-
-    @abstractmethod
-    def load_fills(self, order_id: str) -> list[Fill]: ...
-
-    @abstractmethod
-    def save_position(self, position: Position) -> None: ...
-
-    @abstractmethod
-    def load_positions(self) -> list[Position]: ...
-
-    @abstractmethod
-    def save_event(self, event: DomainEvent) -> None: ...
-
-    @abstractmethod
-    def load_events(
-        self,
-        event_type: str | None = None,
-        since: datetime | None = None,
-    ) -> list[DomainEvent]: ...
-
-    @abstractmethod
-    def save_indicator_state(self, state: IndicatorState) -> None: ...
-
-    @abstractmethod
-    def load_indicator_state(self, symbol: str, dt: date) -> IndicatorState | None: ...
 
     @abstractmethod
     def save_corp_actions(self, symbol: str, actions: list[CorporateAction]) -> None: ...
@@ -81,11 +40,75 @@ class Store(ABC):
     @abstractmethod
     def load_earnings(self, symbol: str) -> list[EarningsEntry]: ...
 
+
+class DecisionStore(ABC):
+    """Decision read/write interface."""
+
+    @abstractmethod
+    def save_decision(self, decision: Decision) -> None: ...
+
+    @abstractmethod
+    def load_decisions(self, symbol: str, since: date) -> list[Decision]: ...
+
+
+class OrderStore(ABC):
+    """Order and fill read/write interface."""
+
+    @abstractmethod
+    def save_order(self, order: Order) -> None: ...
+
+    @abstractmethod
+    def load_order(self, order_id: str) -> Order | None: ...
+
+    @abstractmethod
+    def save_fill(self, fill: Fill) -> None: ...
+
+    @abstractmethod
+    def load_fills(self, order_id: str) -> list[Fill]: ...
+
+
+class PositionStore(ABC):
+    """Position and portfolio read/write interface."""
+
+    @abstractmethod
+    def save_position(self, position: Position) -> None: ...
+
+    @abstractmethod
+    def load_positions(self) -> list[Position]: ...
+
     @abstractmethod
     def save_portfolio_snapshot(self, snapshot: PortfolioSnapshot) -> None: ...
 
     @abstractmethod
     def load_latest_portfolio_snapshot(self, book: str = "PAPER") -> PortfolioSnapshot | None: ...
+
+
+class EventStore(ABC):
+    """Domain event read/write interface."""
+
+    @abstractmethod
+    def save_event(self, event: DomainEvent) -> None: ...
+
+    @abstractmethod
+    def load_events(
+        self,
+        event_type: str | None = None,
+        since: datetime | None = None,
+    ) -> list[DomainEvent]: ...
+
+
+class IndicatorStore(ABC):
+    """Indicator state read/write interface."""
+
+    @abstractmethod
+    def save_indicator_state(self, state: IndicatorState) -> None: ...
+
+    @abstractmethod
+    def load_indicator_state(self, symbol: str, dt: date) -> IndicatorState | None: ...
+
+
+class JournalStore(ABC):
+    """Journal and report read/write interface."""
 
     @abstractmethod
     def save_journal(self, entry: JournalEntry) -> None: ...
@@ -98,6 +121,13 @@ class Store(ABC):
 
     @abstractmethod
     def load_report(self, dt: date, report_type: str) -> ReportEntry | None: ...
+
+
+class AdminStore(ABC):
+    """Admin operations: quarantine, runs, lifecycle."""
+
+    @abstractmethod
+    def transaction(self) -> AbstractContextManager[Self]: ...
 
     @abstractmethod
     def add_quarantine(self, symbol: str, reason: str, severity: str = "QUARANTINE") -> None: ...
@@ -121,3 +151,16 @@ class Store(ABC):
 
     @abstractmethod
     def close(self) -> None: ...
+
+
+class Store(
+    BarStore,
+    DecisionStore,
+    OrderStore,
+    PositionStore,
+    EventStore,
+    IndicatorStore,
+    JournalStore,
+    AdminStore,
+):
+    """Composite store interface combining all role-specific interfaces."""
