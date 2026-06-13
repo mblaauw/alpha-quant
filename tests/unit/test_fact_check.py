@@ -70,6 +70,7 @@ class TestRenderTemplate:
         assert "100,000" in result
         assert "80,000" in result
         import re
+
         assert re.search(r"\b5\b", result)
         assert re.search(r"\b2\b", result)
         assert "moving averages" in result
