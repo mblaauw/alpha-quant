@@ -75,25 +75,33 @@ class Vault:
         dt = ingest_ts.date()
         path = _blob_path(self._base, source, dt, fetch_id)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(compressed)
+        tmp_path = path.with_suffix(".tmp")
 
-        self._conn.execute(
-            "INSERT INTO manifest (fetch_id, source, endpoint, params, ingest_ts,"
-            " content_hash, byte_size, compressed_size, dt)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                fetch_id,
-                source,
-                endpoint,
-                params_str,
-                ingest_ts,
-                content_hash,
-                len(data),
-                len(compressed),
-                dt,
-            ),
-        )
-        self._conn.commit()
+        try:
+            tmp_path.write_bytes(compressed)
+
+            self._conn.execute(
+                "INSERT INTO manifest (fetch_id, source, endpoint, params, ingest_ts,"
+                " content_hash, byte_size, compressed_size, dt)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    fetch_id,
+                    source,
+                    endpoint,
+                    params_str,
+                    ingest_ts,
+                    content_hash,
+                    len(data),
+                    len(compressed),
+                    dt,
+                ),
+            )
+            self._conn.commit()
+
+            tmp_path.rename(path)
+        except BaseException:
+            tmp_path.unlink(missing_ok=True)
+            raise
 
         logger.debug(
             "vault_store",
