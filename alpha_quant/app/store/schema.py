@@ -124,7 +124,7 @@ def model_to_pylist(models: list[Any], model_name: str) -> list[dict[str, Any]]:
             return [
                 {
                     "symbol": m.symbol,
-                    "mention_date": m.date,
+                    "mention_date": m.mention_date,
                     "source": m.source,
                     "count": m.count,
                     "fetch_id": _maybe_fetch_id(m),

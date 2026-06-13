@@ -126,7 +126,7 @@ def _mentions_to_table(mentions: list[MentionCount]) -> pa.Table:
     return pa.table(
         {
             "symbol": [m.symbol for m in mentions],
-            "date": [m.date.isoformat() for m in mentions],
+            "date": [m.mention_date.isoformat() for m in mentions],
             "source": [m.source for m in mentions],
             "count": [m.count for m in mentions],
         }

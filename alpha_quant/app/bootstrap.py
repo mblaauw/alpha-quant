@@ -98,7 +98,7 @@ def _generate_mentions(symbol: str, ref_date: date | None = None) -> list[Mentio
     return [
         MentionCount(
             symbol=symbol,
-            date=today - timedelta(days=d),
+            mention_date=today - timedelta(days=d),
             source="reddit",
             count=10 + _det(f"m-{symbol}-{d}", 200),
         )

@@ -27,7 +27,7 @@ class FixtureSentimentFeed(SentimentFeed):
             counts.append(
                 MentionCount(
                     symbol=row.get("symbol", symbol),
-                    date=row.get("date", date.today()),
+                    mention_date=row.get("date", date.today()),
                     source=row.get("source", "fixture"),
                     count=int(row.get("count", 0)),
                 )
