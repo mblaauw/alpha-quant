@@ -30,9 +30,13 @@ def detect(
         return CAUTION
 
     if spy_close <= spy_ema50:
+        if breadth is not None and breadth <= 0.2:
+            return CAUTION
         return _check_risk_off(spy_close, spy_ema200, vix_level)
 
     if spy_ema50 <= spy_ema200:
+        if breadth is not None and breadth <= 0.2:
+            return CAUTION
         return _check_risk_off(spy_close, spy_ema200, vix_level)
 
     if vix_level is not None and vix_level >= 20:

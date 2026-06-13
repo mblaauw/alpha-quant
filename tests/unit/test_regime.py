@@ -80,3 +80,11 @@ class TestDetect:
         state = _state(close=210, ema50=200, ema200=190)
         result = detect(state, vix_level=15.0, breadth=None)
         assert result == "RISK_ON"
+
+    def test_bearish_with_very_low_breadth_stays_caution(self) -> None:
+        result = detect(_state(close=170, ema50=190, ema200=180), vix_level=15.0, breadth=0.15)
+        assert result == "CAUTION"
+
+    def test_bearish_ema50_cross_with_very_low_breadth_stays_caution(self) -> None:
+        result = detect(_state(close=210, ema50=190, ema200=200), vix_level=15.0, breadth=0.1)
+        assert result == "CAUTION"
