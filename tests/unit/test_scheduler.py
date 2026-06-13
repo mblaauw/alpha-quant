@@ -185,6 +185,7 @@ class TestRunDailyPipeline:
             patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
             patch("alpha_quant.app.scheduler.CanonicalStore", return_value=fake_store),
             patch("alpha_quant.app.scheduler.run_pipeline", return_value=mock_result),
+            patch("alpha_quant.app.scheduler.alert"),
         ):
             result = run_daily_pipeline()
         assert result["status"] == "completed"
@@ -205,6 +206,7 @@ class TestRunDailyPipeline:
             patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
             patch("alpha_quant.app.scheduler.CanonicalStore", return_value=fake_store),
             patch("alpha_quant.app.scheduler.run_pipeline", return_value=mock_result),
+            patch("alpha_quant.app.scheduler.alert"),
         ):
             result = run_daily_pipeline()
         assert result["status"] == "halted"
@@ -219,6 +221,7 @@ class TestRunDailyPipeline:
             patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
             patch("alpha_quant.app.scheduler.CanonicalStore", return_value=fake_store),
             patch("alpha_quant.app.scheduler.run_pipeline", return_value=mock_result),
+            patch("alpha_quant.app.scheduler.alert"),
         ):
             result = run_daily_pipeline()
         assert result["status"] == "violations"
@@ -233,6 +236,7 @@ class TestRunDailyPipeline:
             patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
             patch("alpha_quant.app.scheduler.CanonicalStore", return_value=fake_store),
             patch("alpha_quant.app.scheduler.run_pipeline", side_effect=RuntimeError("boom")),
+            patch("alpha_quant.app.scheduler.alert"),
         ):
             result = run_daily_pipeline()
         assert result["status"] == "failed"

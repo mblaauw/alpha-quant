@@ -314,6 +314,18 @@ def cmd_status(args: argparse.Namespace) -> None:
 
     config = load_config(args.config)
 
+    if args.show_alerts:
+        from alpha_quant.app.alerts import get_recent_alerts
+
+        recent = get_recent_alerts()
+        if not recent:
+            print("[alpha-quant] alerts: none")
+        else:
+            print("[alpha-quant] alerts:")
+            for a in recent[-10:]:
+                print(f"  [{a['level']}] {a['title']}: {a['message']} ({a['timestamp'][:19]})")
+        return
+
     if args.check_connections:
         vault = Vault(base_path=Path("vault")) if config.data.mode == "live" else None
         connectors: list[tuple[str, object]] = [
@@ -518,6 +530,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         dest="check_connections",
         help="Ping each data source",
+    )
+    p_status.add_argument(
+        "--alerts",
+        action="store_true",
+        dest="show_alerts",
+        help="Show recent alerts",
     )
     p_status.add_argument(
         "--json",

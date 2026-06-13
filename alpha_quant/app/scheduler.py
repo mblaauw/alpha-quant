@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from alpha_quant.app.alerts import alert
 from alpha_quant.app.config import load_config, redact_config
 from alpha_quant.app.halt import is_halted
 from alpha_quant.app.pipeline import PipelineConfig
@@ -131,7 +132,13 @@ def run_daily_pipeline(
         store.complete_run(run_id, status=status)
 
     if result is None:
+        alert("CRITICAL", "Pipeline failed", f"Run {run_id} failed", macos_notify=True)
         return {"status": status, "run_id": run_id}
+
+    if result.halted:
+        alert("CRITICAL", "Pipeline halted", f"Run {run_id} halted", macos_notify=True)
+    elif result.violations:
+        alert("WARNING", "Pipeline violations", f"Run {run_id}: {len(result.violations)}")
 
     logger.info(
         "pipeline_complete",
