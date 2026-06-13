@@ -288,14 +288,14 @@ class CanonicalStore(Store):
 
             self._analytical.execute("DROP TABLE IF EXISTS _merged")
 
-            # Move merged partitions from temp to final first (atomic rename on same filesystem)
+            # Atomically replace each affected partition: remove old, rename temp to final
             for p_dir in tmp_path.iterdir():
-                if p_dir.is_dir():
-                    shutil.move(str(p_dir), str(data_path / p_dir.name))
-
-            # Now remove old affected partitions — safe because new data is already in place
-            for p_dir in affected_partitions:
-                shutil.rmtree(p_dir, ignore_errors=True)
+                if not p_dir.is_dir():
+                    continue
+                dest = data_path / p_dir.name
+                if dest.exists():
+                    shutil.rmtree(dest, ignore_errors=True)
+                p_dir.rename(dest)
 
             # Clean up temp directory
             shutil.rmtree(tmp_path, ignore_errors=True)
@@ -328,13 +328,15 @@ class CanonicalStore(Store):
     def read_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
         data_path = str(self._canonical_path("bars") / "**" / "*.parquet")
         pcol = _partition_col("bars")
+        dedup_key = _dedup_keys("bars")
         hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
         result = self._analytical.execute(
             f"""
-            SELECT symbol, "{pcol}" AS date, open, high, low, close, volume, adj_close
+            SELECT DISTINCT ON ({dedup_key})
+                   symbol, "{pcol}" AS date, open, high, low, close, volume, adj_close
             FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
             WHERE symbol = ? AND "{pcol}" >= ? AND "{pcol}" <= ?
-            ORDER BY "{pcol}"
+            ORDER BY {dedup_key} DESC
             """,
             [symbol, start, end],
         ).fetchall()
