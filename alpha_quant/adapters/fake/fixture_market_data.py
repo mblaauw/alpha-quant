@@ -6,7 +6,7 @@ from typing import override
 
 import pyarrow.parquet as pq
 
-from alpha_quant.app.calendar import is_market_day
+from alpha_quant.domain.calendar import is_market_day
 from alpha_quant.domain.models import Bar, Quote, TradingDay
 from alpha_quant.ports.market_data import MarketData
 
