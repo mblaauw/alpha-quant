@@ -538,7 +538,6 @@ class CanonicalStore(Store):
                 json.dumps(decision.mechanism_results),
             ],
         )
-        self._state_conn.commit()
 
     @override
     def load_decisions(self, symbol: str, since: date) -> list[Decision]:
@@ -588,7 +587,6 @@ class CanonicalStore(Store):
                 order.avg_fill_price,
             ],
         )
-        self._state_conn.commit()
 
     @override
     def load_order(self, order_id: str) -> Order | None:
@@ -629,7 +627,6 @@ class CanonicalStore(Store):
                 fill.timestamp,
             ],
         )
-        self._state_conn.commit()
 
     @override
     def load_fills(self, order_id: str) -> list[Fill]:
@@ -672,7 +669,6 @@ class CanonicalStore(Store):
                 position.decision_id,
             ],
         )
-        self._state_conn.commit()
 
     @override
     def load_positions(self) -> list[Position]:
@@ -714,7 +710,6 @@ class CanonicalStore(Store):
                 json.dumps(payload),
             ],
         )
-        self._state_conn.commit()
 
     @override
     def load_events(
@@ -752,7 +747,6 @@ class CanonicalStore(Store):
             " (symbol, state_date, values, status) VALUES (?, ?, ?, ?)",
             [state.symbol, state.date, json.dumps(state.values), state.status],
         )
-        self._state_conn.commit()
 
     @override
     def load_indicator_state(self, symbol: str, dt: date) -> IndicatorState | None:
@@ -845,7 +839,6 @@ class CanonicalStore(Store):
             " VALUES (?, ?, ?, ?, ?)",
             [snapshot.date, snapshot.equity, snapshot.cash, snapshot.equity, book],
         )
-        self._state_conn.commit()
 
     @override
     def load_latest_portfolio_snapshot(self, book: str = "PAPER") -> PortfolioSnapshot | None:
@@ -865,7 +858,6 @@ class CanonicalStore(Store):
             " VALUES (?, ?, CURRENT_DATE, ?)",
             [symbol, reason, severity],
         )
-        self._state_conn.commit()
 
     def list_quarantine(self, cleared: bool = False) -> list[dict[str, Any]]:
         if cleared:
@@ -897,7 +889,6 @@ class CanonicalStore(Store):
             " WHERE symbol = ? AND cleared_date IS NULL",
             [symbol],
         )
-        self._state_conn.commit()
 
     def register_run(
         self,
@@ -911,7 +902,6 @@ class CanonicalStore(Store):
             " VALUES (?, ?, ?, ?, ?, ?)",
             [run_id, run_type, config_hash, fixture_version, datetime.now(UTC), "running"],
         )
-        self._state_conn.commit()
         return run_id
 
     def complete_run(self, run_id: str, status: str = "completed", manifest_hash: str = "") -> None:
@@ -919,7 +909,6 @@ class CanonicalStore(Store):
             "UPDATE runs SET end_ts = ?, status = ?, manifest_hash = ? WHERE run_id = ?",
             [datetime.now(UTC), status, manifest_hash, run_id],
         )
-        self._state_conn.commit()
 
     def list_runs(self, since_date: date | None = None) -> list[dict[str, Any]]:
         if since_date is not None:
@@ -955,7 +944,6 @@ class CanonicalStore(Store):
             "INSERT OR REPLACE INTO journal_entries (entry_date, content) VALUES (?, ?)",
             [entry.date.isoformat(), entry.content],
         )
-        self._state_conn.commit()
 
     @override
     def load_journal(self, dt: date) -> JournalEntry | None:
@@ -973,7 +961,6 @@ class CanonicalStore(Store):
             "INSERT OR REPLACE INTO reports (report_date, report_type, content) VALUES (?, ?, ?)",
             [report.date.isoformat(), report.report_type, report.content],
         )
-        self._state_conn.commit()
 
     @override
     def load_report(self, dt: date, report_type: str) -> ReportEntry | None:
