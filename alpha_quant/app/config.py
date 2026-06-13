@@ -210,6 +210,25 @@ class AppConfig(BaseSettings):
         extra="ignore",
     )
 
+    config_version: int = 1
+
+    @field_validator("config_version")
+    @classmethod
+    def _check_config_version(cls, v: int) -> int:
+        if v != 1:
+            cls._log_migration_warning(v)
+        return v
+
+    @classmethod
+    def _log_migration_warning(cls, v: int) -> None:
+        import logging as _logging
+
+        _logging.warning(
+            "Config version %d detected. Current version is 1. "
+            "Run `alpha-quant status --show-config` to review current config fields.",
+            v,
+        )
+
     bootstrap: BootstrapConfig
     data: DataConfig
     universe: UniverseConfig
