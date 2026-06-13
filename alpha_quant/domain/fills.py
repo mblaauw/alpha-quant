@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
 from datetime import date, datetime
 from datetime import time as dtime
+
+from pydantic import BaseModel, ConfigDict
 
 from alpha_quant.domain.models import Bar, CorporateAction, Fill, Order, Position, Quote
 
 
-@dataclass
-class FillConfig:
+class FillConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
     slippage_bps: float = 5.0
     max_gap_pct: float = 0.005
     half_spread_default: float = 0.001

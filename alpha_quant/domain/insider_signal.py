@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date, timedelta
+
+from pydantic import BaseModel, ConfigDict
 
 from alpha_quant.domain.models import InsiderTransaction
 
 _OFFICER_KEYWORDS = {"ceo", "cfo", "coo", "president", "officer", "vp", "evp", "svp"}
 
 
-@dataclass
-class InsiderVerdict:
+class InsiderVerdict(BaseModel):
+    model_config = ConfigDict(frozen=True)
     score: float
     reason: str | None = None
 

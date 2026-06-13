@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date, timedelta
 
+from pydantic import BaseModel, ConfigDict
 
-@dataclass
-class CrowdingVerdict:
+
+class CrowdingVerdict(BaseModel):
+    model_config = ConfigDict(frozen=True)
     blocked: bool
     blocked_until: date | None = None
     reason: str | None = None
