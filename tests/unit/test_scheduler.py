@@ -99,6 +99,7 @@ class TestRunDailyPipeline:
     def test_skips_non_market_day(self) -> None:
         with (
             patch("alpha_quant.app.scheduler.is_market_day", return_value=False),
+            patch("alpha_quant.app.scheduler.is_halted", return_value=False),
             patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
             patch("alpha_quant.app.scheduler.CanonicalStore"),
         ):
@@ -118,6 +119,7 @@ class TestRunDailyPipeline:
         )
         with (
             patch("alpha_quant.app.scheduler.is_market_day", return_value=True),
+            patch("alpha_quant.app.scheduler.is_halted", return_value=False),
             patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
             patch("alpha_quant.app.scheduler.CanonicalStore", return_value=fake_store),
             patch("alpha_quant.app.scheduler.run_pipeline") as mock_run,
@@ -140,6 +142,7 @@ class TestRunDailyPipeline:
         )
         with (
             patch("alpha_quant.app.scheduler.is_market_day", return_value=True),
+            patch("alpha_quant.app.scheduler.is_halted", return_value=False),
             patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
             patch("alpha_quant.app.scheduler.CanonicalStore", return_value=fake_store),
             patch("alpha_quant.app.scheduler.run_pipeline") as mock_run,
@@ -155,6 +158,7 @@ class TestRunDailyPipeline:
         mock_result = _mock_run_result(decisions=3, fills=2, events=10)
         with (
             patch("alpha_quant.app.scheduler.is_market_day", return_value=True),
+            patch("alpha_quant.app.scheduler.is_halted", return_value=False),
             patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
             patch("alpha_quant.app.scheduler.CanonicalStore", return_value=fake_store),
             patch("alpha_quant.app.scheduler.run_pipeline", return_value=mock_result),
@@ -174,6 +178,7 @@ class TestRunDailyPipeline:
         mock_result = _mock_run_result(halted=True)
         with (
             patch("alpha_quant.app.scheduler.is_market_day", return_value=True),
+            patch("alpha_quant.app.scheduler.is_halted", return_value=False),
             patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
             patch("alpha_quant.app.scheduler.CanonicalStore", return_value=fake_store),
             patch("alpha_quant.app.scheduler.run_pipeline", return_value=mock_result),
@@ -187,6 +192,7 @@ class TestRunDailyPipeline:
         mock_result = _mock_run_result(violations=[_mock_violation("I5")])
         with (
             patch("alpha_quant.app.scheduler.is_market_day", return_value=True),
+            patch("alpha_quant.app.scheduler.is_halted", return_value=False),
             patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
             patch("alpha_quant.app.scheduler.CanonicalStore", return_value=fake_store),
             patch("alpha_quant.app.scheduler.run_pipeline", return_value=mock_result),
