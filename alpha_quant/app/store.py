@@ -313,19 +313,19 @@ class CanonicalStore(Store):
         fields = _CANONICAL_SCHEMAS[dataset]
         return pa.schema([pa.field(name, typ, nullable=typ != pa.date32()) for name, typ in fields])
 
-    def write_bars(self, bars: list[Bar]) -> None:
+    def _write_bars(self, bars: list[Bar]) -> None:
         self._write_dataset(bars, "bars")
 
-    def write_fundamentals(self, snapshots: list[FundamentalsSnapshot]) -> None:
+    def _write_fundamentals(self, snapshots: list[FundamentalsSnapshot]) -> None:
         self._write_dataset(snapshots, "fundamentals")
 
-    def write_insider_transactions(self, transactions: list[InsiderTransaction]) -> None:
+    def _write_insider_transactions(self, transactions: list[InsiderTransaction]) -> None:
         self._write_dataset(transactions, "insider_transactions")
 
-    def write_mentions(self, mentions: list[MentionCount]) -> None:
+    def _write_mentions(self, mentions: list[MentionCount]) -> None:
         self._write_dataset(mentions, "mentions")
 
-    def read_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
+    def _read_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
         data_path = str(self._canonical_path("bars") / "**" / "*.parquet")
         pcol = _partition_col("bars")
         dedup_key = _dedup_keys("bars")
@@ -359,11 +359,11 @@ class CanonicalStore(Store):
 
     @override
     def save_bars(self, symbol: str, bars: list[Bar]) -> None:
-        self.write_bars(bars)
+        self._write_bars(bars)
 
     @override
     def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
-        return self.read_bars(symbol, start, end)
+        return self._read_bars(symbol, start, end)
 
     # ---- State Store (SQLite via DuckDB) ----
 

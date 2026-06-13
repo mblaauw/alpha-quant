@@ -154,3 +154,31 @@ class FixtureStore(Store):
     @override
     def load_report(self, dt: date, report_type: str) -> ReportEntry | None:
         return self._reports.get((dt, report_type))
+
+    @override
+    def add_quarantine(self, symbol: str, reason: str, severity: str = "QUARANTINE") -> None:
+        pass
+
+    @override
+    def list_quarantine(self, cleared: bool = False) -> list[dict[str, object]]:
+        return []
+
+    @override
+    def clear_quarantine(self, symbol: str) -> None:
+        pass
+
+    @override
+    def register_run(self, run_type: str, config_hash: str, fixture_version: str = "") -> str:
+        return "fixture-run-id"
+
+    @override
+    def complete_run(self, run_id: str, status: str = "completed", manifest_hash: str = "") -> None:
+        pass
+
+    @override
+    def list_runs(self, since_date: date | None = None) -> list[dict[str, object]]:
+        return []
+
+    @override
+    def close(self) -> None:
+        pass
