@@ -20,6 +20,9 @@ def evaluate(
     transactions: list[InsiderTransaction],
     as_of_date: date,
     lookback: int = 30,
+    market_cap: float | None = None,
+    min_cluster_value: float = 200_000.0,
+    min_cluster_size: int = 2,
 ) -> InsiderVerdict:
     cutoff = as_of_date - timedelta(days=lookback)
 
@@ -36,8 +39,23 @@ def evaluate(
         and t.shares_traded > 0
     ]
 
+    sell_txns = [
+        t
+        for t in transactions
+        if t.symbol.upper() == symbol.upper()
+        and t.transaction_date is not None
+        and t.transaction_date >= cutoff
+        and t.transaction_date <= as_of_date
+        and t.transaction_type.lower() == "sell"
+    ]
+
     if not buy_txns:
-        return InsiderVerdict(score=0.0, reason="no insider buys in window")
+        sell_penalty = _sell_penalty(sell_txns)
+        if sell_penalty > 0:
+            return InsiderVerdict(
+                score=-sell_penalty, reason=f"c-suite selling ({len(sell_txns)} sells)"
+            )  # noqa: E501
+        return InsiderVerdict(score=0.0, reason="no insider activity in window")
 
     officers: set[str] = set()
     directors: set[str] = set()
@@ -56,19 +74,47 @@ def evaluate(
     combined = officers | directors
     cluster_size = len(combined)
 
-    if cluster_size >= 2 and total_value >= 200_000:
+    if cluster_size < min_cluster_size or total_value < min_cluster_value:
+        sell_penalty = _sell_penalty(sell_txns)
+        score = -sell_penalty if sell_penalty > 0 else 0.0
         return InsiderVerdict(
-            score=0.15,
+            score=score,
             reason=(
-                f"cluster: {len(officers)} officers, {len(directors)} directors,"
-                f" ${total_value:,.0f} in {lookback}d"
-            ),
+                f"below threshold: {cluster_size} insiders, ${total_value:,.0f} in {lookback}d"
+            ),  # noqa: E501
         )
 
+    if market_cap and market_cap > 0:
+        value_ratio = total_value / market_cap
+        value_score = min(1.0, value_ratio * 500)
+    else:
+        value_score = min(1.0, total_value / 5_000_000)
+
+    size_bonus = min(0.5, cluster_size * 0.05)
+    officer_bonus = min(0.3, len(officers) * 0.08)
+    sell_penalty = _sell_penalty(sell_txns)
+
+    score = round(
+        max(
+            0.0, min(0.5, value_score * 0.3 + size_bonus * 0.1 + officer_bonus * 0.1 - sell_penalty)
+        ),
+        4,
+    )  # noqa: E501
+
     return InsiderVerdict(
-        score=0.0,
-        reason=(f"no cluster: {cluster_size} insiders, ${total_value:,.0f} in {lookback}d"),
+        score=score,
+        reason=(
+            f"cluster: {len(officers)} officers, {len(directors)} directors,"
+            f" ${total_value:,.0f} ({value_score:.2f}) in {lookback}d"
+        ),
     )
+
+
+def _sell_penalty(sell_txns: list[InsiderTransaction]) -> float:
+    c_suite_sells = sum(1 for t in sell_txns if t.title and _is_officer_role(t.title.lower()))
+    if c_suite_sells >= 3:
+        return min(0.3, c_suite_sells * 0.05)
+    return 0.0
 
 
 def _is_officer_role(title_lower: str) -> bool:
