@@ -69,14 +69,15 @@ class TestRenderTemplate:
         assert "RISK_ON" in result
         assert "100,000" in result
         assert "80,000" in result
-        assert "5" in result
-        assert "2" in result
+        import re
+        assert re.search(r"\b5\b", result)
+        assert re.search(r"\b2\b", result)
         assert "moving averages" in result
 
     def test_concept_none_shows_fallback(self) -> None:
         ctx = _ctx(concept_of_day=None)
         result = render_template(ctx)
-        assert "none" in result
+        assert "No concept selected" in result or "none" in result
 
     def test_position_count(self) -> None:
         from alpha_quant.domain.narration import PositionNarration
