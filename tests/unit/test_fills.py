@@ -12,13 +12,13 @@ from alpha_quant.domain.fills import (
 from alpha_quant.domain.models import Bar, CorporateAction, Order, Position, Quote
 
 
-def _bar(open_v: float = 100.0, low: float = 95.0) -> Bar:
+def _bar(open_v: float = 100.0, low: float = 95.0, high: float | None = None) -> Bar:
     return Bar(
         symbol="AAPL",
         date=date(2026, 6, 11),
         open=open_v,
-        high=105.0,
-        low=low,
+        high=high or max(open_v, 105.0),
+        low=min(low, open_v, 100.0),
         close=100.0,
         volume=1_000_000,
     )

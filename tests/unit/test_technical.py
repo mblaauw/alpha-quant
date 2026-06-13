@@ -94,6 +94,25 @@ class TestMomentumScore:
         assert result == 0.3
 
     def test_zero_with_negative_prev_close(self) -> None:
-        bars = [_bar(-1), _bar(100)]
+        bars = [
+            Bar(
+                symbol="AAPL",
+                date=date(2026, 6, 9),
+                open=1.0,
+                high=1.0,
+                low=-2.0,
+                close=-1.0,
+                volume=1_000_000,
+            ),
+            Bar(
+                symbol="AAPL",
+                date=date(2026, 6, 11),
+                open=100.0,
+                high=101.0,
+                low=99.0,
+                close=100.0,
+                volume=1_000_000,
+            ),
+        ]
         result = momentum_score(bars, 100)
         assert result == 0.0
