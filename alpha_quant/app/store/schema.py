@@ -19,6 +19,7 @@ _CANONICAL_SCHEMAS: dict[str, list[tuple[str, pa.DataType]]] = {
         ("close", pa.float64()),
         ("volume", pa.float64()),
         ("adj_close", pa.float64()),
+        ("fetch_id", pa.string()),
     ],
     "fundamentals": [
         ("symbol", pa.string()),
@@ -36,6 +37,7 @@ _CANONICAL_SCHEMAS: dict[str, list[tuple[str, pa.DataType]]] = {
         ("revenue", pa.float64()),
         ("net_income", pa.float64()),
         ("accruals", pa.float64()),
+        ("fetch_id", pa.string()),
     ],
     "insider_transactions": [
         ("symbol", pa.string()),
@@ -47,12 +49,14 @@ _CANONICAL_SCHEMAS: dict[str, list[tuple[str, pa.DataType]]] = {
         ("shares_traded", pa.float64()),
         ("price", pa.float64()),
         ("shares_held", pa.float64()),
+        ("fetch_id", pa.string()),
     ],
     "mentions": [
         ("symbol", pa.string()),
         ("mention_date", pa.date32()),
         ("source", pa.string()),
         ("count", pa.int64()),
+        ("fetch_id", pa.string()),
     ],
     "corp_actions": [
         ("symbol", pa.string()),
@@ -60,6 +64,7 @@ _CANONICAL_SCHEMAS: dict[str, list[tuple[str, pa.DataType]]] = {
         ("action_type", pa.string()),
         ("ratio", pa.float64()),
         ("amount", pa.float64()),
+        ("fetch_id", pa.string()),
     ],
     "earnings": [
         ("symbol", pa.string()),
@@ -68,8 +73,13 @@ _CANONICAL_SCHEMAS: dict[str, list[tuple[str, pa.DataType]]] = {
         ("eps_actual", pa.float64()),
         ("revenue_estimate", pa.float64()),
         ("revenue_actual", pa.float64()),
+        ("fetch_id", pa.string()),
     ],
 }
+
+
+def _maybe_fetch_id(m: object) -> str | None:
+    return getattr(m, "fetch_id", None)
 
 
 def model_to_pylist(models: list[Any], model_name: str) -> list[dict[str, Any]]:
@@ -85,11 +95,15 @@ def model_to_pylist(models: list[Any], model_name: str) -> list[dict[str, Any]]:
                     "close": m.close,
                     "volume": m.volume,
                     "adj_close": m.adj_close,
+                    "fetch_id": _maybe_fetch_id(m),
                 }
                 for m in models
             ]
         case "fundamentals":
-            return [m.model_dump() for m in models] if models else []
+            rows = [m.model_dump() for m in models] if models else []
+            for row in rows:
+                row["fetch_id"] = None
+            return rows
         case "insider_transactions":
             return [
                 {
@@ -102,6 +116,7 @@ def model_to_pylist(models: list[Any], model_name: str) -> list[dict[str, Any]]:
                     "shares_traded": m.shares_traded,
                     "price": m.price,
                     "shares_held": m.shares_held,
+                    "fetch_id": _maybe_fetch_id(m),
                 }
                 for m in models
             ]
@@ -112,6 +127,7 @@ def model_to_pylist(models: list[Any], model_name: str) -> list[dict[str, Any]]:
                     "mention_date": m.date,
                     "source": m.source,
                     "count": m.count,
+                    "fetch_id": _maybe_fetch_id(m),
                 }
                 for m in models
             ]
@@ -123,6 +139,7 @@ def model_to_pylist(models: list[Any], model_name: str) -> list[dict[str, Any]]:
                     "action_type": m.action_type,
                     "ratio": m.ratio,
                     "amount": m.amount,
+                    "fetch_id": _maybe_fetch_id(m),
                 }
                 for m in models
             ]
@@ -135,6 +152,7 @@ def model_to_pylist(models: list[Any], model_name: str) -> list[dict[str, Any]]:
                     "eps_actual": m.eps_actual,
                     "revenue_estimate": m.revenue_estimate,
                     "revenue_actual": m.revenue_actual,
+                    "fetch_id": _maybe_fetch_id(m),
                 }
                 for m in models
             ]
