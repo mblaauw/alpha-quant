@@ -62,7 +62,7 @@ def write_dataset(
     analytical.register("_new_data", new_table)
 
     if not affected_partitions:
-        copy_opts = f"FORMAT PARQUET, PER_THREAD_OUTPUT 1, PARTITION_BY {pcol}, COMPRESSION ZSTD"
+        copy_opts = f"FORMAT PARQUET, PARTITION_BY {pcol}, COMPRESSION ZSTD"
         analytical.execute(f"""
             COPY _new_data TO '{data_path}' ({copy_opts})
         """)
@@ -87,7 +87,7 @@ def write_dataset(
         tmp_path = data_path.parent / f".tmp_{dataset}_{uuid.uuid4().hex[:8]}"
         tmp_path.mkdir(parents=True, exist_ok=True)
 
-        copy_opts = f"FORMAT PARQUET, PER_THREAD_OUTPUT 1, PARTITION_BY {pcol}, COMPRESSION ZSTD"
+        copy_opts = f"FORMAT PARQUET, PARTITION_BY {pcol}, COMPRESSION ZSTD"
         analytical.execute(f"""
             COPY (SELECT * FROM _merged ORDER BY {dedup_key})
             TO '{tmp_path}' ({copy_opts})
