@@ -84,6 +84,36 @@ class AlpacaConnector(BaseConnector, MarketData):
             if e.get("date")
         ]
 
+    @override
+    def daily_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
+        from datetime import datetime as dt_mod
+
+        from alpaca.data.requests import StockBarsRequest
+        from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
+
+        client = self._get_stock_client()
+        request = StockBarsRequest(
+            symbol_or_symbols=[symbol],
+            timeframe=TimeFrame(amount=1, unit=TimeFrameUnit.Day),
+            start=dt_mod.combine(start, dt_mod.min.time()).replace(tzinfo=UTC),
+            end=dt_mod.combine(end, dt_mod.max.time()).replace(tzinfo=UTC),
+        )
+        result = client.get_stock_bars(request)
+        raw_bars = result.get(symbol, [])
+        return [
+            Bar(
+                symbol=symbol,
+                date=b.timestamp.date(),
+                open=float(b.open),
+                high=float(b.high),
+                low=float(b.low),
+                close=float(b.close),
+                volume=float(b.volume),
+                adj_close=None,
+            )
+            for b in raw_bars
+        ]
+
     def latest_bar(self, symbol: str) -> Bar | None:
         from alpaca.data.models import Bar as AlpacaBar
         from alpaca.data.requests import StockLatestBarRequest
