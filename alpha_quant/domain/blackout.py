@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Literal
 
+from alpha_quant.domain.calendar import is_market_day
 from alpha_quant.domain.models import EarningsEntry
 
 BlackoutVerdict = Literal["BLOCK", "PASS"]
@@ -36,6 +37,6 @@ def _trading_days_before(dt: date, n: int) -> date:
     result = dt
     while n > 0:
         result -= timedelta(days=1)
-        if result.weekday() < 5:
+        if is_market_day(result):
             n -= 1
     return result
