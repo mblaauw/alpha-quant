@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from alpha_quant.app.config import load_config, redact_config
+from alpha_quant.app.halt import is_halted
 from alpha_quant.app.pipeline import PipelineConfig
 from alpha_quant.app.pipeline import run as run_pipeline
 from alpha_quant.app.store import CanonicalStore
@@ -46,6 +47,11 @@ def run_daily_pipeline(
 ) -> dict[str, Any]:
     config = load_config(config_path)
     config.data.mode = mode
+
+    if is_halted():
+        logger.info("scheduler_skip_halted")
+        return {"status": "skipped", "reason": "halted"}
+
     store = CanonicalStore(base_path=Path("data"))
 
     run_date = _today()

@@ -52,10 +52,15 @@ def cmd_run(args: argparse.Namespace) -> None:
         create_market_data,
         create_sentiment_feed,
     )
+    from alpha_quant.app.halt import is_halted
     from alpha_quant.app.vault import Vault
 
     config = load_config(args.config)
     config.data.mode = args.mode
+
+    if is_halted():
+        print("[alpha-quant] run: pipeline halted — use `alpha-quant halt --resume` to clear")
+        return
 
     vault = None
     if config.data.mode == "live":
@@ -168,6 +173,8 @@ def cmd_status(args: argparse.Namespace) -> None:
         create_sec_connector,
         create_sentiment_feed,
     )
+    from alpha_quant.app.halt import is_halted, read_halt
+    from alpha_quant.app.store import CanonicalStore
     from alpha_quant.app.vault import Vault
 
     config = load_config(args.config)
@@ -187,25 +194,71 @@ def cmd_status(args: argparse.Namespace) -> None:
             _check_connection(name, ok)
         return
 
-    if args.show_config:
-        if args.json:
-            print(json.dumps(redact_config(config), indent=2, default=str))
-        else:
-            for section, fields in redact_config(config).items():
-                print(f"[{section}]")
-                for key, value in fields.items():
-                    print(f"  {key} = {value}")
-                print()
+    store = CanonicalStore(base_path=Path("data"))
+
+    halted = is_halted()
+    halt_info = read_halt()
+    last_runs = store.list_runs()
+    portfolio = store.load_latest_portfolio_snapshot()
+    positions = store.load_positions()
+
+    status: dict[str, object] = {
+        "halted": halted,
+        "halt_reason": halt_info.get("reason") if halt_info else None,
+        "halt_timestamp": halt_info.get("timestamp") if halt_info else None,
+        "last_run": last_runs[0] if last_runs else None,
+        "portfolio": {
+            "equity": portfolio.equity if portfolio else None,
+            "cash": portfolio.cash if portfolio else None,
+            "date": str(portfolio.date) if portfolio else None,
+            "positions": len([p for p in positions if p.quantity > 0]),
+        },
+    }
+
+    if args.json:
+        print(json.dumps(status, indent=2, default=str))
+    elif args.show_config:
+        print(json.dumps(redact_config(config), indent=2, default=str))
     else:
-        print("[alpha-quant] status: OK")
+        print("[alpha-quant] status:")
+        print(f"  halted: {halted}")
+        if halt_info:
+            print(f"  halt reason: {halt_info.get('reason', 'unknown')}")
+            print(f"  halt at: {halt_info.get('timestamp', '')}")
+        if last_runs:
+            r = last_runs[0]
+            print(f"  last run: {r['run_id']} ({r['status']}) at {r['start_ts']}")
+        if portfolio:
+            print(f"  equity: {portfolio.equity:.2f}")
+            print(f"  cash: {portfolio.cash:.2f}")
+        active = [p for p in positions if p.quantity > 0]
+        print(f"  positions: {len(active)}")
 
 
 def cmd_halt(args: argparse.Namespace) -> None:
-    config = load_config(args.config)
-    action = "resume" if args.resume else "halt"
-    print(f"[alpha-quant] {action}: not yet implemented (planned for P5.4 Ops commands)")
-    if args.verbose_config:
-        print(json.dumps(redact_config(config), indent=2, default=str))
+    from alpha_quant.app.halt import clear_halt, is_halted, read_halt, write_halt
+
+    if args.resume:
+        if not is_halted():
+            print("[alpha-quant] resume: not halted")
+            return
+        info = read_halt() or {}
+        if not args.yes:
+            msg = info.get("reason", "unknown")
+            ts = info.get("timestamp", "")
+            answer = input(f"Clear halt (reason: {msg}, at: {ts})? [y/N] ")
+            if answer.strip().lower() != "y":
+                print("[alpha-quant] resume: cancelled")
+                return
+        clear_halt()
+        print("[alpha-quant] resume: halted cleared")
+        return
+
+    reason = " ".join(args.reason) if args.reason else "manual halt"
+    write_halt(reason=reason)
+    print(f"[alpha-quant] halt: {reason}")
+    if is_halted():
+        print("[alpha-quant] halt: use `alpha-quant halt --resume` to clear")
 
 
 def cmd_schedule(args: argparse.Namespace) -> None:
@@ -332,9 +385,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_halt = sub.add_parser("halt", help="Halt or resume pipeline")
     p_halt.add_argument(
+        "reason",
+        type=str,
+        nargs="*",
+        default=None,
+        help="Reason for halting (optional)",
+    )
+    p_halt.add_argument(
         "--resume",
         action="store_true",
         help="Resume after halt",
+    )
+    p_halt.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip confirmation for resume",
     )
     p_halt.set_defaults(func=cmd_halt)
 
