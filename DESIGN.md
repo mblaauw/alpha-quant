@@ -251,7 +251,7 @@ Development speeds: domain unit tests (ms) → full-DAG replay over fixtures (se
 | Rate limiting | small token-bucket util (~30 lines) | not worth a dependency |
 | HTML parsing (OpenInsider) | **selectolax** | fast, lenient; lxml fallback |
 | Validation/models | **pydantic v2** | parse-don't-validate at zone boundaries |
-| DataFrames | — (use DuckDB SQL + pyarrow) | polars evaluated but unused; DuckDB SQL covers all analytical needs |
+| DataFrames | — (use DuckDB SQL + pyarrow) | polars removed from dependencies (was evaluated but unused) |
 | Analytical SQL | **DuckDB** | zero-ops parquet queries; covers both analytical and transactional access |
 | Columnar files | **pyarrow** (parquet, zstd codec) | standard |
 | Compression | **zstandard** | vault blobs |
@@ -263,7 +263,7 @@ Development speeds: domain unit tests (ms) → full-DAG replay over fixtures (se
 | Testing | **pytest + hypothesis** | property tests on cap/risk invariants |
 | LLM client | **httpx** against OpenAI-compatible API | one adapter: OpenAI + OpenRouter |
 | Market data SDK | **alpaca-py** (data module only) | no trading module imported — enforced by lint rule |
-| Dashboard | **Streamlit** | reads event log + SQLite, zero coupling |
+| Dashboard | **Streamlit** | reads DuckDB state store via Store port, zero coupling |
 
 ---
 
@@ -376,7 +376,7 @@ No vectorbt for portfolio simulation (path-dependent constraints); event-driven 
 
 **Phase 0 — Skeleton + fixtures (wk 1).** Repo, ports, config, Clock, event log, fake adapters, `bootstrap` (50-symbol config), fixture bundle frozen, golden-replay harness in CI. *AC: full DAG end-to-end on fixtures with stub mechanisms.*
 
-**Phase 1 — Data layer (wk 1–3).** Connectors + vault + canonical (parquet/DuckDB + SQLite) + derive + validate, per §3. *AC: double ingest ⇒ zero new canonical rows; vault replay of one fixture day reproduces canonical bit-identically; indicator_state matches full-history recompute to 1e-6 for 20 symbols; fake-vs-real adapter contract tests pass.*
+**Phase 1 — Data layer (wk 1–3).** Connectors + vault + canonical (parquet/DuckDB) + derive + validate, per §3. *AC: double ingest ⇒ zero new canonical rows; vault replay of one fixture day reproduces canonical bit-identically; indicator_state matches full-history recompute to 1e-6 for 20 symbols; fake-vs-real adapter contract tests pass.*
 
 **Phase 2 — Domain + backtester + paper engine (wk 3–5).** M1–M4, M7, M8, sizing, risk, fills; backtester; paper book + RULES_ONLY shadow on fixtures; self-consistency checks. *AC: 10-year backtest <60s; hand-computed 5-trade fixture matches fills exactly, including a gap-through-stop case; property tests on cap invariants; golden replay green.*
 
@@ -384,7 +384,7 @@ No vectorbt for portfolio simulation (path-dependent constraints); event-driven 
 
 **Phase 4 — Narration + education + reports (wk 6–7).** Narrator, ~20 concept cards, consistency checker, `ask`, daily/weekly/monthly reports, Streamlit dashboard over events. *AC: every narrated number traceable (automated); LLM outage ⇒ template journal, zero pipeline impact; replayed fixture history yields a readable 6-month journal.* *(Before live data on purpose: the journal is your primary debugging instrument.)*
 
-**Phase 5 — Live data operation (wk 7–8).** Real connectors on schedule, alerting, `status`/`halt` ops, backup routine (SQLite + vault sync). *AC: chaos test — kill mid-run, restart, idempotent; forced staleness ⇒ halt + alert; 2 weeks unattended runs clean.*
+**Phase 5 — Live data operation (wk 7–8).** Real connectors on schedule, alerting, `status`/`halt` ops, backup routine (DuckDB + vault sync). *AC: chaos test — kill mid-run, restart, idempotent; forced staleness ⇒ halt + alert; 2 weeks unattended runs clean.*
 
 **Phase 6 — Evaluation period (≥3 months).** Paper + shadow books daily. Outcome: keep/kill mechanisms per ablation; only *then* revisit the live-broker question (§9.4).
 

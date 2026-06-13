@@ -95,13 +95,19 @@ Branch naming: `<scope>-<description>` (e.g. `port-interfaces-p0.2`, `fake-adapt
 - Follow existing code conventions (type hints, imports, patterns)
 - Use `typing.Protocol` for ports or `abc.ABC` + `@abstractmethod` as specified
 - All data models use `pydantic.BaseModel` with `frozen=True`
-- Verify the code at every step:
+- Verify the code at every step (or use `make check`, `make format`, `make type` as aliases):
 
 ```bash
 uv run ruff check alpha_quant/
 uv run ruff format alpha_quant/
 uv run ty check alpha_quant/
+uv run pytest tests/ -q
 ```
+
+- If golden replay fixture behavior changes, re-bless the golden hash:
+  ```bash
+  make bless-golden
+  ```
 
 ### 5. Create PR
 
@@ -121,8 +127,9 @@ Completes <scope> (closes #<N>).
 ### Verification
 
 - `ruff check` — All checks passed
-- `ruff format` — All files formatted
+- `ruff format --check` — All files formatted
 - `ty check` — All checks passed
+- `pytest` — All tests passed
 EOF
 
 gh pr create \
@@ -135,7 +142,7 @@ gh pr create \
 PR body must include:
 - A summary paragraph
 - A `### Changes` section with bullet points
-- An `### Verification` section with the 3 tool checks
+- An `### Verification` section with the 4 tool checks (ruff, format, ty, pytest)
 
 ### 6. Code Review Loop (Iterative) — MANDATORY
 
@@ -226,11 +233,12 @@ gh pr review <PR_NUMBER> --comment --body-file /tmp/review.md
 
 For each issue found in the review:
 - Fix the code locally
-- Re-run the 3 tool checks:
+- Re-run the 4 tool checks:
   ```bash
   uv run ruff check alpha_quant/
   uv run ruff format alpha_quant/
   uv run ty check alpha_quant/
+  uv run pytest tests/ -q
   ```
 - Amend the commit: `git add -A && git commit --amend --no-edit`
 - Force-push: `git push --force-with-lease origin <branch>`

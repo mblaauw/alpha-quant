@@ -32,7 +32,7 @@ Create the `alpha_quant` Python package with directory structure per DESIGN §1,
 
 **Technical Details:**
 - Use `pyproject.toml` with `[project.scripts]` entry point: `alpha-quant = "alpha_quant.cli:main"`
-- Dependencies (core): httpx, pydantic, pydantic-settings, structlog, sqlalchemy, duckdb, pyarrow, polars, numpy, tenacity, apscheduler, zstandard, selectolax
+- Dependencies (core): httpx, pydantic, pydantic-settings, structlog, duckdb, pyarrow, numpy, tenacity, apscheduler, zstandard, selectolax
 - Dependencies (dev): pytest, pytest-cov, hypothesis, mypy, ruff
 - CLI framework: `argparse` (stdlib) — no Click/Typer dependency for v1
 - Each subcommand in `alpha_quant/cli.py` dispatches to `app/` module (e.g., `app.runner`)
@@ -107,8 +107,8 @@ Implement the append-only typed event log. Define all event types as a discrimin
 **Acceptance Criteria:**
 - [ ] All 20+ event types from DESIGN §10 are implemented as frozen dataclasses
 - [ ] Events carry: `event_type`, `timestamp`, `run_id`, `payload` (type-specific), `source` (module name)
-- [ ] `EventSink.emit()` writes to both SQLite (for queries) and structlog JSON stream (for debugging)
-- [ ] SQLite schema: `CREATE TABLE events (id TEXT PK, run_id TEXT, event_type TEXT, ts TEXT, payload_json TEXT, source TEXT)`
+- [ ] `EventSink.emit()` writes to both DuckDB state store (for queries) and structlog JSON stream (for debugging)
+- [ ] DuckDB-managed state tables: decisions, orders, fills, positions, equity_curve, events, concept_log, indicator_state, catalog
 - [ ] Events are queryable by `run_id`, `event_type`, date range
 - [ ] `alpha-quant journal --events --since 7d` prints recent events in human-readable form
 - [ ] Event emission is in the hot path — verify ≤1ms per event (benchmark test)
@@ -122,7 +122,7 @@ Implement the append-only typed event log. Define all event types as a discrimin
   ```
 - Use `pydantic.TypeAdapter` for serialization/deserialization
 - structlog integration: `structlog.get_logger().info("domain_event", event=event.model_dump_json())`
-- SQLite write uses batch insert, not per-event — aggregate in a list and flush every 100ms or after each pipeline stage
+- DuckDB write uses batch insert, not per-event — aggregate in a list and flush every 100ms or after each pipeline stage
 
 ---
 
@@ -191,7 +191,7 @@ Implement `alpha-quant bootstrap` that reads the bootstrap config, fetches histo
 **Acceptance Criteria:**
 - [ ] `alpha-quant bootstrap --symbols AAPL,MSFT,NVDA,...` processes exactly the requested symbols
 - [ ] Bootstrap fetches: `history_years` of daily bars, fundamentals snapshots, earnings calendar, OpenInsider history
-- [ ] Bootstrap writes to vault (zstd), then canonical (parquet + SQLite), then seeds indicator_state
+- [ ] Bootstrap writes to vault (zstd), then canonical (Parquet via DuckDB), then seeds indicator_state
 - [ ] After bootstrap, `alpha-quant bootstrap --fixture-only` produces a frozen fixture bundle at `fixtures/{fixture_version}/`
 - [ ] Fixture bundle includes manifest.json with content hashes for every file
 - [ ] Re-running bootstrap with same config and same data is idempotent (vault skips duplicate content-addressed fetches)
@@ -230,7 +230,7 @@ Set up CI pipeline (GitHub Actions) that runs `alpha-quant replay --fixture --fr
 **Technical Details:**
 - Golden output file: `fixtures/golden/{fixture_version}/decision_log.json + equity_curve.json` — SHA256 of concatenated deterministic JSON
 - `make bless-golden` target: runs replay, computes hash, writes to golden file
-- CI matrix: Python 3.12, macOS + Ubuntu
+- CI matrix: Python 3.14, macOS + Ubuntu
 - Use `actions/setup-python@v5` with cache for pip/uv dependencies
 
 ---
@@ -254,13 +254,13 @@ Write 18 Architecture Decision Records (MADR template) covering every architectu
 - [ ] 18 ADRs written to `docs/adr/` using MADR template (see `docs/planning/ADR_PLAN.md`)
 - [ ] Each ADR covers Context, Decision Drivers, Considered Options (≥2), Decision Outcome, Positive/Negative Consequences
 - [ ] ADR-001 through ADR-018 cover:
-  - 001: Python Runtime (3.12 LTS)
+  - 001: Python Runtime (3.14)
   - 002: Package Manager (uv)
   - 003: Architecture Pattern (Ports-and-Adapters)
   - 004: CLI Framework (argparse stdlib)
   - 005: Configuration (pydantic-settings + TOML)
   - 006: Analytical Store (DuckDB + Parquet)
-  - 007: Transactional Store (SQLite WAL + SQLAlchemy Core)
+  - 007: Transactional Store (SQLite WAL + SQLAlchemy Core) [Superseded by ADR-0021]
   - 008: Technical Indicators (custom numpy O(1) recurrences)
   - 009: Fill Model (custom pessimistic semantics)
   - 010: Backtesting Engine (custom event-driven)
@@ -302,8 +302,8 @@ Create the LikeC4 DSL workspace and define Level 1 (System Context) and Level 2 
   - External systems: EODHD, Alpaca Data, SEC EDGAR, OpenInsider, Reddit Public API, LLM Provider (OpenAI/OpenRouter)
   - Relationships: data flows, protocols, cadence labels
 - [ ] **L2 Container** diagram shows:
-  - 12 containers: CLI, Pipeline Engine, Data Layer (connectors/vault/canonical/inference/validation), Domain Core, Fill Model, Paper Portfolio, Shadow Books, LLM Narrator, Dashboard, SQLite State Store, Parquet Archive, Event Log
-  - Technology labels (e.g., `[Python 3.12]`, `[httpx]`, `[DuckDB]`)
+  - 12 containers: CLI, Pipeline Engine, Data Layer (connectors/vault/canonical/inference/validation), Domain Core, Fill Model, Paper Portfolio, Shadow Books, LLM Narrator, Dashboard, DuckDB State Store, Parquet Archive, Event Log
+  - Technology labels (e.g., `[Python 3.14]`, `[httpx]`, `[DuckDB]`)
   - Relationships between containers with data flow descriptions
 - [ ] Interactive preview works: `npx likec4 start` from `docs/architecture/`
 - [ ] PNG exports generate: `likec4 export png -o docs/architecture/views/`
@@ -315,7 +315,7 @@ Create the LikeC4 DSL workspace and define Level 1 (System Context) and Level 2 
 - Element specification: define custom element kinds (`person`, `softwareSystem`, `container`, `component`)
 - Use `specification` block for custom element types and styling
 - Layout hints: LikeC4 auto-layouts; use relationship labels for data flow descriptions
-- Technology tags on elements: `[Python 3.12]`, `[DuckDB]`, `[httpx]`
+- Technology tags on elements: `[Python 3.14]`, `[DuckDB]`, `[httpx]`
 - Export command: `cd docs/architecture && npx likec4 export png -o views/`
 
 ---
@@ -332,7 +332,7 @@ Define Level 3 component diagrams for the three critical subsystems (Data Layer,
   - 5 Connectors (EODHD, Alpaca, SEC, OpenInsider, Reddit)
   - Vault (zstd, content-addressed)
   - Normalizer (pydantic parsers)
-  - Canonical Writer (Parquet + SQLite writers)
+  - Canonical Writer (Parquet + DuckDB state)
   - Derive Engine (numpy indicator recurrence)
   - Validator (~15 predicate checks)
   - Catalog (dataset versioning)
@@ -374,7 +374,7 @@ Create the Level 4 Deployment diagram showing the physical deployment architectu
   - APScheduler process (daily 17:30 ET cron)
   - CLI process (ad-hoc operations)
   - Streamlit process (dashboard, read-only)
-  - File system: vault/ (zstd blobs), canonical/ (parquet partitions), data/state.db (SQLite)
+  - File system: vault/ (zstd blobs), canonical/ (parquet partitions), data/state.db (DuckDB)
   - Network: outbound HTTPS to 5 external APIs
 - [ ] `docs/architecture/README.md` with:
   - Navigation links to all diagrams (PNG thumbnails)
@@ -429,7 +429,7 @@ Write the comprehensive Reference Architecture Document (`docs/architecture/REFE
 
 **Duration:** Weeks 1–3 (overlaps with P0 after ports are defined) | **Dependencies:** P0 (ports) | **Size:** 34 points
 
-Build the complete data subsystem: 5 connectors, raw vault, canonical stores (DuckDB parquet + SQLite), incremental indicator engine, validation gates.
+Build the complete data subsystem: 5 connectors, raw vault, canonical stores (DuckDB parquet + DuckDB state), incremental indicator engine, validation gates.
 
 ---
 
@@ -599,7 +599,7 @@ Implement the Reddit connector using public JSON endpoints. Provides mention cou
 - Parse JSON response: iterate `data.children[].data`, check `title` for ticker matches
 - Use regex `\b(AAPL|MSFT|...)\b` — build pattern dynamically from universe symbols
 - Common-word filter list: `["DD", "RH", "IT", "GO", "EV", "AI", "YT", "UK", "US", "CEO", "CFO", "ETF", "IPO", "PE", "EPS"]`
-- 30-day rolling baseline: store daily counts in SQLite, compute z-score = `(current - mean) / std`
+- 30-day rolling baseline: store daily counts in DuckDB, compute z-score = `(current - mean) / std`
 - z > 3 → M6 veto (10-day entry block for that symbol)
 
 ---
@@ -659,25 +659,25 @@ Implement `normalize.py` with pydantic models and parser functions that convert 
 
 ---
 
-### STORY-1.9: Canonical store — Parquet/DuckDB for analytical data + SQLite for transactional state
+### STORY-1.9: Canonical store — Parquet/DuckDB for analytical data + DuckDB for transactional state
 
 **Points:** 5 | **Priority:** P0 | **Status:** 📝
 
 **Description:**
-Implement the canonical store layer. Analytical data (bars, fundamentals, insider, mentions) → date-partitioned Parquet queried via DuckDB. Transactional data (decisions, orders, fills, positions, events, indicator state) → SQLite WAL.
+Implement the canonical store layer. Analytical data (bars, fundamentals, insider, mentions) → date-partitioned Parquet queried via DuckDB. Transactional data (decisions, orders, fills, positions, events, indicator state) → DuckDB.
 
 **Acceptance Criteria:**
 - [ ] `CanonicalStore.write_bars(bars: list[Bar])` appends to `canonical/bars/date={date}/part.parquet`
-- [ ] `CanonicalStore.read_bars(symbol, start, end)` returns polars DataFrame or list[Bar]
+- [ ] `CanonicalStore.read_bars(symbol, start, end)` returns pyarrow Table or list[Bar]
 - [ ] `CanonicalStore.write_fundamentals(snapshots)` writes to `canonical/fundamentals/snapshot_date={date}/`
 - [ ] `CanonicalStore.write_insider_transactions(txns)` writes to `canonical/insider_tx/filed_date={date}/`
 - [ ] `CanonicalStore.write_mentions(mentions)` writes to `canonical/mentions/date={date}/`
-- [ ] SQLite store: `StateStore.create_tables()` creates schema: `decisions`, `orders`, `fills`, `positions`, `equity_curve`, `events`, `concept_log`, `indicator_state`, `catalog`
+- [ ] DuckDB state: `StateStore.create_tables()` creates schema: `decisions`, `orders`, `fills`, `positions`, `equity_curve`, `events`, `concept_log`, `indicator_state`, `catalog`
 - [ ] `StateStore.write_decision(decision)` inserts into `decisions` table
 - [ ] `StateStore.read_positions(as_of_date)` returns current positions
 - [ ] `StateStore.read_indicator_state(symbol)` returns current indicator values or None
 - [ ] `StateStore.update_indicator_state(symbol, state)` upserts
-- [ ] All writes are transactional (SQLite WAL mode, batch commits)
+- [ ] All writes are transactional (DuckDB, batch commits)
 - [ ] Test: double-ingest produces zero new canonical rows (idempotency); DuckDB query over parquet returns correct date range
 - [ ] 50-day tail prune: `CanonicalStore.prune_bars(before_date)` removes date partitions older than the tail window
 
@@ -691,7 +691,7 @@ Implement the canonical store layer. Analytical data (bars, fundamentals, inside
   pq.write_table(table, path, compression="zstd")
   ```
 - DuckDB query: `duckdb.sql("SELECT * FROM read_parquet('canonical/bars/**/*.parquet', hive_partitioning=true) WHERE symbol = ? AND date BETWEEN ? AND ?", [symbol, start, end])`
-- SQLite schema (SQLAlchemy Core):
+- DuckDB state schema:
   ```sql
   CREATE TABLE decisions (
       decision_id TEXT PRIMARY KEY,
@@ -728,7 +728,7 @@ Implement `derive.py`: incremental O(1) calculation of technical indicators usin
 - [ ] `backfill_month_end_closes(bars) → list[tuple[date, float]]` extracts month-end closes for 12-1 momentum
 - [ ] Integrity test: recompute from full 250-day window via brute-force and compare to incremental state — must match to 1e-6
 - [ ] Performance: 10,000 symbols × 1 update takes <10ms
-- [ ] State is serializable/deserializable via pydantic for SQLite storage
+- [ ] State is serializable/deserializable via pydantic for DuckDB state storage
 
 **Technical Details:**
 - All numpy, no loops:
@@ -784,7 +784,7 @@ Implement `validate.py` with declarative quality checks between every data zone.
 
 **Technical Details:**
 - `ValidationResult`: `typing.TypedDict` or frozen dataclass with `is_valid: bool, issues: list[Issue], severity: Literal["WARN","QUARANTINE","HALT"]`
-- Quarantine list stored in SQLite: `quarantine: symbol TEXT, reason TEXT, date DATE, cleared BOOLEAN`
+- Quarantine list stored in DuckDB state: `quarantine: symbol TEXT, reason TEXT, date DATE, cleared BOOLEAN`
 - Halt mechanism: symlink or lockfile at `data/.HALT` with reason + timestamp; pipeline checks this before every run
 - No rules engine — each check is a standalone function with a name like `check_negative_prices(bars)`, `check_date_gaps(dates, calendar)`, etc.
 - ~15 checks total, easy to add more as predicates
@@ -802,13 +802,13 @@ Implement `catalog.py` for dataset versioning, manifest tracking, and fixture in
 - [ ] `Catalog.register_run(run_type, config_hash, fixture_version)` stores run metadata
 - [ ] `Catalog.compute_dataset_hash(path)` returns SHA256 of concatenated file contents
 - [ ] `Catalog.verify_fixture_integrity(fixture_path, manifest)` checks file content hashes match
-- [ ] `Catalog.current_fixture_version()` reads from SQLite state store
+- [ ] `Catalog.current_fixture_version()` reads from DuckDB state store
 - [ ] `Catalog.list_runs(since_date)` returns list of runs with type, date, config hash
 - [ ] Golden replay uses catalog to verify hash matches committed golden file
 - [ ] Test: fixture tampering (modify one parquet file) causes integrity check failure
 
 **Technical Details:**
-- Catalog table in SQLite: `run_id TEXT PK, run_type TEXT, config_hash TEXT, fixture_version TEXT, start_ts TIMESTAMP, end_ts TIMESTAMP, status TEXT`
+- Catalog table in DuckDB state: `run_id TEXT PK, run_type TEXT, config_hash TEXT, fixture_version TEXT, start_ts TIMESTAMP, end_ts TIMESTAMP, status TEXT`
 - Manifest verification: read manifest JSON, iterate files, compare SHA256, report mismatches
 - Dataset hash for golden comparison: sort files by path, concatenate content bytes, SHA256
 
@@ -868,7 +868,7 @@ Implement M1 universe selection: filter the symbol universe by liquidity, price,
 **Technical Details:**
 - ADV calculation: median of daily dollar volume over trailing 20 trading days
 - SEC map lookup: cache of `{ticker: TickerRecord}` loaded at pipeline start
-- Quarantine list: read from SQLite `quarantine` table where `cleared = FALSE`
+- Quarantine list: read from DuckDB `quarantine` table where `cleared = FALSE`
 - Output is used by M3, M4, M5 — all other mechanisms receive this filtered list
 
 ---
@@ -898,7 +898,7 @@ Implement M2 regime gate: classify current market environment as `RISK_ON`, `CAU
 - Breadth: requires calculating SMA50 for all SP500 members — this can be approximated from the universe data
 - VIX level: from configured VIX symbol (^VIX in config, or a VIX ETF like VIXY)
 - Simple ladder, not a model — no ML, no hidden states
-- Regime state stored in SQLite: `current_regime TEXT, as_of_date DATE, spy_price REAL, vix_level REAL`
+- Regime state stored in DuckDB: `current_regime TEXT, as_of_date DATE, spy_price REAL, vix_level REAL`
 - Position sizing multiplier is read from this state by `sizing.py`
 
 ---
@@ -953,7 +953,7 @@ Implement M4 fundamental quality gate: binary pass/fail based on operating cash 
 - Accruals calculation: `(Net Income - Operating Cash Flow) / Average Total Assets`
   - Net income and OCF from income/cash flow statements via EODHD fundamentals
   - If cash flow statement not available, use balance sheet approach or fall through
-- Sector median D/E: compute per sector from the universe; stored in SQLite and recalculated weekly
+- Sector median D/E: compute per sector from the universe; stored in DuckDB and recalculated weekly
 - Earnings surprise: compare actual EPS to estimated EPS from earnings calendar
 - If any fundamental field is unavailable, log a specific warning and pass through (fail-open for the gate)
 
@@ -969,7 +969,7 @@ Implement M7 earnings blackout: block new entries for symbols within 3 trading d
 **Acceptance Criteria:**
 - [ ] `M7EarningsBlackout.check(symbol, date, earnings_calendar) → BlackoutVerdict` — pass/fail with reason
 - [ ] Blackout window: 3 trading days before earnings report date
-- [ ] Uses earnings calendar from EODHD (stored in SQLite)
+- [ ] Uses earnings calendar from EODHD (stored in DuckDB)
 - [ ] If earnings date unknown (not in calendar) → pass (no blackout for unknown)
 - [ ] Test: 2 days before earnings → blocked; 4 days before → allowed; day after earnings → allowed
 
@@ -1055,7 +1055,7 @@ Implement risk.py: all risk rule evaluation. Structurally exit-only — this mod
 - Stop evaluation against daily bar: `if bar.low <= stop_price → exit at min(bar.open, stop_price) - slippage`
   - This happens in the fill model (§9.2), but the risk module decides *what* stops/trails are active
 - `highest_since_entry` tracked in Position model field `highest_price` or computed from bars since entry
-- Drawdown: compute peak-to-trough from equity curve points; store `peak_equity, current_dd_pct` in SQLite
+- Drawdown: compute peak-to-trough from equity curve points; store `peak_equity, current_dd_pct` in DuckDB
 - All risk actions are idempotent: if a stop already triggered, don't re-trigger
 - The function returns actions, does not execute them — execution happens in `app/pipeline.py`
 
@@ -1100,7 +1100,7 @@ Implement `domain/fills.py`: THE fill model used identically by backtest, replay
 **Points:** 5 | **Priority:** P0 | **Status:** 📝
 
 **Description:**
-Implement `app/paper.py`: the authoritative paper portfolio. Maintains cash, positions, orders, fills, equity curve in SQLite with transactional integrity. No broker dependency.
+Implement `app/paper.py`: the authoritative paper portfolio. Maintains cash, positions, orders, fills, equity curve in DuckDB with transactional integrity. No broker dependency.
 
 **Acceptance Criteria:**
 - [ ] `PaperPortfolio.__init__(store, config, clock)` — loads persisted state or initializes new
@@ -1109,8 +1109,8 @@ Implement `app/paper.py`: the authoritative paper portfolio. Maintains cash, pos
 - [ ] `process_entry_orders(candidates, bar, quote)` — creates orders, fills via fill model
 - [ ] `mark_to_market(date, market_data)` — updates position.current_price, records equity curve point
 - [ ] `self_consistency_check()` — asserts: `cash + Σ(shares * current_price) == equity_curve.last()`
-- [ ] All write operations are in a single SQLite transaction (rollback on error)
-- [ ] `equity_curve_point(equity, date)` — appends to SQLite equity_curve table
+- [ ] All write operations are in a single DuckDB transaction (rollback on error)
+- [ ] `equity_curve_point(equity, date)` — appends to DuckDB equity_curve table
 - [ ] Positions traced to fills → orders → decisions (I1, no orphans)
 - [ ] Test: full day cycle (risk + entry + fill + mark) produces consistent state; invalid state triggers halt
 
@@ -1252,7 +1252,7 @@ Implement the self-consistency assertion engine (DESIGN §9.3, §16). Run after 
   - Gross exposure ≤ configured cap (I6)
 - [ ] Violation → `ConsistencyViolation` event + halt lockfile
 - [ ] `alpha-quant status` shows "HALTED: self-consistency failure" with violation details
-- [ ] Test: manually corrupt position SQLite → violation detected; inject orphan order → violation detected
+- [ ] Test: manually corrupt position in DuckDB → violation detected; inject orphan order → violation detected
 
 **Technical Details:**
 - Run after every fill batch (both risk exits and entries)
@@ -1310,9 +1310,9 @@ Implement M6 crowding veto: use Reddit mention z-score to block entries for symb
 
 **Technical Details:**
 - Z-score: `(current_day_count - mean_30d) / std_30d`
-- Baseline stored in SQLite: `mention_baseline: symbol, mean, std, last_updated`
+- Baseline stored in DuckDB: `mention_baseline: symbol, mean, std, last_updated`
 - 30-day window: rolling window, updated daily
-- Block state in SQLite: `crowding_block: symbol, blocked_until_date, reason`
+- Block state in DuckDB: `crowding_block: symbol, blocked_until_date, reason`
 - M6 is a hard veto (not a score) — blocked symbols cannot enter regardless of other scores
 
 ---
@@ -1336,10 +1336,10 @@ Activate the remaining two shadow ablation books (NO_INSIDER, NO_CROWDING_VETO) 
 - [ ] Test: fake a mechanism underperforming its ablation → flag triggers after 2 quarters of replay
 
 **Technical Details:**
-- Ablation comparator runs weekly, stores comparison results in SQLite
+- Ablation comparator runs weekly, stores comparison results in DuckDB
 - Rolling metrics: 3-month and 6-month windows
 - Comparison table: `mechanism, window_start, window_end, paper_sharpe, ablation_sharpe, outperformance, flagged`
-- Flagged mechanisms: written to SQLite `mechanism_flags` table, read by pipeline at startup
+- Flagged mechanisms: written to DuckDB `mechanism_flags` table, read by pipeline at startup
 
 ---
 
@@ -1359,7 +1359,7 @@ Implement the degradation fallback logic for when alternative data sources are u
 - [ ] Test: disconnect each source in fixture replay → verify correct fallback behavior, verify pipeline continues
 
 **Technical Details:**
-- Degradation state stored in SQLite: `source_degradation: source, since_date, last_ok_date, degradation_payload (JSON)`
+- Degradation state stored in DuckDB: `source_degradation: source, since_date, last_ok_date, degradation_payload (JSON)`
 - Pipeline reads degradation state at startup for each source
 - Fallback behaviors are implemented in the respective mechanism functions, not in the connectors
 
@@ -1433,7 +1433,7 @@ Implement the narration context builder: reads events/lineage, extracts numbers,
 **Technical Details:**
 - Event extraction queries: `events_by_run_id()`, `events_by_type("RegimeChanged")`, etc.
 - Risk map: for each position, compute `(current_price - stop_price) / equity * 100` — "AAPL is 0.8% of equity from its stop"
-- Concept rotation: cycle through concept list, track `concept_log` in SQLite, respect `concept_repeat_limit`
+- Concept rotation: cycle through concept list, track `concept_log` in DuckDB, respect `concept_repeat_limit`
 
 ---
 
@@ -1509,7 +1509,7 @@ Generate the daily journal: regime, actions, risk map, concept card. Output is M
   - **Non-Actions**: "No entries today — regime is CAUTION" (negative-space narration)
   - **Concept of the Day**: one expandable concept card
   - **Key Numbers**: portfolio value, cash, exposure, daily return
-- [ ] Output written to SQLite `journal_entries` table (date, markdown)
+- [ ] Output written to DuckDB `journal_entries` table (date, markdown)
 - [ ] Test: fixture replay produces readable 6-month journal; verify sections present
 
 **Technical Details:**
@@ -1536,7 +1536,7 @@ Generate weekly review and monthly performance reports. Monthly includes ablatio
   - Turnover and cost drag (total slippage + spread costs for the month)
   - Concept cards reviewed this month (from concept_log)
   - Paper-vs-live caveat: bolded callout
-- [ ] Reports are Markdown, stored in SQLite, accessible via `alpha-quant report --weekly/--monthly`
+- [ ] Reports are Markdown, stored in DuckDB, accessible via `alpha-quant report --weekly/--monthly`
 - [ ] Test: fixture replay of 3 months → monthly report with all sections populated; ablation comparisons correct
 
 **Technical Details:**
@@ -1553,7 +1553,7 @@ Generate weekly review and monthly performance reports. Monthly includes ablatio
 **Points:** 3 | **Priority:** P1 | **Status:** 📝
 
 **Description:**
-Build a read-only Streamlit dashboard that reads from the event log and SQLite store. No coupling to pipeline internals — consumes only persisted data.
+Build a read-only Streamlit dashboard that reads from the event log and DuckDB state store. No coupling to pipeline internals — consumes only persisted data.
 
 **Acceptance Criteria:**
 - [ ] `streamlit run alpha_quant/app/dashboard.py` launches dashboard
@@ -1568,7 +1568,7 @@ Build a read-only Streamlit dashboard that reads from the event log and SQLite s
 
 **Technical Details:**
 - Stack: Streamlit + altair/plotly for charts + markdown rendering
-- Data sources: SQLite store (positions, equity_curve, events) and journal tables
+- Data sources: DuckDB state store (positions, equity_curve, events) and journal tables
 - No network calls, no pipeline interaction — pure read from local state
 - Auto-refresh: `st_autorefresh` every 60 seconds when running live
 
@@ -1652,7 +1652,7 @@ Set up APScheduler to run the daily pipeline at 17:30 ET every trading day. With
 **Technical Details:**
 - APScheduler `CronTrigger` with timezone = America/New_York, hour=17, minute=30
 - Use `BackgroundScheduler` with `logging` integration
-- Idempotency: check SQLite `runs` table for existing run with today's date
+- Idempotency: check DuckDB `runs` table for existing run with today's date
 - Cron fallback entry (to be added manually via `crontab -e`):
   ```cron
   30 21 * * 1-5 cd /path/to/alpha-quant && alpha-quant run --live --if-not-already-run
@@ -1711,7 +1711,7 @@ Implement operational commands: `alpha-quant status` (full system status), `halt
 **Technical Details:**
 - Halt lockfile: `data/.HALT` — JSON with `{reason, timestamp, run_id}`
 - Pipeline checks for `.HALT` at startup: if exists and not expired, refuse to run
-- Status reads from: SQLite (last run, portfolio, regime), vault (data health), halt file
+- Status reads from: DuckDB (last run, portfolio, regime), vault (data health), halt file
 
 ---
 
@@ -1720,21 +1720,21 @@ Implement operational commands: `alpha-quant status` (full system status), `halt
 **Points:** 2 | **Priority:** P1 | **Status:** 📝
 
 **Description:**
-Implement backup routine for critical data: SQLite state store + vault manifest. Document recovery procedure.
+Implement backup routine for critical data: DuckDB state store + vault manifest. Document recovery procedure.
 
 **Acceptance Criteria:**
 - [ ] `alpha-quant backup` creates compressed archive of:
-  - SQLite state store (`.backup` command)
+  - DuckDB state store
   - Vault manifest (DuckDB)
   - Config file (redacted copy)
 - [ ] Backup path: `backups/alpha-quant-{date}-{sha}.tar.zst`
 - [ ] Automatic daily backup after pipeline run
 - [ ] Retention: keep last 30 daily backups, last 12 monthly
 - [ ] Recovery document: `docs/ops/RECOVERY.md` with step-by-step restore procedure
-- [ ] Test: backup → delete SQLite → restore → verify data integrity
+- [ ] Test: backup → delete DuckDB state → restore → verify data integrity
 
 **Technical Details:**
-- SQLite backup: `sqlite3 alpha_quant.db ".backup backup_path/alpha_quant-{date}.db"` (hot backup, WAL mode supports concurrent reads)
+- DuckDB backup
 - Parquet/canonical data: not backed up per-se (re-parseable from vault), but vault is cheap to back up
 - Recovery procedure (documented):
   1. Stop scheduler
@@ -1755,7 +1755,7 @@ Validate that the system runs unattended for 2 weeks without human intervention.
 **Acceptance Criteria:**
 - [ ] Chaos test 1: `kill -9` the running process mid-ingest → restart → verify idempotent re-run (no duplicate data, no corruption)
 - [ ] Chaos test 2: disable network → pipeline logs SOURCE_DEGRADED for all sources → DATA_HALT triggered by staleness → restore network → next run recovers
-- [ ] Chaos test 3: modify SQLite directly (corrupt a position row) → self-consistency check catches → HALT → restore from backup
+- [ ] Chaos test 3: modify DuckDB directly (corrupt a position row) → self-consistency check catches → HALT → restore from backup
 - [ ] Chaos test 4: disk full → graceful error, log, pipeline halt
 - [ ] All tests pass without human intervention (beyond starting the test)
 - [ ] Log of 2-week unattended run shows no crashes, clean daily runs, all halt conditions recover
@@ -1763,7 +1763,7 @@ Validate that the system runs unattended for 2 weeks without human intervention.
 **Technical Details:**
 - Chaos tests are scripts in `tests/chaos/` that simulate failure conditions
 - Disk full test: use a small tmpfs or quota limit via `pytest` fixture
-- Recovery from kill: no partial writes (SQLite WAL + vault append-only guarantee atomicity per operation)
+- Recovery from kill: no partial writes (DuckDB ACID + vault append-only guarantee atomicity per operation)
 - Run verification: `pytest tests/chaos/` as part of CI (not golden, but integration)
 
 ---
