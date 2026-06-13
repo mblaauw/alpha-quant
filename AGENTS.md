@@ -14,6 +14,37 @@ EOF
 gh <command> --body-file /tmp/body.md
 ```
 
+---
+
+## Phase Lifecycle
+
+Work proceeds in phases (P0 → P1 → ... → P6). Between each phase, a **Refinement Sprint** is conducted. Within each phase, work follows the **Full Issue Lifecycle**.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Phase N                                                    │
+│  ┌──────────────────┐   ┌──────────────────┐               │
+│  │  Issue N.1       │ → │  Issue N.2       │ → ... → Done │
+│  │  (Full Lifecycle) │   │  (Full Lifecycle) │               │
+│  └──────────────────┘   └──────────────────┘               │
+└─────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────┐
+              │  Refinement Sprint          │
+              │  (PO + System Designer +    │
+              │   Software Architect +      │
+              │   Data Architect +          │
+              │   Data Engineer)            │
+              │  → Backlog for Phase N+1   │
+              └────────────────────────────┘
+                            │
+                            ▼
+                      Phase N+1 ...
+```
+
+---
+
 ## Full Issue Lifecycle
 
 ### 1. Pick Up Next Issue
@@ -106,9 +137,11 @@ PR body must include:
 - A `### Changes` section with bullet points
 - An `### Verification` section with the 3 tool checks
 
-### 6. Code Review Loop (Iterative)
+### 6. Code Review Loop (Iterative) — MANDATORY
 
-**ALWAYS do a thorough code review of the PR after pushing.** Do NOT skip this step. The review is your own critical assessment — read every changed line, run the code mentally, and check every acceptance criterion from the issue.
+**ALWAYS do a thorough code review of the PR after pushing. Do NOT skip this step.** The review is your own critical assessment — read every changed line, run the code mentally, and check every acceptance criterion from the issue.
+
+The review MUST produce visible PR comments (not just mental notes). This creates an audit trail of issues found and fixes applied.
 
 #### 6a. Review PR diff against each AC item
 
@@ -121,15 +154,22 @@ For every acceptance criterion in the issue:
 - Read the corresponding code in the diff
 - Verify the code actually satisfies the criterion
 - Check edge cases, error handling, typing, and performance
-- For each criterion, note PASS or FAIL in your head (or in a PR comment)
+- For each criterion, note PASS or FAIL
 
-#### 6b. Add PR review comments for every issue found
+#### 6b. Post PR review comments for every issue found — MANDATORY
 
-For each issue (unmet AC, bug, style problem, missing edge case, performance concern, etc.):
+For each issue found (unmet AC, bug, style problem, missing edge case, performance concern, etc.), **you MUST post a PR review comment** before making any fixes:
 
 ```bash
-# Add a PR review comment pointing at the specific code
-gh pr review <PR_NUMBER> --comment --body "<file>:<line> — <what's wrong>"
+gh pr review <PR_NUMBER> --comment --body "\`<file>:<line>\` — <what's wrong>"
+```
+
+This creates a visible audit trail on GitHub. Even self-found issues must be commented. The PR review tab should show all discovered problems.
+
+Example:
+```bash
+gh pr review 123 --comment --body \
+  "\`sizing.py:44\` — Formula missing \`* price\` factor, see CRIT-1 for details."
 ```
 
 #### 6c. Fix every issue
@@ -212,13 +252,13 @@ git push origin --delete <feature-branch-name>
 
 ---
 
-## Refinement Workflow
+## Refinement Sprint
 
-When the PO calls for a technical refinement, the Software Designer evaluates the current state and reports back.
+A Refinement Sprint runs **between phases** (e.g., P2→P3, P4→P5). It is a cross-functional review involving the **PO**, **System Designer**, **Software Architect**, **Data Architect**, and **Data Engineer**.
 
-### 1. PO creates a Refinement Issue (P1.R style)
+### 1. PO creates a Refinement Issue
 
-Create the issue with a multi-line body using `--body-file`:
+The PO creates a refinement issue with a multi-line body using `--body-file`:
 
 ```bash
 cat > /tmp/refinement_body.md << 'EOF'
@@ -229,19 +269,32 @@ cat > /tmp/refinement_body.md << 'EOF'
 ## Acceptance Criteria
 
 ### ADR Audit
-- [ ] ...
+- [ ] Review all ADRs for relevance; flag any that are obsolete, superseded, or missing
 
 ### Dependency Fitness
-- [ ] ...
+- [ ] Evaluate every dependency (keep / remove / replace / add)
+- [ ] Flag unused or outdated dependencies
 
 ### Duplicate Code
-- [ ] ...
+- [ ] Quantify duplicate code patterns across the codebase
+- [ ] Propose refactoring targets
 
 ### Architecture Consistency
-- [ ] ...
+- [ ] Verify hexagonal architecture rules (domain → ports → adapters)
+- [ ] Check for violations (domain importing from app/adapters, etc.)
+
+### Data Architecture
+- [ ] Review data models for correctness (accrual ratio, position sizing, etc.)
+- [ ] Check schema consistency between models, store, and normalize layers
+
+### Trading Logic Audit
+- [ ] Review risk management formulas (stops, sizing, trailing, drawdown)
+- [ ] Review fill model for edge cases (gap-through, partial fills)
+- [ ] Verify composite ranking formulas (factor weights, double-counting)
 
 ### Future-Proofing
-- [ ] ...
+- [ ] Assess how upcoming phases (P3, P4, P5) integrate with current architecture
+- [ ] Identify blocking issues for next phase
 
 ## Technical Details
 
@@ -249,28 +302,37 @@ cat > /tmp/refinement_body.md << 'EOF'
 EOF
 
 gh issue create \
-  --title "P1.R: Technical refinement — <scope>" \
-  --label "story,priority/p0,size/m,domain/backend,P1" \
+  --title "P<N>.R: Technical refinement — <scope>" \
+  --label "story,priority/p0,size/m,domain/backend,P<N>" \
   --body-file /tmp/refinement_body.md
 ```
 
-### 2. Software Designer completes evaluation
+### 2. Cross-functional evaluation
 
-- Reviews every ADR for relevance
-- Evaluates every dependency (keep / remove / replace / add)
-- Quantifies duplicate code patterns
-- Proposes ADR amendments or new ADRs (status: Proposed)
-- Produces the refactoring punch list
+Each role evaluates their domain:
 
-### 3. Software Designer commits ADR updates
+| Role | Focus |
+|------|-------|
+| PO | Backlog priorities, acceptance criteria, business value |
+| System Designer | Architecture, code quality, dependency rules, module boundaries |
+| Software Architect | Port interfaces, adapter patterns, event design, testability |
+| Data Architect | Data models, store schema, normalization, data flow |
+| Data Engineer | Connector robustness, caching, rate limiting, data integrity |
 
-Files in `docs/adr/` — new ADR files following MADR template. Updated `docs/adr/README.md` index.
+### 3. Produce outputs
+
+- **Refactoring Punch List**: Save to `docs/adr/REFAKTORING_PUNCH_LIST.md` with P0/P1/P2 priority groupings
+- **New ADRs**: Create files in `docs/adr/` following MADR template for each new architectural decision
+- **Updated ADRs**: Update existing ADRs that are stale or superseded
+- **New Backlog Issues**: Create issues for each actionable finding with priority/size labels
+- **Updated Issue Descriptions**: Update existing issue bodies if scope changes
 
 ### 4. PO acts on outputs
 
-- Creates refactoring issue(s) from punch list (P1.RA, P1.RB, etc.)
-- Updates remaining P1.x issue descriptions if ADR changes affect their scope
-- Updates priority/size labels on affected issues
+- Review punch list with the team
+- Assign priority/size labels to each new issue
+- Update the backlog for the next phase
+- Present to stakeholders if needed
 
 ---
 
