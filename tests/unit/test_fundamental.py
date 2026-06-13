@@ -1,7 +1,5 @@
 """Unit tests for M4 fundamental quality gate (alpha_quant.domain.fundamental)."""
 
-from datetime import date
-
 from alpha_quant.domain.fundamental import QualityVerdict, evaluate
 from tests.conftest import make_earnings, make_fundamentals
 
