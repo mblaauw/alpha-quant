@@ -410,6 +410,20 @@ def cmd_schedule(args: argparse.Namespace) -> None:
         scheduler.shutdown(wait=False)
 
 
+def cmd_backup(args: argparse.Namespace) -> None:
+    from alpha_quant.app.backup import run_backup
+
+    path = run_backup(config_path=args.config)
+    print(f"[alpha-quant] backup: created {path}")
+
+    if args.prune:
+        from alpha_quant.app.backup import prune_backups
+
+        removed = prune_backups()
+        for r in removed:
+            print(f"[alpha-quant] backup: pruned {r.name}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="alpha-quant",
@@ -546,6 +560,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run mode (default: live)",
     )
     p_schedule.set_defaults(func=cmd_schedule)
+
+    p_backup = sub.add_parser("backup", help="Create backup archive")
+    p_backup.add_argument("--prune", action="store_true", help="Remove old backups per policy")
+    p_backup.set_defaults(func=cmd_backup)
 
     return parser
 
