@@ -40,7 +40,7 @@ npx likec4 export png -o docs/architecture/views docs/architecture
 
 ## Related Documentation
 
-- [Architecture Decision Records](../adr/README.md) — 26 ADRs covering every technology choice
+- [Architecture Decision Records](../adr/README.md) — 28 ADRs covering every technology choice
 - [Design Specification](../../DESIGN.md) — Full system design (v1.2)
 - [Implementation Roadmap](../planning/ROADMAP.md)
 - [Project Backlog](../planning/BACKLOG.md)
