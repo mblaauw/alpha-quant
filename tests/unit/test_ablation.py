@@ -3,7 +3,6 @@
 import math
 from datetime import date, datetime
 
-from alpha_quant.adapters.fake.fixture_store import FixtureStore
 from alpha_quant.domain.ablation import (
     NO_CROWDING_VETO_CONFIG,
     NO_INSIDER_CONFIG,
@@ -167,35 +166,27 @@ class TestAblationComparison:
 
 
 class TestShadowBookInitialize:
-    def test_sets_cash_and_saves_snapshot(self) -> None:
-        store = FixtureStore()
-        book = ShadowBook(store, "TEST_BOOK", AblationConfig())
-        book.initialize(100_000.0, date(2025, 1, 2))
+    def test_sets_cash_and_returns_snapshot(self) -> None:
+        book = ShadowBook("TEST_BOOK", AblationConfig())
+        snap = book.initialize(100_000.0, date(2025, 1, 2))
         assert book.cash == 100_000.0
-        snap = store.load_latest_portfolio_snapshot("TEST_BOOK")
-        assert snap is not None
         assert snap.cash == 100_000.0
         assert snap.equity == 100_000.0
         assert snap.book == "TEST_BOOK"
 
-    def test_recovers_cash_on_init(self) -> None:
-        store = FixtureStore()
-        book = ShadowBook(store, "RECOVER", AblationConfig())
-        book.initialize(50_000.0, date(2025, 1, 2))
-        book2 = ShadowBook(store, "RECOVER", AblationConfig())
-        assert book2.cash == 50_000.0
+    def test_starts_with_given_cash(self) -> None:
+        book = ShadowBook("INIT_CASH", AblationConfig(), initial_cash=50_000.0)
+        assert book.cash == 50_000.0
 
     def test_initial_positions_empty(self) -> None:
-        store = FixtureStore()
-        book = ShadowBook(store, "EMPTY", AblationConfig())
+        book = ShadowBook("EMPTY", AblationConfig())
         book.initialize(100_000.0, date(2025, 1, 2))
         assert book.positions == []
 
 
 class TestShadowBookEntryOrders:
     def test_fills_buy_order(self) -> None:
-        store = FixtureStore()
-        book = ShadowBook(store, "ENTRY", AblationConfig())
+        book = ShadowBook("ENTRY", AblationConfig())
         book.initialize(100_000.0, date(2025, 1, 2))
 
         bar = _make_bar("AAPL", date(2025, 1, 3), 150.0, 152.0, 149.0, 151.0)
@@ -209,8 +200,7 @@ class TestShadowBookEntryOrders:
         assert book.cash == round(100_000.0 - fill_cost, 2)
 
     def test_insufficient_cash_violation(self) -> None:
-        store = FixtureStore()
-        book = ShadowBook(store, "CASH", AblationConfig())
+        book = ShadowBook("CASH", AblationConfig())
         book.initialize(100.0, date(2025, 1, 2))
 
         bar = _make_bar("AAPL", date(2025, 1, 3), 200.0, 205.0, 199.0, 202.0)
@@ -223,8 +213,7 @@ class TestShadowBookEntryOrders:
         assert book.cash == 100.0
 
     def test_fill_gap_blocks_entry(self) -> None:
-        store = FixtureStore()
-        book = ShadowBook(store, "GAP", AblationConfig())
+        book = ShadowBook("GAP", AblationConfig())
         book.initialize(100_000.0, date(2025, 1, 2))
 
         bar = _make_bar("AAPL", date(2025, 1, 3), 200.0, 205.0, 199.0, 202.0)
@@ -235,8 +224,7 @@ class TestShadowBookEntryOrders:
         assert book.cash == 100_000.0
 
     def test_adds_to_existing_position(self) -> None:
-        store = FixtureStore()
-        book = ShadowBook(store, "ADD", AblationConfig())
+        book = ShadowBook("ADD", AblationConfig())
         book.initialize(100_000.0, date(2025, 1, 2))
         bar = _make_bar("AAPL", date(2025, 1, 3), 150.0, 152.0, 149.0, 151.0)
 
@@ -249,8 +237,7 @@ class TestShadowBookEntryOrders:
 
 class TestShadowBookRiskActions:
     def test_stop_exit_sells_position(self) -> None:
-        store = FixtureStore()
-        book = ShadowBook(store, "STOP", AblationConfig())
+        book = ShadowBook("STOP", AblationConfig())
         book.initialize(100_000.0, date(2025, 1, 2))
 
         bar = _make_bar("AAPL", date(2025, 1, 3), 150.0, 152.0, 140.0, 145.0)
@@ -269,8 +256,7 @@ class TestShadowBookRiskActions:
         assert len([p for p in book.positions if p.quantity > 0]) == 0
 
     def test_partial_take_reduces_position(self) -> None:
-        store = FixtureStore()
-        book = ShadowBook(store, "PARTIAL", AblationConfig())
+        book = ShadowBook("PARTIAL", AblationConfig())
         book.initialize(100_000.0, date(2025, 1, 2))
 
         bar = _make_bar("AAPL", date(2025, 1, 3), 150.0, 152.0, 149.0, 151.0)
@@ -288,8 +274,7 @@ class TestShadowBookRiskActions:
         assert remaining[0].quantity == 50
 
     def test_unknown_position_skipped(self) -> None:
-        store = FixtureStore()
-        book = ShadowBook(store, "SKIP", AblationConfig())
+        book = ShadowBook("SKIP", AblationConfig())
         book.initialize(100_000.0, date(2025, 1, 2))
 
         bar = _make_bar("AAPL", date(2025, 1, 3), 150.0, 152.0, 149.0, 151.0)
@@ -301,8 +286,7 @@ class TestShadowBookRiskActions:
 
 class TestShadowBookMarkToMarket:
     def test_marks_positions_and_returns_snapshot(self) -> None:
-        store = FixtureStore()
-        book = ShadowBook(store, "MARK", AblationConfig())
+        book = ShadowBook("MARK", AblationConfig())
         book.initialize(100_000.0, date(2025, 1, 2))
 
         bar = _make_bar("AAPL", date(2025, 1, 3), 150.0, 152.0, 149.0, 151.0)
@@ -319,8 +303,7 @@ class TestShadowBookMarkToMarket:
         assert snap.equity == expected_equity
 
     def test_tracks_daily_returns(self) -> None:
-        store = FixtureStore()
-        book = ShadowBook(store, "RETURNS", AblationConfig())
+        book = ShadowBook("RETURNS", AblationConfig())
         book.initialize(100_000.0, date(2025, 1, 2))
 
         bar = _make_bar("AAPL", date(2025, 1, 3), 150.0, 152.0, 149.0, 151.0)
@@ -330,8 +313,7 @@ class TestShadowBookMarkToMarket:
         assert len(book.daily_returns) > 0
 
     def test_cleans_up_zero_quantity_positions(self) -> None:
-        store = FixtureStore()
-        book = ShadowBook(store, "CLEAN", AblationConfig())
+        book = ShadowBook("CLEAN", AblationConfig())
         book.initialize(100_000.0, date(2025, 1, 2))
 
         book._positions["DEAD"] = Position(symbol="DEAD", quantity=0, avg_cost=100.0)
@@ -343,16 +325,14 @@ class TestShadowBookMarkToMarket:
 
 class TestShadowBookSelfConsistency:
     def test_returns_empty_when_consistent(self) -> None:
-        store = FixtureStore()
-        book = ShadowBook(store, "CONSIST", AblationConfig())
+        book = ShadowBook("CONSIST", AblationConfig())
         book.initialize(100_000.0, date(2025, 1, 2))
 
         violations = book.self_consistency_check()
         assert len(violations) == 0
 
     def test_detects_mismatch(self) -> None:
-        store = FixtureStore()
-        book = ShadowBook(store, "MISMATCH", AblationConfig())
+        book = ShadowBook("MISMATCH", AblationConfig())
         book.initialize(100_000.0, date(2025, 1, 2))
 
         bar = _make_bar("AAPL", date(2025, 1, 3), 150.0, 152.0, 149.0, 151.0)
