@@ -73,7 +73,7 @@ def evaluate_stops(
         return actions
 
     if highest >= entry + r * cfg.trail_after_r:
-        trail_price = max(stop_price, entry)
+        trail_price = max(highest - r, entry)
         if bar.low <= trail_price:
             actions.append(
                 RiskAction(

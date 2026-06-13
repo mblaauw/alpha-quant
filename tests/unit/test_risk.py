@@ -68,6 +68,13 @@ class TestEvaluateStops:
         assert len(result) == 1
         assert result[0].action_type == "trail_stop"
 
+    def test_trail_tightens_as_price_rallies(self) -> None:
+        pos = _position(avg_cost=100.0, stop_price=90.0)
+        bar = _bar(high=125.0, low=105.0)
+        result = evaluate_stops(pos, bar, atr=5.0, highest_since_entry=120.0)
+        assert len(result) == 1
+        assert result[0].action_type == "trail_stop"
+
     def test_partial_take_triggers_when_no_stop(self) -> None:
         config = RiskConfig(partial_take_at_r=2.0)
         pos = _position(avg_cost=100.0, stop_price=90.0)
