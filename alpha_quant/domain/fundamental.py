@@ -37,8 +37,15 @@ def evaluate(
         failures.append(f"D/E ({de:.2f}) >= sector median * 2")
 
     accrual_ratio = _compute_accrual_ratio(fundamentals)
+    accrual_skipped = False
     if accrual_ratio is not None and (accrual_ratio < -0.05 or accrual_ratio > 0.05):
         failures.append(f"accrual ratio ({accrual_ratio:.4f}) outside [-0.05, 0.05]")
+    elif (
+        accrual_ratio is None
+        and fundamentals.total_liabilities is None
+        and fundamentals.accruals is not None
+    ):
+        accrual_skipped = True
 
     if recent_earnings is not None:
         surprise = _check_negative_surprise(recent_earnings)
@@ -47,6 +54,13 @@ def evaluate(
 
     if failures:
         return QualityVerdict(passed=False, reason="; ".join(failures))
+
+    if accrual_skipped:
+        return QualityVerdict(
+            passed=True,
+            passed_degraded=True,
+            reason="accrual check skipped (missing total_liabilities)",
+        )
 
     return QualityVerdict(passed=True)
 
@@ -72,11 +86,7 @@ def _compute_accrual_ratio(fundamentals: FundamentalsSnapshot) -> float | None:
 def _estimate_total_assets(fundamentals: FundamentalsSnapshot) -> float | None:
     if fundamentals.total_liabilities is not None and fundamentals.total_equity is not None:
         return fundamentals.total_liabilities + fundamentals.total_equity
-    debt = fundamentals.total_debt
-    equity = fundamentals.total_equity
-    if debt is None or equity is None:
-        return None
-    return debt + equity
+    return None
 
 
 def _check_negative_surprise(earnings: EarningsEntry) -> str | None:
