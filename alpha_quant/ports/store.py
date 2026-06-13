@@ -98,3 +98,26 @@ class Store(ABC):
 
     @abstractmethod
     def load_report(self, dt: date, report_type: str) -> ReportEntry | None: ...
+
+    @abstractmethod
+    def add_quarantine(self, symbol: str, reason: str, severity: str = "QUARANTINE") -> None: ...
+
+    @abstractmethod
+    def list_quarantine(self, cleared: bool = False) -> list[dict[str, object]]: ...
+
+    @abstractmethod
+    def clear_quarantine(self, symbol: str) -> None: ...
+
+    @abstractmethod
+    def register_run(self, run_type: str, config_hash: str, fixture_version: str = "") -> str: ...
+
+    @abstractmethod
+    def complete_run(
+        self, run_id: str, status: str = "completed", manifest_hash: str = ""
+    ) -> None: ...
+
+    @abstractmethod
+    def list_runs(self, since_date: date | None = None) -> list[dict[str, object]]: ...
+
+    @abstractmethod
+    def close(self) -> None: ...
