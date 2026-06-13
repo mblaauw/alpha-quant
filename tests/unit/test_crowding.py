@@ -43,11 +43,17 @@ class TestEvaluate:
         )
         assert result.blocked is False
 
-    def test_active_block_with_new_z_score_keeps_original(self) -> None:
+    def test_active_block_extended_by_new_high_z_score(self) -> None:
+        blocked_until = date(2026, 6, 20)
+        result = evaluate(z_score=8.0, blocked_until=blocked_until, as_of_date=date(2026, 6, 18))
+        assert result.blocked is True
+        assert result.blocked_until > blocked_until
+
+    def test_active_block_with_new_z_score_extends(self) -> None:
         blocked_until = date(2026, 6, 20)
         result = evaluate(z_score=6.0, blocked_until=blocked_until, as_of_date=date(2026, 6, 15))
         assert result.blocked is True
-        assert result.blocked_until == blocked_until
+        assert result.blocked_until >= blocked_until
 
     def test_block_reason_includes_date(self) -> None:
         result = evaluate(z_score=4.0, blocked_until=None, as_of_date=date(2026, 6, 11))
@@ -58,7 +64,7 @@ class TestEvaluate:
         blocked_until = date(2026, 6, 20)
         result = evaluate(z_score=4.0, blocked_until=blocked_until, as_of_date=date(2026, 6, 15))
         assert result.reason is not None
-        assert "2026-06-20" in result.reason
+        assert "extended" in result.reason
 
     def test_degraded_source_lifts_block(self) -> None:
         blocked_until = date(2026, 6, 10)
