@@ -160,11 +160,53 @@ For every acceptance criterion in the issue:
 
 For each issue found (unmet AC, bug, style problem, missing edge case, performance concern, etc.), **you MUST post a PR review comment** before making any fixes:
 
+**Always use `--body-file /tmp/review.md` with proper Markdown formatting.** Never use inline `--body "..."` — bash double quotes do not interpret `\n` as newlines, producing raw `\n` in the PR review UI.
+
+Template for a failing review:
+
 ```bash
-gh pr review <PR_NUMBER> --comment --body "\`<file>:<line>\` — <what's wrong>"
+cat > /tmp/review.md << 'EOF'
+**Issue found in review**
+
+| # | File | Issue |
+|---|------|-------|
+| 1 | `sizing.py:44` | Formula missing `* price` factor — see CRIT-1 |
+| 2 | `risk.py:76` | Trailing stop never trails |
+
+**AC Verification**
+- AC 1 (fix formula): ❌ — see issue 1 above
+- AC 2 (update tests): ✅ — all 260 pass
+
+**Notes**
+- Edge case: negative equity not handled
+- Performance: O(n) is acceptable
+EOF
+
+gh pr review <PR_NUMBER> --comment --body-file /tmp/review.md
 ```
 
-This creates a visible audit trail on GitHub. Even self-found issues must be commented. The PR review tab should show all discovered problems.
+Template for a passing review (no issues found):
+
+```bash
+cat > /tmp/review.md << 'EOF'
+**Code Review — Passed**
+
+**AC Verification**
+- AC 1 (unified scoring path): ✅ — `bars_up_to` helper extracted and used by both files
+- AC 2 (no behavior change): ✅ — 260/260 tests pass
+
+**Quality checks**
+- Follows existing patterns in `_loop.py` (typed, pure, consistent naming)
+- No edge cases missed
+- No performance concerns
+
+**Verdict:** Ready to merge.
+EOF
+
+gh pr review <PR_NUMBER> --comment --body-file /tmp/review.md
+```
+
+This creates a readable, structured audit trail on GitHub. Even self-found issues must be commented. The PR review tab should show all discovered problems.
 
 Example:
 ```bash
