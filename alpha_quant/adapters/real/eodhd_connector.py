@@ -4,6 +4,7 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, override
 
 from alpha_quant.adapters.real.base_connector import BaseConnector
+from alpha_quant.domain._normalize_helpers import _expect_type, _float, _latest_period
 from alpha_quant.domain.exceptions import DataNormalizationError
 from alpha_quant.domain.models import Bar, EarningsEntry, FundamentalsSnapshot
 from alpha_quant.domain.normalize import _parse_date
@@ -74,7 +75,7 @@ class EODHDConnector(BaseConnector, MarketData, Fundamentals):
             f"eod/{symbol}",
             {"from": start.isoformat(), "to": end.isoformat()},
         )
-        _expect_type(raw, list, "list of bars")
+        _expect_type(raw, list, "list of bars", source="eodhd")
         bars: list[Bar] = []
         for entry in raw:
             if not isinstance(entry, dict):
@@ -85,7 +86,7 @@ class EODHDConnector(BaseConnector, MarketData, Fundamentals):
     @override
     def snapshot(self, symbol: str) -> FundamentalsSnapshot:
         raw = self._get_json(f"fundamentals/{symbol}")
-        _expect_type(raw, dict, "dict for fundamentals")
+        _expect_type(raw, dict, "dict for fundamentals", source="eodhd")
 
         general = raw.get("General", {}) or {}
         highlights = raw.get("Highlights", {}) or {}
@@ -136,9 +137,9 @@ class EODHDConnector(BaseConnector, MarketData, Fundamentals):
             "calendar/earnings",
             {"from": start.isoformat(), "to": end.isoformat()},
         )
-        _expect_type(raw, dict, "dict for earnings calendar")
+        _expect_type(raw, dict, "dict for earnings calendar", source="eodhd")
         entries = raw.get("earnings", [])
-        _expect_type(entries, list, "'earnings' list")
+        _expect_type(entries, list, "'earnings' list", source="eodhd")
         results: list[EarningsEntry] = []
         for entry in entries:
             if not isinstance(entry, dict):
@@ -165,38 +166,10 @@ class EODHDConnector(BaseConnector, MarketData, Fundamentals):
 
     def bulk_last_day(self, exchange: str = "US") -> list[Bar]:
         raw = self._get_json(f"eod-bulk-last-day/{exchange}")
-        _expect_type(raw, list, "list for bulk_last_day")
+        _expect_type(raw, list, "list for bulk_last_day", source="eodhd")
         bars: list[Bar] = []
         for entry in raw:
             if not isinstance(entry, dict):
                 continue
             bars.append(self._parse_bar(entry, entry.get("code", "")))
         return bars
-
-
-def _float(value: Any) -> float | None:
-    if value is None:
-        return None
-    try:
-        return float(value)
-    except ValueError, TypeError:
-        return None
-
-
-def _expect_type(raw: Any, expected: type, description: str) -> None:
-    if not isinstance(raw, expected):
-        raise DataNormalizationError(
-            f"Expected {description}, got {type(raw).__name__}",
-            source="eodhd",
-            raw=str(raw)[:500],
-        )
-
-
-def _latest_period(*quarters: dict[str, Any]) -> tuple[dict[str, Any], ...] | None:
-    all_periods: set[str] = set()
-    for q in quarters:
-        all_periods.update(q.keys())
-    if not all_periods:
-        return None
-    latest = max(all_periods)
-    return tuple((q.get(latest, {}) or {}) for q in quarters)

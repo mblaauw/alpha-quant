@@ -1,23 +1,20 @@
 from __future__ import annotations
 
 import json
-import re
 from datetime import UTC, date, datetime
-from statistics import mean, stdev
-from typing import Any
 
 import structlog
-from selectolax.parser import HTMLParser
 
-from alpha_quant.domain.exceptions import DataNormalizationError
+from alpha_quant.domain._normalize_helpers import (
+    _float,
+    _latest_period,
+    _parse_date,
+)
 from alpha_quant.domain.models import (
     Bar,
     EarningsEntry,
     FundamentalsSnapshot,
-    InsiderTransaction,
-    MentionCount,
     Quote,
-    SentimentBaseline,
     TickerRecord,
 )
 
@@ -26,46 +23,6 @@ logger = structlog.get_logger()
 _BAR_DATE_FMT = "%Y-%m-%d"
 _EARNINGS_DATE_FMT = "%Y-%m-%d"
 _TIMESTAMP_FMTS = ("%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y")
-
-
-def _float(value: Any) -> float | None:
-    if value is None:
-        return None
-    try:
-        return float(value)
-    except ValueError, TypeError:
-        return None
-
-
-def _expect_type(raw: Any, expected: type, description: str) -> None:
-    if not isinstance(raw, expected):
-        raise DataNormalizationError(
-            f"Expected {description}, got {type(raw).__name__}",
-            source="normalize",
-            raw=str(raw)[:500],
-        )
-
-
-def _parse_date(value: str | None, *fmts: str) -> date | None:
-    if not value:
-        return None
-    formats = fmts or _TIMESTAMP_FMTS
-    for fmt in formats:
-        try:
-            return datetime.strptime(value.strip(), fmt).date()
-        except ValueError, TypeError:
-            continue
-    return None
-
-
-def _latest_period(*quarters: dict[str, Any]) -> tuple[dict[str, Any], ...] | None:
-    all_periods: set[str] = set()
-    for q in quarters:
-        all_periods.update(q.keys())
-    if not all_periods:
-        return None
-    latest = max(all_periods)
-    return tuple((q.get(latest, {}) or {}) for q in quarters)
 
 
 def normalize_eodhd_bars(raw: bytes | str, symbol: str) -> list[Bar] | None:
@@ -272,122 +229,3 @@ def normalize_sec_tickers(raw: bytes | str) -> dict[str, TickerRecord] | None:
             name=title,
         )
     return result if result else None
-
-
-def _cell_text(cells: list, index: int) -> str:
-    if index >= len(cells):
-        return ""
-    return cells[index].text(strip=True)
-
-
-def _parse_number(text: str | None) -> float | None:
-    if not text:
-        return None
-    cleaned = re.sub(r"[^\d.,-]", "", text)
-    cleaned = cleaned.replace(",", "")
-    try:
-        return float(cleaned)
-    except ValueError, TypeError:
-        return None
-
-
-def _parse_relationship(rel: str) -> str:
-    if not rel:
-        return ""
-    if "officer" in rel and "director" in rel:
-        return "officer,director"
-    if "officer" in rel:
-        return "officer"
-    if "director" in rel:
-        return "director"
-    return rel
-
-
-def _row_to_transaction(cells: list) -> InsiderTransaction | None:
-    ticker_el = cells[0].css_first("a")
-    if ticker_el is None:
-        return None
-    ticker = ticker_el.text(strip=True).upper()
-    if not ticker:
-        return None
-
-    owner = _cell_text(cells, 1)
-    title = _cell_text(cells, 2)
-
-    rel = _cell_text(cells, 3).lower()
-    rel = _parse_relationship(rel)
-
-    tx_type = _cell_text(cells, 4).strip().lower()
-    if tx_type and tx_type not in ("buy", "sell"):
-        return None
-
-    price_text = _cell_text(cells, 5)
-    price = _parse_number(price_text)
-
-    qty_text = _cell_text(cells, 6)
-    qty = _parse_number(qty_text)
-
-    date_text = _cell_text(cells, 8)
-    tx_date = _parse_date(date_text)
-
-    if not ticker or qty is None or tx_date is None:
-        return None
-
-    return InsiderTransaction(
-        symbol=ticker,
-        filing_date=tx_date,
-        transaction_date=tx_date,
-        owner=owner or "Unknown",
-        title=title,
-        transaction_type=("Buy" if tx_type == "buy" else "Sell"),
-        shares_traded=qty if tx_type == "buy" else -qty,
-        price=price,
-    )
-
-
-def normalize_openinsider_html(raw: bytes | str) -> list[InsiderTransaction] | None:
-    html = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else raw
-
-    parser = HTMLParser(html)
-    rows = parser.css("table.tinytable tbody tr")
-    if not rows:
-        rows = parser.css("table.tinytable tr")
-    if not rows:
-        logger.warning("normalize_openinsider_no_rows_found")
-        return None
-
-    transactions: list[InsiderTransaction] = []
-    for row in rows:
-        cells = row.css("td")
-        if len(cells) < 10:
-            continue
-        try:
-            tx = _row_to_transaction(cells)
-            if tx is not None:
-                transactions.append(tx)
-        except Exception as exc:
-            logger.debug("normalize_openinsider_skip_row", error=str(exc))
-            continue
-    return transactions if transactions else None
-
-
-def calculate_sentiment_baseline(counts: list[MentionCount], symbol: str) -> SentimentBaseline:
-    relevant = [c.count for c in counts if c.symbol.upper() == symbol.upper()]
-    if len(relevant) < 2:
-        return SentimentBaseline(
-            symbol=symbol.upper(),
-            mean_mentions=float(sum(relevant)) if relevant else 0.0,
-            std_mentions=0.0,
-            z_score=0.0,
-        )
-
-    avg = mean(relevant)
-    sd = stdev(relevant)
-    current = relevant[-1]
-    z = (current - avg) / sd if sd > 0 else 0.0
-    return SentimentBaseline(
-        symbol=symbol.upper(),
-        mean_mentions=avg,
-        std_mentions=sd,
-        z_score=round(z, 4),
-    )
