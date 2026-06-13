@@ -1,26 +1,24 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 
-from alpha_quant.domain.models import UniverseMember
-from alpha_quant.ports.fundamentals import Fundamentals
-from alpha_quant.ports.market_data import MarketData
+from alpha_quant.domain.models import Bar, FundamentalsSnapshot, UniverseMember
 
 
 def select(
     dt: date,
     all_symbols: list[str],
-    market_data: MarketData,
-    fundamentals: Fundamentals,
+    bars_by_symbol: dict[str, list[Bar]],
+    fundamentals_by_symbol: dict[str, FundamentalsSnapshot | None],
     *,
     sec_map: dict[str, object] | None = None,
     quarantined: set[str] | None = None,
     min_price: float = 5.0,
     min_adv: float = 5_000_000,
+    adv_days: int = 20,
 ) -> list[UniverseMember]:
     quarantined = quarantined or set()
     results: list[UniverseMember] = []
-    adv_days = 20
 
     for symbol in all_symbols:
         if symbol in quarantined:
@@ -35,18 +33,10 @@ def select(
             )
             continue
 
-        start = dt - timedelta(days=adv_days * 2)
-        try:
-            bars = market_data.daily_bars(symbol, start, dt)
-        except Exception:
-            results.append(
-                UniverseMember(symbol=symbol, passes_m1=False, fail_reason="Price data unavailable")
-            )
-            continue
-
+        bars = bars_by_symbol.get(symbol)
         if not bars:
             results.append(
-                UniverseMember(symbol=symbol, passes_m1=False, fail_reason="No recent bars")
+                UniverseMember(symbol=symbol, passes_m1=False, fail_reason="No bars data")
             )
             continue
 
@@ -87,13 +77,9 @@ def select(
             )
             continue
 
-        try:
-            snap = fundamentals.snapshot(symbol)
-            market_cap = snap.market_cap
-            sector = snap.sector
-        except Exception:
-            market_cap = None
-            sector = None
+        snap = fundamentals_by_symbol.get(symbol)
+        market_cap = snap.market_cap if snap else None
+        sector = snap.sector if snap else None
 
         results.append(
             UniverseMember(
