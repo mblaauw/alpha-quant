@@ -154,10 +154,23 @@ class PaperPortfolio:
                 )
                 continue
 
+            is_trail = action.action_type == "trail_stop"
             is_partial = action.action_type == "partial_take"
-            is_exit = action.action_type in ("stop", "trail_stop", "time_stop")
+            is_exit = action.action_type in ("stop", "time_stop")
 
-            if is_exit:
+            if is_trail:
+                new_stop = action.price
+                if new_stop is not None and new_stop > (position.stop_price or 0):
+                    self._store.save_position(
+                        position.model_copy(
+                            update={
+                                "stop_price": new_stop,
+                                "trail_price": new_stop,
+                            }
+                        )
+                    )
+
+            elif is_exit:
                 fill = fill_stop_loss(position, bar, order_id=f"{action.symbol}_stop", quote=quote)
                 if fill is None:
                     violations.append(

@@ -2,6 +2,8 @@
 
 from datetime import date
 
+import pytest
+
 from alpha_quant.domain.models import Bar, Position
 from alpha_quant.domain.risk import (
     RiskAction,
@@ -72,8 +74,11 @@ class TestEvaluateStops:
         pos = _position(avg_cost=100.0, stop_price=90.0)
         bar = _bar(open_v=115.0, high=125.0, low=105.0)
         result = evaluate_stops(pos, bar, atr=5.0, highest_since_entry=120.0)
-        assert len(result) == 1
-        assert result[0].action_type == "trail_stop"
+        assert any(a.action_type == "trail_stop" for a in result)
+        trail_actions = [a for a in result if a.action_type == "trail_stop"]
+        assert len(trail_actions) == 1
+        assert trail_actions[0].shares == 0.0
+        assert trail_actions[0].price == pytest.approx(115.0)
 
     def test_partial_take_triggers_when_no_stop(self) -> None:
         config = RiskConfig(partial_take_at_r=2.0)

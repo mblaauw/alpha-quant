@@ -32,6 +32,7 @@ class RiskAction:
     symbol: str
     shares: float  # 0 = full exit, >0 = partial reduce
     reason: str
+    price: float | None = None  # new stop price for trail_stop
 
 
 @dataclass
@@ -74,16 +75,16 @@ def evaluate_stops(
 
     if highest >= entry + r * cfg.trail_after_r:
         trail_price = max(highest - r, entry)
-        if bar.low <= trail_price:
+        if trail_price > (position.stop_price or 0):
             actions.append(
                 RiskAction(
                     action_type="trail_stop",
                     symbol=position.symbol,
-                    shares=position.quantity,
-                    reason=f"trail stop at {trail_price:.2f}",
+                    shares=0.0,
+                    reason=f"trail stop adjusted to {trail_price:.2f}",
+                    price=trail_price,
                 )
             )
-            return actions
 
     if highest >= entry + r * cfg.partial_take_at_r:
         partial_qty = position.quantity * 0.5
