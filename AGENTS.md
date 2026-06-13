@@ -210,13 +210,21 @@ This creates a readable, structured audit trail on GitHub. Even self-found issue
 
 Example:
 ```bash
-gh pr review 123 --comment --body \
-  "\`sizing.py:44\` — Formula missing \`* price\` factor, see CRIT-1 for details."
+cat > /tmp/review.md << 'EOF'
+**Issue found in review**
+
+| # | File | Issue |
+|---|------|-------|
+| 1 | `sizing.py:44` | Formula missing `* price` factor — see CRIT-1 |
+| 2 | `risk.py:76` | Trailing stop never trails |
+EOF
+
+gh pr review <PR_NUMBER> --comment --body-file /tmp/review.md
 ```
 
 #### 6c. Fix every issue
 
-For each issue:
+For each issue found in the review:
 - Fix the code locally
 - Re-run the 3 tool checks:
   ```bash
