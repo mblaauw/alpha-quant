@@ -148,7 +148,7 @@ class RedditSentimentConnector(BaseConnector, SentimentFeed):
                         results.append(
                             MentionCount(
                                 symbol=sym,
-                                date=today,
+                                mention_date=today,
                                 source=f"reddit/{sub}",
                                 count=count,
                             )

@@ -116,7 +116,7 @@ class MentionCount(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     symbol: str
-    date: date
+    mention_date: date
     source: str
     count: int
 
