@@ -43,6 +43,8 @@ def _configure_logging() -> None:
 
 
 def cmd_run(args: argparse.Namespace) -> None:
+    import hashlib
+    from datetime import date
     from pathlib import Path
 
     from alpha_quant.app.factory import (
@@ -53,7 +55,13 @@ def cmd_run(args: argparse.Namespace) -> None:
         create_sentiment_feed,
     )
     from alpha_quant.app.halt import is_halted
+    from alpha_quant.app.pipeline import PipelineConfig
+    from alpha_quant.app.pipeline import run as run_pipeline
+    from alpha_quant.app.store import CanonicalStore
     from alpha_quant.app.vault import Vault
+    from alpha_quant.domain.fills import FillConfig
+    from alpha_quant.domain.risk import RiskConfig as DomainRiskConfig
+    from alpha_quant.domain.sizing import SizingConfig
 
     config = load_config(args.config)
     config.data.mode = args.mode
@@ -82,6 +90,61 @@ def cmd_run(args: argparse.Namespace) -> None:
     )
     if args.verbose_config:
         print(json.dumps(redact_config(config), indent=2, default=str))
+
+    store = CanonicalStore(base_path=Path("data"))
+    cfg_redacted = redact_config(config)
+    config_hash = hashlib.sha256(json.dumps(cfg_redacted, sort_keys=True).encode()).hexdigest()[:16]
+    run_id = store.register_run("cli", config_hash, config.data.fixture_version)
+
+    universe = config.bootstrap.symbols + config.bootstrap.include_benchmarks
+    pipeline_cfg = PipelineConfig(run_id=run_id)
+
+    fill_config = FillConfig(slippage_bps=float(config.paper.slippage_bps))
+    risk_config = DomainRiskConfig(
+        stop_atr_mult=config.risk.stop_atr_mult,
+        trail_after_r=config.risk.trail_after_r,
+        partial_take_at_r=config.risk.partial_take_at_r,
+        time_stop_days=config.risk.time_stop_days,
+        dd_ladder=config.risk.dd_ladder,
+        daily_loss_halt_pct=config.risk.daily_loss_halt_pct,
+    )
+    sizing_config = SizingConfig(
+        risk_per_trade_pct=config.portfolio.risk_per_trade_pct,
+        max_position_pct=config.portfolio.max_position_pct,
+        max_gross_exposure=config.portfolio.max_gross_exposure,
+    )
+
+    prev = store.load_latest_portfolio_snapshot()
+    prev_equity = prev.equity if prev else None
+
+    run_date = date.today()
+
+    result = run_pipeline(
+        run_date=run_date,
+        store=store,
+        universe=universe,
+        config=pipeline_cfg,
+        fill_config=fill_config,
+        risk_config=risk_config,
+        sizing_config=sizing_config,
+        prev_equity=prev_equity,
+    )
+
+    status = "completed"
+    if result.halted:
+        status = "halted"
+    elif result.violations:
+        status = "violations"
+
+    store.complete_run(run_id, status=status)
+
+    print(
+        f"[alpha-quant] run: {status},"
+        f" decisions={len(result.decisions)},"
+        f" fills={len(result.fills)},"
+        f" events={len(result.events)},"
+        f" violations={len(result.violations)}"
+    )
 
 
 def _check_connection(source: str, ok: bool) -> None:
