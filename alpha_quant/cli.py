@@ -208,6 +208,20 @@ def cmd_halt(args: argparse.Namespace) -> None:
         print(json.dumps(redact_config(config), indent=2, default=str))
 
 
+def cmd_schedule(args: argparse.Namespace) -> None:
+    config = load_config(args.config)
+    config.data.mode = args.mode
+
+    from alpha_quant.app.scheduler import setup_scheduler
+
+    scheduler = setup_scheduler(config_path=args.config, mode=args.mode)
+    try:
+        scheduler.start()
+    except KeyboardInterrupt:
+        print("[alpha-quant] scheduler: stopped")
+        scheduler.shutdown(wait=False)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="alpha-quant",
@@ -323,6 +337,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Resume after halt",
     )
     p_halt.set_defaults(func=cmd_halt)
+
+    p_schedule = sub.add_parser("schedule", help="Start daily scheduler daemon")
+    p_schedule.add_argument(
+        "--mode",
+        choices=["live", "fixture"],
+        default="live",
+        help="Run mode (default: live)",
+    )
+    p_schedule.set_defaults(func=cmd_schedule)
 
     return parser
 

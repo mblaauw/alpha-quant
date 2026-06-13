@@ -16,6 +16,7 @@ dependencies = [
     "zstandard>=0.23",
     "selectolax>=0.3",
     "pandas>=2.2",
+    "apscheduler>=3.11",
 ]
 
 [project.scripts]
