@@ -201,3 +201,16 @@ class TestRunDailyPipeline:
         assert result["status"] == "violations"
         assert result["violations"] == 1
         assert fake_store.completed_status == "violations"
+
+    def test_records_failed_run_on_exception(self) -> None:
+        fake_store = _FakeStore(existing_runs=[])
+        with (
+            patch("alpha_quant.app.scheduler.is_market_day", return_value=True),
+            patch("alpha_quant.app.scheduler.is_halted", return_value=False),
+            patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
+            patch("alpha_quant.app.scheduler.CanonicalStore", return_value=fake_store),
+            patch("alpha_quant.app.scheduler.run_pipeline", side_effect=RuntimeError("boom")),
+        ):
+            result = run_daily_pipeline()
+        assert result["status"] == "failed"
+        assert fake_store.completed_status == "failed"

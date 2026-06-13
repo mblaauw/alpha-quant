@@ -85,21 +85,31 @@ def run_daily_pipeline(
         symbols=len(universe),
     )
 
-    result = run_pipeline(
-        run_date=run_date,
-        store=store,
-        universe=universe,
-        config=pipeline_cfg,
-        prev_equity=prev_equity,
-    )
+    try:
+        result = run_pipeline(
+            run_date=run_date,
+            store=store,
+            universe=universe,
+            config=pipeline_cfg,
+            prev_equity=prev_equity,
+        )
 
-    status = "completed"
-    if result.halted:
-        status = "halted"
-    elif result.violations:
-        status = "violations"
+        status = "completed"
+        if result.halted:
+            status = "halted"
+        elif result.violations:
+            status = "violations"
 
-    store.complete_run(run_id, status=status)
+    except Exception:
+        logger.exception("pipeline_failed", run_id=run_id)
+        status = "failed"
+        result = None
+
+    finally:
+        store.complete_run(run_id, status=status)
+
+    if result is None:
+        return {"status": status, "run_id": run_id}
 
     logger.info(
         "pipeline_complete",
