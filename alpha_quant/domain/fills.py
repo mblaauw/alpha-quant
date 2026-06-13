@@ -13,6 +13,7 @@ class FillConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     slippage_bps: float = 5.0
     max_gap_pct: float = 0.005
+    max_fill_pct: float = 1.0
     half_spread_default: float = 0.001
 
 
@@ -61,7 +62,9 @@ def fill_entry_order(
 
     slippage = _slippage_pct(quote=quote, config=cfg)
     fill_price = bar.open * (1.0 + slippage)
-    fill_qty = order.quantity
+    fill_qty = int(order.quantity * cfg.max_fill_pct)
+    if fill_qty <= 0:
+        return None
 
     fill_id = make_fill_id(order.order_id, bar.date)
 
