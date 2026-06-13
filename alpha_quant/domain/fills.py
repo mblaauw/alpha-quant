@@ -11,7 +11,7 @@ from alpha_quant.domain.models import Bar, CorporateAction, Fill, Order, Positio
 @dataclass
 class FillConfig:
     slippage_bps: float = 5.0
-    max_gap_pct: float = 0.002
+    max_gap_pct: float = 0.005
     half_spread_default: float = 0.001
 
 

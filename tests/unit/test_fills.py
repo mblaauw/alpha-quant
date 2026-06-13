@@ -3,6 +3,7 @@
 from datetime import date, datetime
 
 from alpha_quant.domain.fills import (
+    FillConfig,
     apply_corporate_action,
     fill_entry_order,
     fill_partial_take,
@@ -115,6 +116,25 @@ class TestFillEntryOrder:
         fill = fill_entry_order(order, bar, prev_close=99.9, quote=_quote(bid=98.0, ask=102.0))
         assert fill is not None
         assert fill.price > 100.0
+
+    def test_gap_at_threshold_passes(self) -> None:
+        order = _order()
+        bar = _bar(open_v=100.5)
+        fill = fill_entry_order(order, bar, prev_close=100.0)
+        assert fill is not None
+
+    def test_gap_above_threshold_fails(self) -> None:
+        order = _order()
+        bar = _bar(open_v=100.6)
+        fill = fill_entry_order(order, bar, prev_close=100.0)
+        assert fill is None
+
+    def test_gap_above_custom_threshold_fails(self) -> None:
+        order = _order()
+        bar = _bar(open_v=100.2)
+        cfg = FillConfig(max_gap_pct=0.001)
+        fill = fill_entry_order(order, bar, prev_close=100.0, config=cfg)
+        assert fill is None
 
 
 class TestFillStopLoss:
