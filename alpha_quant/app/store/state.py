@@ -1,7 +1,9 @@
-from __future__ import annotations
+"""DuckDB state store operations.
+
+Split from app/store.py — no behavior change.
+"""
 
 import json
-import shutil
 import uuid
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -10,9 +12,14 @@ from pathlib import Path
 from typing import Any, Self, cast, override
 
 import duckdb
-import pyarrow as pa
 import structlog
 
+from alpha_quant.app.store.canonical import (
+    load_corp_actions,
+    load_earnings,
+    read_bars,
+    write_dataset,
+)
 from alpha_quant.domain.events import DomainEvent
 from alpha_quant.domain.journal import JournalEntry
 from alpha_quant.domain.models import (
@@ -34,155 +41,6 @@ from alpha_quant.domain.reporting import ReportEntry, ReportType
 from alpha_quant.ports.store import Store
 
 logger = structlog.get_logger()
-
-_BAR_DATE_COL = "date"
-
-_CANONICAL_SCHEMAS: dict[str, list[tuple[str, pa.DataType]]] = {
-    "bars": [
-        ("symbol", pa.string()),
-        (_BAR_DATE_COL, pa.date32()),
-        ("open", pa.float64()),
-        ("high", pa.float64()),
-        ("low", pa.float64()),
-        ("close", pa.float64()),
-        ("volume", pa.float64()),
-        ("adj_close", pa.float64()),
-    ],
-    "fundamentals": [
-        ("symbol", pa.string()),
-        ("as_of_date", pa.date32()),
-        ("market_cap", pa.float64()),
-        ("pe_ratio", pa.float64()),
-        ("eps_ttm", pa.float64()),
-        ("dividend_yield", pa.float64()),
-        ("sector", pa.string()),
-        ("industry", pa.string()),
-        ("operating_cash_flow", pa.float64()),
-        ("total_liabilities", pa.float64()),
-        ("total_debt", pa.float64()),
-        ("total_equity", pa.float64()),
-        ("revenue", pa.float64()),
-        ("net_income", pa.float64()),
-        ("accruals", pa.float64()),
-    ],
-    "insider_transactions": [
-        ("symbol", pa.string()),
-        ("filing_date", pa.date32()),
-        ("transaction_date", pa.date32()),
-        ("owner", pa.string()),
-        ("title", pa.string()),
-        ("transaction_type", pa.string()),
-        ("shares_traded", pa.float64()),
-        ("price", pa.float64()),
-        ("shares_held", pa.float64()),
-    ],
-    "mentions": [
-        ("symbol", pa.string()),
-        ("mention_date", pa.date32()),
-        ("source", pa.string()),
-        ("count", pa.int64()),
-    ],
-    "corp_actions": [
-        ("symbol", pa.string()),
-        ("effective_date", pa.date32()),
-        ("action_type", pa.string()),
-        ("ratio", pa.float64()),
-        ("amount", pa.float64()),
-    ],
-    "earnings": [
-        ("symbol", pa.string()),
-        ("date", pa.date32()),
-        ("eps_estimate", pa.float64()),
-        ("eps_actual", pa.float64()),
-        ("revenue_estimate", pa.float64()),
-        ("revenue_actual", pa.float64()),
-    ],
-}
-
-
-def _model_to_pylist(
-    models: list[Any],
-    model_name: str,
-) -> list[dict[str, Any]]:
-    match model_name:
-        case "bars":
-            return [
-                {
-                    "symbol": m.symbol,
-                    _BAR_DATE_COL: m.date,
-                    "open": m.open,
-                    "high": m.high,
-                    "low": m.low,
-                    "close": m.close,
-                    "volume": m.volume,
-                    "adj_close": m.adj_close,
-                }
-                for m in models
-            ]
-        case "fundamentals":
-            return [m.model_dump() for m in models] if models else []
-        case "insider_transactions":
-            return [
-                {
-                    "symbol": m.symbol,
-                    "filing_date": m.filing_date,
-                    "transaction_date": m.transaction_date,
-                    "owner": m.owner,
-                    "title": m.title,
-                    "transaction_type": m.transaction_type,
-                    "shares_traded": m.shares_traded,
-                    "price": m.price,
-                    "shares_held": m.shares_held,
-                }
-                for m in models
-            ]
-        case "mentions":
-            return [
-                {
-                    "symbol": m.symbol,
-                    "mention_date": m.date,
-                    "source": m.source,
-                    "count": m.count,
-                }
-                for m in models
-            ]
-        case "corp_actions":
-            return [
-                {
-                    "symbol": m.symbol,
-                    "effective_date": m.effective_date,
-                    "action_type": m.action_type,
-                    "ratio": m.ratio,
-                    "amount": m.amount,
-                }
-                for m in models
-            ]
-        case "earnings":
-            return [
-                {
-                    "symbol": m.symbol,
-                    "date": m.date,
-                    "eps_estimate": m.eps_estimate,
-                    "eps_actual": m.eps_actual,
-                    "revenue_estimate": m.revenue_estimate,
-                    "revenue_actual": m.revenue_actual,
-                }
-                for m in models
-            ]
-        case _:
-            return [m.model_dump() for m in models]
-
-
-def _partition_col(model_name: str) -> str:
-    mapping = {
-        "bars": _BAR_DATE_COL,
-        "fundamentals": "as_of_date",
-        "insider_transactions": "filing_date",
-        "mentions": "mention_date",
-        "corp_actions": "effective_date",
-        "earnings": "date",
-    }
-    return mapping.get(model_name, "date")
 
 
 class CanonicalStore(Store):
@@ -213,105 +71,7 @@ class CanonicalStore(Store):
     # ---- Analytical store (Parquet via DuckDB) ----
 
     def _write_dataset(self, models: list[Any], dataset: str) -> None:
-        if not models:
-            return
-
-        data_path = self._canonical_path(dataset)
-        data_path.mkdir(parents=True, exist_ok=True)
-
-        pylist = _model_to_pylist(models, dataset)
-        new_table = pa.Table.from_pylist(pylist, schema=self._schema(dataset))
-
-        pcol = _partition_col(dataset)
-        dedup_key = _dedup_keys(dataset)
-        hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
-
-        # Find affected partition dates from new data
-        new_dates = sorted(set(new_table.column(pcol).to_pylist()))
-        if not new_dates:
-            return
-
-        min_date, max_date = min(new_dates), max(new_dates)
-
-        # Find existing partition directories that overlap with new data
-        affected_partitions: list[Path] = []
-        for p_dir in data_path.iterdir():
-            if not p_dir.is_dir() or not p_dir.name.startswith(f"{pcol}="):
-                continue
-            try:
-                dt = date.fromisoformat(p_dir.name.split("=", 1)[1])
-                if min_date <= dt <= max_date:
-                    affected_partitions.append(p_dir)
-            except (ValueError, IndexError):  # fmt: skip
-                continue
-
-        self._analytical.register("_new_data", new_table)
-
-        if not affected_partitions:
-            # First write or no overlap with existing: write directly
-            copy_opts = (
-                f"FORMAT PARQUET, PER_THREAD_OUTPUT 1, PARTITION_BY {pcol}, COMPRESSION ZSTD"
-            )
-            self._analytical.execute(f"""
-                COPY _new_data TO '{data_path}' ({copy_opts})
-            """)
-        else:
-            # Read only affected partitions, merge with new data, write back
-            file_patterns = [str(p / "*.parquet") for p in affected_partitions]
-            read_parquet = (
-                f"read_parquet([{', '.join(repr(f) for f in file_patterns)}],"
-                f" hive_partitioning=true, {hive_spec})"
-            )
-
-            self._analytical.execute(f"""
-                CREATE OR REPLACE TABLE _merged AS
-                SELECT DISTINCT ON ({dedup_key}) *
-                FROM (
-                    SELECT * FROM {read_parquet}
-                    UNION ALL
-                    SELECT * FROM _new_data
-                ) sub
-                ORDER BY {dedup_key} DESC
-            """)
-
-            # Write merged data to a temp location first
-            tmp_path = data_path.parent / f".tmp_{dataset}_{uuid.uuid4().hex[:8]}"
-            tmp_path.mkdir(parents=True, exist_ok=True)
-
-            copy_opts = (
-                f"FORMAT PARQUET, PER_THREAD_OUTPUT 1, PARTITION_BY {pcol}, COMPRESSION ZSTD"
-            )
-            self._analytical.execute(f"""
-                COPY (SELECT * FROM _merged ORDER BY {dedup_key})
-                TO '{tmp_path}' ({copy_opts})
-            """)
-
-            self._analytical.execute("DROP TABLE IF EXISTS _merged")
-
-            # Atomically replace each affected partition: remove old, rename temp to final
-            for p_dir in tmp_path.iterdir():
-                if not p_dir.is_dir():
-                    continue
-                dest = data_path / p_dir.name
-                if dest.exists():
-                    shutil.rmtree(dest, ignore_errors=True)
-                p_dir.rename(dest)
-
-            # Clean up temp directory
-            shutil.rmtree(tmp_path, ignore_errors=True)
-
-        self._analytical.unregister("_new_data")
-
-        logger.debug(
-            "store_write",
-            dataset=dataset,
-            count=len(models),
-            partitions=len(affected_partitions),
-        )
-
-    def _schema(self, dataset: str) -> pa.Schema:
-        fields = _CANONICAL_SCHEMAS[dataset]
-        return pa.schema([pa.field(name, typ, nullable=typ != pa.date32()) for name, typ in fields])
+        write_dataset(self._analytical, self._base, models, dataset)
 
     def _write_bars(self, bars: list[Bar]) -> None:
         self._write_dataset(bars, "bars")
@@ -326,34 +86,7 @@ class CanonicalStore(Store):
         self._write_dataset(mentions, "mentions")
 
     def _read_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
-        data_path = str(self._canonical_path("bars") / "**" / "*.parquet")
-        pcol = _partition_col("bars")
-        dedup_key = _dedup_keys("bars")
-        hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
-        result = self._analytical.execute(
-            f"""
-            SELECT DISTINCT ON ({dedup_key})
-                   symbol, "{pcol}" AS date, open, high, low, close, volume, adj_close
-            FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
-            WHERE symbol = ? AND "{pcol}" >= ? AND "{pcol}" <= ?
-            ORDER BY {dedup_key} DESC
-            """,
-            [symbol, start, end],
-        ).fetchall()
-
-        return [
-            Bar(
-                symbol=r[0],
-                date=r[1],
-                open=r[2],
-                high=r[3],
-                low=r[4],
-                close=r[5],
-                volume=r[6],
-                adj_close=r[7],
-            )
-            for r in result
-        ]
+        return read_bars(self._analytical, self._base, symbol, start, end)
 
     # --- Port interface (Store) ---
 
@@ -365,7 +98,7 @@ class CanonicalStore(Store):
     def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
         return self._read_bars(symbol, start, end)
 
-    # ---- State Store (SQLite via DuckDB) ----
+    # ---- State Store (DuckDB) ----
 
     def _init_state_schema(self) -> None:
         conn = self._state_conn
@@ -772,31 +505,7 @@ class CanonicalStore(Store):
 
     @override
     def load_corp_actions(self, symbol: str) -> list[CorporateAction]:
-        data_path = str(self._canonical_path("corp_actions") / "**" / "*.parquet")
-        pcol = _partition_col("corp_actions")
-        hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
-        try:
-            result = self._analytical.execute(
-                f"""
-                SELECT symbol, "{pcol}" AS effective_date, action_type, ratio, amount
-                FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
-                WHERE symbol = ?
-                ORDER BY "{pcol}"
-                """,
-                [symbol],
-            ).fetchall()
-        except (duckdb.CatalogException, duckdb.IOException):  # fmt: skip
-            return []
-        return [
-            CorporateAction(
-                symbol=r[0],
-                effective_date=r[1],
-                action_type=r[2],
-                ratio=r[3],
-                amount=r[4],
-            )
-            for r in result
-        ]
+        return load_corp_actions(self._analytical, self._base, symbol)
 
     @override
     def save_earnings(self, symbol: str, entries: list[EarningsEntry]) -> None:
@@ -804,33 +513,7 @@ class CanonicalStore(Store):
 
     @override
     def load_earnings(self, symbol: str) -> list[EarningsEntry]:
-        data_path = str(self._canonical_path("earnings") / "**" / "*.parquet")
-        pcol = _partition_col("earnings")
-        hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
-        try:
-            result = self._analytical.execute(
-                f"""
-                SELECT symbol, "{pcol}" AS date, eps_estimate, eps_actual,
-                       revenue_estimate, revenue_actual
-                FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
-                WHERE symbol = ?
-                ORDER BY "{pcol}"
-                """,
-                [symbol],
-            ).fetchall()
-        except (duckdb.CatalogException, duckdb.IOException):  # fmt: skip
-            return []
-        return [
-            EarningsEntry(
-                symbol=r[0],
-                date=r[1],
-                eps_estimate=r[2],
-                eps_actual=r[3],
-                revenue_estimate=r[4],
-                revenue_actual=r[5],
-            )
-            for r in result
-        ]
+        return load_earnings(self._analytical, self._base, symbol)
 
     @override
     def save_portfolio_snapshot(self, snapshot: PortfolioSnapshot) -> None:
@@ -981,18 +664,3 @@ class CanonicalStore(Store):
     def close(self) -> None:
         self._analytical.close()
         self._state_conn.close()
-
-
-def _dedup_keys(dataset: str) -> str:
-    mapping = {
-        "bars": "symbol, date",
-        "fundamentals": "symbol, as_of_date",
-        "insider_transactions": (
-            "symbol, filing_date, transaction_date, transaction_type,"
-            " owner, shares_traded, price, shares_held"
-        ),
-        "mentions": "symbol, mention_date, source",
-        "corp_actions": "symbol, effective_date, action_type",
-        "earnings": "symbol, date",
-    }
-    return mapping.get(dataset, "rowid")
