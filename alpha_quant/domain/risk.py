@@ -152,6 +152,7 @@ def evaluate_drawdown(
                 symbol="",
                 shares=0.0,
                 reason=f"drawdown {dd_pct * 100:.1f}% → multiplier {multiplier}",
+                price=multiplier,
             )
         )
 

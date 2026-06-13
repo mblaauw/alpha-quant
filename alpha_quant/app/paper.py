@@ -141,6 +141,57 @@ class PaperPortfolio:
         positions = {p.symbol: p for p in self._store.load_positions()}
 
         for action in actions:
+            is_global = action.symbol == "" and action.action_type in (
+                "drawdown_cut",
+                "daily_halt",
+            )
+
+            if is_global:
+                if action.action_type == "drawdown_cut":
+                    mult = action.price or 0.0
+                    for pos in positions.values():
+                        if pos.quantity <= 0:
+                            continue
+                        new_qty = int(pos.quantity * mult)
+                        if new_qty <= 0:
+                            realized_pl = 0.0
+                            if pos.avg_cost > 0 and pos.current_price is not None:
+                                realized_pl = round(
+                                    (pos.current_price - pos.avg_cost) * pos.quantity
+                                )
+                            self._store.save_position(
+                                pos.model_copy(
+                                    update={
+                                        "quantity": 0,
+                                        "market_value": 0.0,
+                                        "realized_pl": (pos.realized_pl or 0) + realized_pl,
+                                    }
+                                )
+                            )
+                        else:
+                            new_mv = round(new_qty * (pos.current_price or pos.avg_cost), 2)
+                            self._store.save_position(
+                                pos.model_copy(
+                                    update={
+                                        "quantity": float(new_qty),
+                                        "market_value": new_mv,
+                                    }
+                                )
+                            )
+                elif action.action_type == "daily_halt":
+                    for pos in positions.values():
+                        if pos.quantity <= 0:
+                            continue
+                        self._store.save_position(
+                            pos.model_copy(
+                                update={
+                                    "quantity": 0,
+                                    "market_value": 0.0,
+                                }
+                            )
+                        )
+                continue
+
             position = positions.get(action.symbol)
             if position is None:
                 violations.append(
