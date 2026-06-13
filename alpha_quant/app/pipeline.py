@@ -45,7 +45,6 @@ from alpha_quant.ports.store import Store
 logger = structlog.get_logger()
 
 _LOOKBACK_DAYS = 400
-_REGIME_CACHE: dict[str, str] = {}
 
 
 @dataclass
@@ -64,6 +63,7 @@ class RunResult:
     fills: list[Fill]
     events: list[object]
     violations: list[InvariantViolation]
+    current_regime: str | None = None
     halted: bool = False
     prev_equity: float | None = None
     new_equity: float | None = None
@@ -78,6 +78,7 @@ def run(
     risk_config: RiskConfig | None = None,
     sizing_config: SizingConfig | None = None,
     prev_equity: float | None = None,
+    prev_regime: str = "CAUTION",
     degradation: DegradationStatus | None = None,
 ) -> RunResult:
     cfg = config or PipelineConfig()
@@ -186,9 +187,7 @@ def run(
 
     # --- 4. Regime ---
     spy_state = indicator_states.get("SPY")
-    prev_regime = _REGIME_CACHE.get("current", "CAUTION")
     regime, regime_mult = detect_regime_and_multiplier(spy_state)
-    _REGIME_CACHE["current"] = regime
     if regime != prev_regime:
         events.append(
             RegimeChanged(
@@ -409,7 +408,8 @@ def run(
         fills=fills,
         events=events,
         violations=violations,
+        current_regime=regime,
+        halted=halted,
         prev_equity=prev_equity,
         new_equity=pop_equity_final,
-        halted=halted,
     )

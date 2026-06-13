@@ -128,6 +128,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         risk_config=risk_config,
         sizing_config=sizing_config,
         prev_equity=prev_equity,
+        prev_regime="CAUTION",
     )
 
     status = "completed"
