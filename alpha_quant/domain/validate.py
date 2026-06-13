@@ -36,7 +36,10 @@ def _nan_inf_issues(val: Any, name: str) -> list[str]:
     return issues
 
 
-def validate_bars(bars: list[Bar]) -> list[ValidationResult]:
+def validate_bars(
+    bars: list[Bar],
+    spike_atr_mult: float = 5.0,
+) -> list[ValidationResult]:
     results: list[ValidationResult] = []
 
     bad_prices: list[str] = []
@@ -82,8 +85,18 @@ def validate_bars(bars: list[Bar]) -> list[ValidationResult]:
             prev = bars[i - 1]
             if prev.close is not None and prev.close > 0 and bar.close is not None:
                 ret = abs(bar.close / prev.close - 1.0)
-                if ret > 0.4:
-                    return_spikes.append(f"{bar.date} return={ret * 100:.1f}%")
+                window = bars[max(0, i - 20) : i]
+                closes = [b.close for b in window if b.close is not None and b.close > 0]
+                if closes:
+                    returns = [abs(closes[j] / closes[j - 1] - 1.0) for j in range(1, len(closes))]
+                    avg_ret = sum(returns) / len(returns) if returns else 0.01
+                    threshold = min(max(avg_ret * spike_atr_mult, 0.05), 1.0)
+                else:
+                    threshold = 0.4
+                if ret > threshold:
+                    return_spikes.append(
+                        f"{bar.date} return={ret * 100:.1f}% (threshold={threshold * 100:.1f}%)"
+                    )  # noqa: E501
 
             gap = (bar.date - prev.date).days
             expected_next = next_market_day(prev.date)
