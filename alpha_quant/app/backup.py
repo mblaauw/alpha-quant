@@ -22,7 +22,7 @@ _RETENTION_MONTHLY = 12
 
 
 def _load_config_for_backup(config_path: str | None = None) -> Any:
-    from alpha_quant.app.config import load_config, AppConfig
+    from alpha_quant.app.config import load_config
 
     return load_config(config_path)
 
