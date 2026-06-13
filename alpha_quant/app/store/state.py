@@ -198,6 +198,8 @@ class CanonicalStore(Store):
             "  payload JSON NOT NULL"
             ")"
         )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type)")
         conn.execute(
             "CREATE TABLE IF NOT EXISTS concept_log ("
             "  log_id INTEGER PRIMARY KEY,"
