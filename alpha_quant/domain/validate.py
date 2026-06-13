@@ -41,6 +41,8 @@ def validate_bars(bars: list[Bar]) -> list[ValidationResult]:
 
     bad_prices: list[str] = []
     bad_volumes: list[str] = []
+    volume_spikes: list[str] = []
+    volume_drops: list[str] = []
     nan_issues: list[str] = []
     return_spikes: list[str] = []
     date_gaps: list[str] = []
@@ -61,6 +63,20 @@ def validate_bars(bars: list[Bar]) -> list[ValidationResult]:
 
         if bar.volume is not None and bar.volume <= 0:
             bad_volumes.append(str(bar.date))
+        elif bar.volume is not None and i > 0:
+            prev_vol = bars[i - 1].volume
+            if prev_vol is not None and prev_vol > 0 and bar.volume > prev_vol * 10:
+                volume_spikes.append(f"{bar.date} vol={bar.volume:.0f} x10 vs prev={prev_vol:.0f}")
+
+        if i >= 20:
+            window = bars[i - 19 : i + 1]
+            vols = [b.volume for b in window if b.volume is not None and b.volume > 0]
+            if len(vols) >= 5 and bar.volume is not None:
+                avg_vol = sum(vols) / len(vols)
+                if bar.volume < avg_vol * 0.1:
+                    volume_drops.append(
+                        f"{bar.date} vol={bar.volume:.0f} <10% of 20d avg={avg_vol:.0f}"
+                    )  # noqa: E501
 
         if i > 0:
             prev = bars[i - 1]
@@ -108,6 +124,24 @@ def validate_bars(bars: list[Bar]) -> list[ValidationResult]:
                 is_valid=False,
                 check="bar_zero_volume",
                 issues=bad_volumes[:_ISSUE_PREVIEW],
+                severity="WARN",
+            )
+        )
+    if volume_spikes:
+        results.append(
+            ValidationResult(
+                is_valid=False,
+                check="bar_volume_spike",
+                issues=volume_spikes[:_ISSUE_PREVIEW],
+                severity="WARN",
+            )
+        )
+    if volume_drops:
+        results.append(
+            ValidationResult(
+                is_valid=False,
+                check="bar_volume_drop",
+                issues=volume_drops[:_ISSUE_PREVIEW],
                 severity="WARN",
             )
         )
