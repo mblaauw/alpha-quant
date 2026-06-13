@@ -30,7 +30,7 @@ The system operates across three execution realities — **backtest** (historica
 | P4 | **LLM is Explainer Only** | Never in the decision path. Every number is injected; a post-render checker verifies figures match source data. |
 | P5 | **Degrade, Never Block** | Source failures degrade (not block) the pipeline. Only price staleness sets `DATA_HALT`. |
 | P6 | **Append-Only Immutability** | Raw vault is append-only, zstd-compressed. Nothing is ever deleted or rewritten. |
-| P7 | **Self-Consistency Over Reconciliation** | Nightly assertions over the SQLite book. A violation is a software bug — full halt. |
+| P7 | **Self-Consistency Over Reconciliation** | Nightly assertions over the DuckDB book. A violation is a software bug — full halt. |
 | P8 | **13 System Invariants (I1–I13)** | Assertion-enforced properties including determinism (I7), domain/adapter isolation (I2), LLM exclusion (I3), and post-fill self-consistency (I12). |
 
 ## 3. C4 Model
@@ -59,17 +59,17 @@ Alpha-Quant contains 13 containers and 2 internal data stores:
 - **Data Layer** — Four zones: connectors → vault → canonical store → derived state
 - **Domain Core** — Pure functions: M1–M8, position sizing, risk management
 - **Fill Model** — Pessimistic fill semantics shared by all execution realities
-- **Paper Portfolio** — Authoritative internal portfolio (transactional SQLite)
+- **Paper Portfolio** — Authoritative internal portfolio (transactional DuckDB)
 - **Shadow Books** — 3 ablation books + SPY baseline
 - **Narrator** — LLM-powered journal generation
 - **Dashboard** — Streamlit read-only monitoring
 - **Event Log** — Append-only typed event stream
-- **SQLite State Store** — Transactional state (WAL mode)
+- **DuckDB State Store** — Transactional state (ACID)
 - **Parquet Archive** — Analytical data (date-partitioned)
 
 ### 3.3 Component Diagrams (L3)
 
-**Data Layer** (7 components): Connectors (5 implementations sharing httpx + tenacity), Raw Vault (append-only zstd), Normalizer (pydantic parsers), Canonical Writer (PyArrow/SQLAlchemy), Derive Engine (numpy indicator recurrences), Validator (~15 predicate checks), Catalog (versioning/manifest).
+**Data Layer** (7 components): Connectors (5 implementations sharing httpx + tenacity), Raw Vault (append-only zstd), Normalizer (pydantic parsers), Canonical Writer (PyArrow), Derive Engine (numpy indicator recurrences), Validator (~15 predicate checks), Catalog (versioning/manifest).
 
 **Decision Engine** (10 components): M1 Universe, M2 Regime, M3 Technical, M4 Quality, M5 Insider, M6 Crowding, M7 Blackout, M8 Ranker, Position Sizer, Risk Evaluator. Gates are hard filters; scores feed the composite M8 rank.
 
@@ -77,22 +77,21 @@ Alpha-Quant contains 13 containers and 2 internal data stores:
 
 ### 3.4 Deployment Diagram (L4)
 
-Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamlit Dashboard) and 5 storage locations (Vault Directory, Canonical Directory, SQLite Database, Config File, Halt Lockfile). All processes share the local filesystem; the dashboard reads SQLite concurrently via WAL mode.
+Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamlit Dashboard) and 5 storage locations (Vault Directory, Canonical Directory, DuckDB State Database, Config File, Halt Lockfile). All processes share the local filesystem; the dashboard reads DuckDB concurrently.
 
 ## 4. Technology Stack
 
 | Concern | Choice | Rationale |
 |---------|--------|-----------|
-| Runtime | Python 3.12 LTS | Widest wheel support; supported until Oct 2028 |
+| Runtime | Python 3.14 | Latest stable; all core deps provide 3.14 wheels |
 | Package manager | uv | Rust-based, 10-100x faster resolution, deterministic lockfile |
 | HTTP client | httpx | Sync+async, HTTP/2, configurable timeouts |
 | Retry/backoff | tenacity | Declarative per-connector policies |
 | HTML parsing | selectolax | Fast, lenient; lxml fallback |
 | Validation | pydantic v2 | Parse-don't-validate at zone boundaries |
-| DataFrames | polars | Fast lazy scans over parquet |
 | Analytical SQL | DuckDB | Zero-ops parquet queries, embedded |
 | Columnar storage | PyArrow / Parquet (zstd) | Standard columnar format |
-| Transactional DB | SQLite WAL via SQLAlchemy Core | ACID, single-file, concurrent reads |
+| State store | DuckDB | Both analytical (Parquet) and transactional (DuckDB) |
 | Indicators | numpy recurrences (~100 lines) | O(1) per symbol per day |
 | Scheduling | APScheduler (cron fallback) | In-process, simple |
 | Configuration | pydantic-settings + TOML | Typed, env-overridable, SecretStr |
@@ -106,17 +105,17 @@ Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamli
 
 ## 5. Architecture Decision Records
 
-26 ADRs document every technology and architectural decision.
+27 ADRs document every technology and architectural decision.
 
 | ADR | Title | Key Decision |
 |-----|-------|-------------|
-| 0001 | Python 3.12 LTS as Runtime | Chose 3.12 over 3.13/3.14 for widest wheel support |
+| 0001 | Python 3.14 as Runtime | Chose 3.14 over 3.12 for actual dev environment wheel support |
 | 0002 | uv as Package Manager | Chose uv over pip/Poetry for 10-100x faster CI |
 | 0003 | Ports-and-Adapters Architecture | Chose hexagonal over layered/Clean for domain purity |
 | 0004 | argparse for CLI | Chose stdlib over Click/Typer for zero-dependency CLI |
 | 0005 | pydantic-settings + TOML | Chose over dynaconf/YAML for type-safe env overrides |
 | 0006 | DuckDB + Parquet for Analytics | Chose over PostgreSQL/pandas for zero-ops columnar queries |
-| 0007 | SQLite WAL + SQLAlchemy Core | Chose over PostgreSQL/DuckDB for ACID single-file state |
+| 0007 | SQLite WAL + SQLAlchemy Core | **Superseded** — replaced by ADR-0021 |
 | 0008 | Custom numpy Indicator Recurrences | Chose over TA-Lib/pandas-ta for O(1) incremental update |
 | 0009 | Custom Pessimistic Fill Model | Chose for honest upper-bound simulation (gap-through-stop fills at open) |
 | 0010 | Custom Event-Driven Backtester | Chose over vectorbt/Zipline for path-dependent portfolio |
@@ -128,6 +127,15 @@ Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamli
 | 0016 | Degrade-Don't-Block Data Failure | Source degradation with defined fallbacks |
 | 0017 | Golden Replay as CI Strategy | SHA256 decision log comparison for deterministic replay |
 | 0018 | Bootstrap + Fixture Bundle Workflow | One-time fetch freezes fixture bundle for offline dev/CI |
+| 0019 | Astral Development Tooling (ruff + ty) | Lint/format/type from one toolchain |
+| 0020 | DuckDB for Vault Manifest | DuckDB dual-use: vault manifest + analytical |
+| 0021 | DuckDB for Both State Types | Unify analytical and transactional on DuckDB |
+| 0022 | Paper Portfolio Engine | Authoritative portfolio state manager |
+| 0023 | Pipeline Orchestrator | Daily run sequencing |
+| 0024 | Self-Consistency Invariants | Portfolio integrity assertions |
+| 0025 | SQLite Cache for SEC Connector | Per-connector SEC ticker cache |
+| 0026 | Content-Addressed Vault | Append-only zstd blob storage |
+| 0027 | Dependency Pruning | Remove polars, SQLAlchemy, 50-day prune |
 
 See [docs/adr/README.md](../adr/README.md) for full ADR index.
 
@@ -192,19 +200,19 @@ At the next open: fill queued orders against T+1 bars.
 
 - Raw vault: `vault/{source}/{yyyy}/{mm}/{dd}/{fetch_id}.zst`
 - Canonical data: `canonical/bars/date=*/` (Parquet, date-partitioned)
-- Transactional state: `data/state.db` (SQLite WAL)
+- Transactional state: `data/state.db` (DuckDB)
 - 50-day raw bar tail with pruning
 
 ### 8.2 Operational Controls
 
 - **Halt**: `alpha-quant halt` creates a lockfile that blocks the scheduler
-- **Backup**: SQLite file copy + vault sync (hot with WAL mode)
+- **Backup**: DuckDB state store copy + vault sync
 - **Monitoring**: alerts on data staleness, source degradation, consistency violations
 - **Chaos testing**: kill mid-run, restart, verify idempotency; forced staleness → halt + alert
 
 ### 8.3 Migration Path (post-v1)
 
-- SQLite → PostgreSQL behind the `store` port
+- DuckDB state store → PostgreSQL behind the `store` port
 - Local Parquet → S3/MinIO behind DuckDB path config
 - Paper engine → live broker via `broker.py` port (defined but unimplemented)
 
@@ -213,6 +221,6 @@ At the next open: fill queued orders against T+1 bars.
 - [DESIGN.md](../../DESIGN.md) — Detailed system design specification (v1.2)
 - [Model DSL](model.c4) — LikeC4 model definitions (all elements, relationships, deployment)
 - [Views DSL](views.c4) — LikeC4 view definitions (6 diagram layouts)
-- [ADR Index](../adr/README.md) — 18 Architecture Decision Records
+- [ADR Index](../adr/README.md) — 27 Architecture Decision Records
 - [ROADMAP.md](../planning/ROADMAP.md) — 6-phase implementation timeline
 - [BACKLOG.md](../planning/BACKLOG.md) — Full backlog with epics and stories

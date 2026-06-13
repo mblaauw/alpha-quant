@@ -32,6 +32,7 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0024](./0024-use-self-consistency-invariants.md) | Use Self-Consistency Invariants for Portfolio Integrity | Accepted | 2026-06-12 |
 | [0025](./0025-use-sec-connector-sqlite-cache.md) | Use SQLite Cache for SEC Connector | Accepted | 2026-06-12 |
 | [0026](./0026-use-content-addressed-vault.md) | Use Content-Addressed Vault for Raw Data Storage | Accepted | 2026-06-12 |
+| [0027](./0027-use-dependency-pruning.md) | Dependency Pruning — polars, SQLAlchemy, APScheduler CLI, 50-Day Prune | Accepted | 2026-06-13 |
 
 ## Status Meanings
 

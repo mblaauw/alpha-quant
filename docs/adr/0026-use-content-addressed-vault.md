@@ -1,8 +1,12 @@
 # ADR-0026: Vault Design — Append-Only Raw Data Storage
 
-- **Status:** Accepted
-- **Date:** 2026-06-12
-- **Deciders:** mich
+## Status
+
+Accepted
+
+## Date
+
+2026-06-12
 
 ## Context
 
@@ -13,9 +17,25 @@ The system needs a durable, append-only archive of raw API responses (bars, fund
 
 The vault stores data in its raw wire format so that normalization and processing logic can evolve independently of the raw data.
 
-## Decision
+## Decision Drivers
 
-Store raw API responses as individual zstd-compressed JSON files in a date-partitioned directory tree, indexed by a DuckDB manifest with content hashes.
+- Append-only: raw data must never be modified after writing
+- Content-addressed: identical responses produce identical file names, enabling deduplication
+- Self-describing: the vault must be usable without external metadata (directory structure encodes source and date)
+- Fast replay: O(log n) lookup by source, date range, or symbol
+- Compression: JSON text must be compressed for storage efficiency
+
+## Considered Options
+
+- **Option A: Zstd-compressed JSON files in date-partitioned directory tree + DuckDB manifest** — Chosen.
+- **Option B: Parquet-only** — Raw data must be parsed before storage, losing the original wire format.
+- **Option C: Single SQLite file with blob columns** — Single file but no filesystem-level partitioning; requires SQL for all queries.
+- **Option D: Object storage (S3/GCS) with metadata DB** — Better scalability but over-engineered for single-machine deployment.
+- **Option E: No vault (store only normalized data)** — Cannot replay original API responses; normalization bugs cannot be retroactively fixed.
+
+## Decision Outcome
+
+Chosen option: **Option A — Zstd-compressed JSON files in a date-partitioned directory tree, indexed by a DuckDB manifest with content hashes.**
 
 ### Directory Structure
 
@@ -49,7 +69,7 @@ vault/
 
 ### Compression
 
-- zstd with default compression level
+- Zstd with default compression level (3)
 - Chosen over gzip for faster decompression (important during replay) and better compression ratios on JSON text
 - Python's `zstandard` library provides bindings
 
@@ -76,18 +96,19 @@ CREATE TABLE manifest (
 - `content_hash` = SHA256(file content)[:16] (matches filename)
 - `status` = 'ok' | 'stale' | 'corrupt'
 
-## Consequences
+### Positive Consequences
 
-### Positive
 - **Append-only immutability** — Raw data is never modified after writing. Normalization logic can evolve independently.
 - **Content-addressed deduplication** — Identical API responses from different days or connectors share one file.
 - **Fast replay** — DuckDB manifest enables O(log n) lookup of fetches by date range, source, or symbol.
 - **Independent of schema** — Raw JSON preserves all fields, even those not yet consumed by normalization.
 
-### Negative
+### Negative Consequences
+
 - **Storage growth** — Raw JSON + compression is larger than normalized parquet. Estimated ~3x storage for raw vs canonical.
 - **Two DuckDB databases** — The vault manifest is a separate DuckDB file from the state database. Managing two DuckDB instances adds minor operational complexity.
 - **No built-in retention** — Old data is never deleted. A separate purge/vacuum process would need to be designed for storage management in long-running deployments.
+- **8-char content hash vulnerable to birthday bound** — At ~65k files, collision probability is ~50%. A future enhancement should increase this to 16 hex chars.
 
 ## References
 
