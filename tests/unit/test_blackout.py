@@ -100,15 +100,11 @@ class TestCheck:
     def test_skips_holiday_christmas(self) -> None:
         earnings_date = date(2025, 12, 26)
         monday_before = date(2025, 12, 22)
-        result = check(
-            "AAPL", monday_before, [_earnings("AAPL", earnings_date)]
-        )
+        result = check("AAPL", monday_before, [_earnings("AAPL", earnings_date)])
         assert result == "BLOCK"
 
     def test_does_not_overcount_holiday_week(self) -> None:
         earnings_date = date(2025, 12, 26)
         sunday_before = date(2025, 12, 21)
-        result = check(
-            "AAPL", sunday_before, [_earnings("AAPL", earnings_date)]
-        )
+        result = check("AAPL", sunday_before, [_earnings("AAPL", earnings_date)])
         assert result == "PASS"
