@@ -17,7 +17,6 @@ from alpha_quant.domain.models import (
     Quote,
 )
 from alpha_quant.domain.risk import RiskAction
-from alpha_quant.ports.store import Store
 
 AblationMechanism = Literal["RULES_ONLY", "NO_INSIDER", "NO_CROWDING_VETO"]
 ABLATION_MECHANISMS: list[AblationMechanism] = [
@@ -91,22 +90,16 @@ class ShadowBook:
 
     def __init__(
         self,
-        store: Store,
         book_name: str,
         config: AblationConfig,
+        *,
+        initial_cash: float = 0.0,
     ) -> None:
-        self._store = store
         self._book_name = book_name
         self._config = config
-        self._cash: float = 0.0
+        self._cash: float = initial_cash
         self._positions: dict[str, Position] = {}
         self._daily_returns: list[float] = []
-        self._recover()
-
-    def _recover(self) -> None:
-        snap = self._store.load_latest_portfolio_snapshot(self._book_name)
-        if snap is not None:
-            self._cash = snap.cash
 
     @property
     def cash(self) -> float:
@@ -120,12 +113,11 @@ class ShadowBook:
     def daily_returns(self) -> list[float]:
         return list(self._daily_returns)
 
-    def initialize(self, equity: float, start_date: date) -> None:
+    def initialize(self, equity: float, start_date: date) -> PortfolioSnapshot:
         self._cash = equity
         self._positions.clear()
         self._daily_returns.clear()
-        snap = PortfolioSnapshot(date=start_date, cash=equity, equity=equity, book=self._book_name)
-        self._store.save_portfolio_snapshot(snap)
+        return PortfolioSnapshot(date=start_date, cash=equity, equity=equity, book=self._book_name)
 
     def process_entry_orders(
         self,
@@ -285,7 +277,6 @@ class ShadowBook:
         snap = PortfolioSnapshot(
             date=run_date, cash=self._cash, equity=equity, book=self._book_name
         )
-        self._store.save_portfolio_snapshot(snap)
 
         if prev_equity is not None and prev_equity > 0:
             daily_ret = (equity - prev_equity) / prev_equity
