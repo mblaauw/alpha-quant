@@ -76,6 +76,11 @@ class TestDetect:
         result = detect(state, vix_level=None, breadth=0.6)
         assert result == "RISK_ON"
 
+    def test_extreme_breadth_triggers_caution(self) -> None:
+        state = _state(close=210, ema50=200, ema200=190)
+        result = detect(state, vix_level=15.0, breadth=0.15)
+        assert result == "CAUTION"
+
     def test_none_breadth_with_good_indicators(self) -> None:
         state = _state(close=210, ema50=200, ema200=190)
         result = detect(state, vix_level=15.0, breadth=None)
