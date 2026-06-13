@@ -35,7 +35,6 @@ dependencies = [
     { name = "duckdb" },
     { name = "httpx" },
     { name = "numpy" },
-    { name = "pandas" },
     { name = "pyarrow" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -48,6 +47,7 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "hypothesis" },
+    { name = "pandas" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
@@ -63,7 +63,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.0" },
     { name = "numpy", specifier = ">=2.2" },
-    { name = "pandas", specifier = ">=2.2" },
+    { name = "pandas", marker = "extra == 'dev'", specifier = ">=2.2" },
     { name = "pyarrow", specifier = ">=19.0" },
     { name = "pydantic", specifier = ">=2.10" },
     { name = "pydantic-settings", specifier = ">=2.7" },
