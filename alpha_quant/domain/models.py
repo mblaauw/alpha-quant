@@ -197,6 +197,9 @@ class Position(BaseModel):
     realized_pl: float | None = None
     sector: str | None = None
     decision_id: str | None = None
+    entry_date: date | None = None
+    high_since_entry: float | None = None
+    partial_taken: bool = False
 
 
 class Decision(BaseModel):
