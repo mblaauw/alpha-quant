@@ -4,6 +4,7 @@ from datetime import date
 from unittest.mock import patch
 
 from alpha_quant.app.pipeline import RunResult, run
+from alpha_quant.domain.invariants import InvariantViolation
 from alpha_quant.domain.models import Bar, PortfolioSnapshot, Position
 from alpha_quant.domain.risk import RiskConfig
 
@@ -61,7 +62,11 @@ class _FakeStore:
         return max(matching, key=lambda s: s.date) if matching else None
 
     def save_position(self, position: Position) -> None:
-        pass
+        for i, p in enumerate(self._positions):
+            if p.symbol == position.symbol:
+                self._positions[i] = position
+                return
+        self._positions.append(position)
 
     def save_fill(self, fill: object) -> None:
         pass
@@ -225,10 +230,14 @@ class TestPipelineCore:
             patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
             patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
             patch("alpha_quant.app.pipeline.ensure_spy") as mock_ensure,
+            patch("alpha_quant.app.pipeline.check_invariants") as mock_ci,
         ):
             mock_backfill.return_value = _FakeIndicatorState()
             mock_regime.return_value = ("RISK_ON", 1.0)
             mock_ensure.return_value = ["AAPL", "SPY"]
+            mock_ci.return_value = [
+                InvariantViolation(check="I1_test", detail="test")
+            ]
             result = run(
                 run_date=date(2026, 6, 11),
                 store=store,
@@ -307,6 +316,89 @@ class TestPipelineCore:
         assert isinstance(result, RunResult)
         halt_events = [e for e in result.events if hasattr(e, "action_type") and e.action_type == "daily_halt"]
         assert len(halt_events) > 0, "daily_halt should emit when equity drops from 100K to 50K"
+
+    def test_mark_to_market_updates_positions(self) -> None:
+        spy_bars = _make_bars(400, 100.0)
+        aapl_bars = _make_bars(400, 150.0)
+        snapshots = [
+            PortfolioSnapshot(date=date(2026, 6, 10), cash=100_000.0, equity=100_000.0),
+        ]
+        store = _FakeStore(bars={"SPY": spy_bars, "AAPL": aapl_bars}, snapshots=snapshots)
+        store._positions = [
+            Position(
+                symbol="AAPL",
+                quantity=100.0,
+                entry_price=150.0,
+                avg_cost=150.0,
+                current_price=150.0,
+                stop_price=130.0,
+                market_value=15_000.0,
+            )
+        ]
+        with (
+            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
+        ):
+            mock_backfill.return_value = _FakeIndicatorState()
+            mock_regime.return_value = ("RISK_ON", 1.0)
+            result = run(
+                run_date=date(2026, 6, 11),
+                store=store,
+                universe=["SPY", "AAPL"],
+                risk_config=RiskConfig(stop_atr_mult=10.0),
+                prev_equity=100_000.0,
+            )
+        assert isinstance(result, RunResult)
+        updated_positions = store._positions
+        aapl_pos = next((p for p in updated_positions if p.symbol == "AAPL"), None)
+        assert aapl_pos is not None
+        # AAPL bars end at ~150 + 200 = ~350, so price should be ~200
+        assert aapl_pos.current_price is not None and aapl_pos.current_price > 150.0, (
+            f"current_price should be updated from bars, got {aapl_pos.current_price}"
+        )
+
+    def test_invariant_check_formats_consistency_violation(self) -> None:
+        """Pipeline formats each invariant violation as a ConsistencyViolation event."""
+        spy_bars = _make_bars(400, 100.0)
+        aapl_bars = _make_bars(400, 150.0)
+        snapshots = [
+            PortfolioSnapshot(date=date(2026, 6, 10), cash=100_000.0, equity=100_000.0),
+        ]
+        store = _FakeStore(bars={"SPY": spy_bars, "AAPL": aapl_bars}, snapshots=snapshots)
+        store._positions = [
+            Position(
+                symbol="AAPL",
+                quantity=100.0,
+                entry_price=150.0,
+                avg_cost=150.0,
+                current_price=150.0,
+                stop_price=130.0,
+                market_value=15_000.0,
+            )
+        ]
+        with (
+            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("alpha_quant.app.pipeline.check_invariants") as mock_ci,
+        ):
+            mock_backfill.return_value = _FakeIndicatorState()
+            mock_regime.return_value = ("RISK_ON", 1.0)
+            mock_ci.return_value = [
+                InvariantViolation(check="I1_test", detail="test")
+            ]
+            result = run(
+                run_date=date(2026, 6, 11),
+                store=store,
+                universe=["SPY", "AAPL"],
+                risk_config=RiskConfig(),
+                prev_equity=100_000.0,
+            )
+        assert isinstance(result, RunResult)
+        assert any(
+            getattr(e, "check", None) == "I1_test"
+            for e in result.events
+        ), "check_invariants violations should produce ConsistencyViolation events"
+        mock_ci.assert_called_once()
 
 
 class _FakeIndicatorState:

@@ -38,7 +38,7 @@ from alpha_quant.domain.events import (
     StopAdjusted,
 )
 from alpha_quant.domain.fills import FillConfig, fill_stop_loss
-from alpha_quant.domain.invariants import InvariantViolation
+from alpha_quant.domain.invariants import InvariantViolation, check_invariants
 from alpha_quant.domain.models import (
     Bar,
     Candidate,
@@ -529,6 +529,8 @@ def run(
             regime=regime,
         )
         store.save_portfolio_snapshot(main_snap)
+    else:
+        today_equity = (prev_equity or 100_000.0) + cash_adjust - entry_cost
 
     # --- 7. Shadow books ---
     if shadow_books is not None:
@@ -620,25 +622,43 @@ def run(
 
             fills.extend(sh_results_fills)
 
-    # --- Self-consistency ---
+    # --- Mark to market ---
     all_positions = store.load_positions()
     for pos in all_positions:
-        if pos.market_value is not None and pos.market_value < 0:
-            inv = InvariantViolation(
-                check="I11_negative_market_value",
-                detail=f"{pos.symbol}: market_value={pos.market_value}",
-            )
-            violations.append(inv)
-            events.append(
-                ConsistencyViolation(
-                    run_id=run_id,
-                    source="pipeline",
-                    check=inv.check,
-                    detail=inv.detail,
+        price = prices.get(pos.symbol)
+        if price is not None and pos.quantity > 0:
+            mark = round(pos.quantity * price, 2)
+            unrel_pl = round((price - pos.avg_cost) * pos.quantity, 2)
+            store.save_position(
+                pos.model_copy(
+                    update={
+                        "current_price": price,
+                        "market_value": mark,
+                        "unrealized_pl": unrel_pl,
+                    }
                 )
             )
 
-    pop_equity_final = (prev_equity or 100_000.0) + cash_adjust
+    # --- Self-consistency ---
+    prev_snap_sc = store.load_latest_portfolio_snapshot()
+    base = prev_snap_sc.cash if prev_snap_sc else (prev_equity or 0.0)
+    cash = base + cash_adjust - entry_cost
+    all_positions = store.load_positions()
+    total_mark = sum(p.market_value or 0 for p in all_positions)
+    current_equity = round(cash + total_mark, 2)
+    inv = check_invariants(equity=current_equity, cash=cash, positions=all_positions)
+    violations.extend(inv)
+    for v in inv:
+        events.append(
+            ConsistencyViolation(
+                run_id=run_id,
+                source="pipeline",
+                check=v.check,
+                detail=v.detail,
+            )
+        )
+
+    pop_equity_final = current_equity
     has_violations = len(violations) > 0
     duration = (datetime.now(UTC) - now).total_seconds()
     events.append(
