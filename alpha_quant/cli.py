@@ -1,4 +1,5 @@
 import argparse
+import contextlib
 import json
 import os
 import sys
@@ -317,9 +318,13 @@ def cmd_ingest(args: argparse.Namespace) -> None:
         results[symbol] = sym_results
         print(f"  {symbol}: {', '.join(sym_results)}")
 
-    total_bars = sum(
-        int(r.split("=")[1]) for rr in results.values() for r in rr if r.startswith("bars=")
-    )
+    total_bars = 0
+    for rr in results.values():
+        for r in rr:
+            if r.startswith("bars="):
+                value = r.split("=", 1)[1]
+                with contextlib.suppress(ValueError):
+                    total_bars += int(value)
     ok = sum(1 for rr in results.values() for r in rr if "FAIL" not in r)
     fail = sum(1 for rr in results.values() for r in rr if "FAIL" in r)
     print(
