@@ -98,14 +98,17 @@ def evaluate_risk_actions(
     bar: Bar,
     state: IndicatorState | None,
     risk_config: RiskConfig,
-    entry_date: date,
     current_date: date,
 ) -> list[RiskAction]:
     atr = state.values.get("atr", 0.0) if state else 0.0
     if np.isnan(atr):
         atr = 0.0
-    highest = max(position.entry_price or 0.0, bar.high)
-    actions = evaluate_stops(position, bar, atr, highest, risk_config)
+    entry_date = position.entry_date if position.entry_date is not None else current_date
+    highest_ever = max(
+        position.high_since_entry or position.entry_price or 0.0,
+        bar.high,
+    )
+    actions = evaluate_stops(position, bar, atr, highest_ever, risk_config)
     actions.extend(evaluate_time_stop(position, entry_date, current_date, risk_config))
     return actions
 

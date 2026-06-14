@@ -230,7 +230,6 @@ def run_backtest(
                 bar,
                 state,
                 rc,
-                entry_dates.get(sym, trade_date),
                 trade_date,
             )
 
@@ -323,9 +322,10 @@ def run_backtest(
                     stop_price=stop_price,
                     market_value=cost,
                     decision_id=uuid.uuid4().hex[:16],
+                    entry_date=trade_date,
+                    high_since_entry=bar.high,
                 )
                 positions[cand.symbol] = pos
-                entry_dates[cand.symbol] = trade_date
 
         # --- Mark to market ---
         total_mark = 0.0
