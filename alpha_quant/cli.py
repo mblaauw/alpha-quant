@@ -245,6 +245,90 @@ def cmd_bootstrap(args: argparse.Namespace) -> None:
         print(json.dumps(redact_config(config), indent=2, default=str))
 
 
+def cmd_ingest(args: argparse.Namespace) -> None:
+    """Fetch and normalize live data into the canonical store."""
+    from datetime import date, timedelta
+    from pathlib import Path
+
+    from alpha_quant.app.factory import (
+        create_fundamentals,
+        create_insider_feed,
+        create_market_data,
+        create_sentiment_feed,
+    )
+    from alpha_quant.app.store import CanonicalStore
+    from alpha_quant.app.vault import Vault
+
+    config = load_config(args.config)
+    config.data.mode = "live"
+
+    vault = Vault(base_path=Path("vault"))
+    market_data = create_market_data(config, vault)
+    fundamentals = create_fundamentals(config, vault)
+    insider = create_insider_feed(config, vault)
+    sentiment = create_sentiment_feed(config, vault)
+
+    store = CanonicalStore(base_path=Path("data"))
+    universe = config.bootstrap.symbols + config.bootstrap.include_benchmarks
+
+    today = date.today()
+    lookback = today - timedelta(days=args.days or 400)
+    results: dict[str, list[str]] = {}
+
+    for symbol in universe:
+        sym_results: list[str] = []
+
+        # Market data
+        try:
+            bars = market_data.daily_bars(symbol, lookback, today)
+            if bars:
+                store.save_bars(symbol, bars)
+                sym_results.append(f"bars={len(bars)}")
+        except Exception as e:
+            sym_results.append(f"bars=FAIL({e})")
+
+        # Fundamentals
+        try:
+            snap = fundamentals.snapshot(symbol)
+            if snap is not None:
+                store.save_fundamentals(symbol, [snap])
+                sym_results.append("fundamentals=OK")
+        except Exception as e:
+            sym_results.append(f"fundamentals=FAIL({e})")
+
+        # Insider transactions
+        try:
+            txns = insider.cluster_transactions(symbol)
+            if txns:
+                store.save_insider_transactions(symbol, txns)
+                sym_results.append(f"insider={len(txns)}")
+        except Exception as e:
+            sym_results.append(f"insider=FAIL({e})")
+
+        # Sentiment
+        try:
+            mentions = sentiment.mention_counts(symbol)
+            if mentions:
+                store.save_mentions(symbol, mentions)
+                sym_results.append(f"mentions={len(mentions)}")
+        except Exception as e:
+            sym_results.append(f"mentions=FAIL({e})")
+
+        results[symbol] = sym_results
+        print(f"  {symbol}: {', '.join(sym_results)}")
+
+    total_bars = sum(
+        int(r.split("=")[1]) for rr in results.values() for r in rr if r.startswith("bars=")
+    )
+    ok = sum(1 for rr in results.values() for r in rr if "FAIL" not in r)
+    fail = sum(1 for rr in results.values() for r in rr if "FAIL" in r)
+    print(
+        f"[alpha-quant] ingest: {len(universe)} symbols,"
+        f" {total_bars} bars total,"
+        f" {ok} ok, {fail} failed"
+    )
+
+
 def cmd_journal(args: argparse.Namespace) -> None:
     from pathlib import Path
 
@@ -516,6 +600,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Vault directory path (default: ./vault)",
     )
     p_bootstrap.set_defaults(func=cmd_bootstrap)
+
+    p_ingest = sub.add_parser("ingest", help="Fetch and normalize live data into canonical store")
+    p_ingest.add_argument(
+        "--days",
+        type=int,
+        default=400,
+        help="Lookback days (default: 400)",
+    )
+    p_ingest.set_defaults(func=cmd_ingest)
 
     p_journal = sub.add_parser("journal", help="Display recent journal entries")
     p_journal.add_argument(

@@ -144,6 +144,18 @@ class FixtureStore(Store):
         return []
 
     @override
+    def save_fundamentals(self, symbol: str, snapshots: list[FundamentalsSnapshot]) -> None:
+        pass
+
+    @override
+    def save_insider_transactions(self, symbol: str, txns: list[InsiderTransaction]) -> None:
+        pass
+
+    @override
+    def save_mentions(self, symbol: str, mentions: list[MentionCount]) -> None:
+        pass
+
+    @override
     def save_portfolio_snapshot(self, snapshot: PortfolioSnapshot) -> None:
         self._portfolio_snapshots.append(snapshot)
 

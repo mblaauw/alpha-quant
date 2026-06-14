@@ -566,6 +566,18 @@ class CanonicalStore(Store):
         return read_mentions(self._analytical, self._base, symbol)
 
     @override
+    def save_fundamentals(self, symbol: str, snapshots: list[FundamentalsSnapshot]) -> None:
+        self._write_fundamentals(snapshots)
+
+    @override
+    def save_insider_transactions(self, symbol: str, txns: list[InsiderTransaction]) -> None:
+        self._write_insider_transactions(txns)
+
+    @override
+    def save_mentions(self, symbol: str, mentions: list[MentionCount]) -> None:
+        self._write_mentions(mentions)
+
+    @override
     def save_portfolio_snapshot(self, snapshot: PortfolioSnapshot) -> None:
         book = snapshot.book or "PAPER"
         reg = snapshot.regime or "CAUTION"

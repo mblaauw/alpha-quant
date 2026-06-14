@@ -52,6 +52,15 @@ class BarStore(ABC):
     @abstractmethod
     def load_mentions(self, symbol: str) -> list[MentionCount]: ...
 
+    @abstractmethod
+    def save_fundamentals(self, symbol: str, snapshots: list[FundamentalsSnapshot]) -> None: ...
+
+    @abstractmethod
+    def save_insider_transactions(self, symbol: str, txns: list[InsiderTransaction]) -> None: ...
+
+    @abstractmethod
+    def save_mentions(self, symbol: str, mentions: list[MentionCount]) -> None: ...
+
 
 class DecisionStore(ABC):
     """Decision read/write interface."""
