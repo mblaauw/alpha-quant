@@ -147,7 +147,8 @@ graph TB
 |---------|--------|-------------|
 | `alpha-quant bootstrap` | ✅ Ready | Generate deterministic fixture data for development |
 | `alpha-quant replay` | 🔧 Partial | Golden replay — metadata only; DAG wiring tracked in BETA-DA-2 |
-| `alpha-quant run` | ✅ Ready | Daily pipeline (indicator derive, decide, size, fill, persist, narrate) |
+| `alpha-quant ingest` | ✅ Ready | Fetch live data from APIs into canonical store (store-only source) |
+| `alpha-quant run` | ✅ Ready | Daily pipeline — reads canonical store (store-only; ingest separately) |
 | `alpha-quant backtest` | ✅ Ready | Event-driven backtester (single fill model) |
 | `alpha-quant journal` | ✅ Ready | Daily journal with LLM narration |
 | `alpha-quant ask` | ✅ Ready | Query recorded decisions and events |
@@ -173,7 +174,7 @@ make check          # Ruff lint
 make format         # Ruff format
 make type           # Type check (ty)
 make bootstrap      # Generate fixtures
-uv run pytest       # Run tests (397 passing)
+uv run pytest       # Run tests (419 passing)
 make bless-golden   # Update golden replay fixture hash
 ```
 
