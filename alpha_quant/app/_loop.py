@@ -5,6 +5,7 @@ from datetime import date, timedelta
 
 import numpy as np
 
+from alpha_quant.domain.ablation import AblationConfig
 from alpha_quant.domain.blackout import check as check_blackout
 from alpha_quant.domain.crowding import evaluate as evaluate_crowding
 from alpha_quant.domain.fundamental import evaluate as evaluate_fundamental
@@ -193,11 +194,14 @@ def evaluate_candidate_mechanisms(
     symbol: str,
     run_date: date,
     data: MechanismData,
+    ablation: AblationConfig | None = None,
 ) -> tuple[dict[str, float], dict[str, bool], str | None]:
     """Apply M4/M5/M6/M7 mechanisms.
 
     Returns (additional_scores, gate_results, block_reason).
+    AblationConfig can disable M5 (insider) and M6 (crowding) gates.
     """
+    ab = ablation or AblationConfig()
     additional_scores: dict[str, float] = {}
     gate_results: dict[str, bool] = {
         "fundamental": True,
@@ -227,30 +231,32 @@ def evaluate_candidate_mechanisms(
             block_reason = "earnings_blackout"
             return additional_scores, gate_results, block_reason
 
-    # M5: Insider signal
-    txns = data.insider_txns.get(symbol, [])
-    if txns:
-        fund_snap = data.fundamentals.get(symbol)
-        market_cap = fund_snap.market_cap if fund_snap else None
-        insider_v = evaluate_insider(symbol, txns, run_date, market_cap=market_cap)
-        additional_scores["insider"] = insider_v.score
-        if insider_v.score < 0:
-            gate_results["insider"] = False
-            block_reason = insider_v.reason or "negative_insider_signal"
-            return additional_scores, gate_results, block_reason
+    # M5: Insider signal (skipped when disabled)
+    if not ab.disable_insider:
+        txns = data.insider_txns.get(symbol, [])
+        if txns:
+            fund_snap = data.fundamentals.get(symbol)
+            market_cap = fund_snap.market_cap if fund_snap else None
+            insider_v = evaluate_insider(symbol, txns, run_date, market_cap=market_cap)
+            additional_scores["insider"] = insider_v.score
+            if insider_v.score < 0:
+                gate_results["insider"] = False
+                block_reason = insider_v.reason or "negative_insider_signal"
+                return additional_scores, gate_results, block_reason
 
-    # M6: Crowding veto
-    mentions = data.mentions.get(symbol, [])
-    if mentions:
-        blocked_until = data.blocked_until.get(symbol)
-        z = _compute_z_score(symbol, mentions, run_date)
-        verdict = evaluate_crowding(z, blocked_until, run_date)
-        if verdict.blocked:
-            gate_results["crowding"] = False
-            block_reason = verdict.reason or "crowding_veto"
-            return additional_scores, gate_results, block_reason
-        if verdict.blocked_until is not None:
-            data.blocked_until[symbol] = verdict.blocked_until
+    # M6: Crowding veto (skipped when disabled)
+    if not ab.disable_crowding_veto:
+        mentions = data.mentions.get(symbol, [])
+        if mentions:
+            blocked_until = data.blocked_until.get(symbol)
+            z = _compute_z_score(symbol, mentions, run_date)
+            verdict = evaluate_crowding(z, blocked_until, run_date)
+            if verdict.blocked:
+                gate_results["crowding"] = False
+                block_reason = verdict.reason or "crowding_veto"
+                return additional_scores, gate_results, block_reason
+            if verdict.blocked_until is not None:
+                data.blocked_until[symbol] = verdict.blocked_until
 
     return additional_scores, gate_results, None
 
@@ -262,6 +268,7 @@ def decide_candidates(
     run_date: date,
     regime: str,
     mechanism_data: MechanismData | None = None,
+    ablation: AblationConfig | None = None,
 ) -> list[Candidate]:
     """Shared decide step used by pipeline.run and backtest.run_backtest.
 
@@ -269,6 +276,7 @@ def decide_candidates(
     Candidates blocked by any mechanism are excluded.
     Caller should emit CandidateScored for surviving candidates
     and CandidateBlocked for blocked ones (with mechanism data).
+    AblationConfig can disable M5 (insider) and M6 (crowding) gates.
     """
 
     data = mechanism_data or MechanismData()
@@ -290,6 +298,7 @@ def decide_candidates(
             symbol,
             run_date,
             data,
+            ablation,
         )
 
         all_gates_pass = all(gate_results.values())

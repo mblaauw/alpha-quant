@@ -16,10 +16,14 @@ from alpha_quant.app.halt import is_halted
 from alpha_quant.app.pipeline import PipelineConfig
 from alpha_quant.app.pipeline import run as run_pipeline
 from alpha_quant.app.store import CanonicalStore
+from alpha_quant.domain.ablation import SHADOW_CONFIGS, ShadowBook
 from alpha_quant.domain.calendar import is_market_day
 from alpha_quant.domain.fills import FillConfig
 from alpha_quant.domain.risk import RiskConfig as DomainRiskConfig
 from alpha_quant.domain.sizing import SizingConfig
+
+# Module-level shadow book state (persists across daily calls)
+_SHADOW_BOOKS: dict[str, ShadowBook] = {}
 
 if TYPE_CHECKING:
     from apscheduler.schedulers.blocking import BlockingScheduler
@@ -104,6 +108,11 @@ def run_daily_pipeline(
         max_gross_exposure=config.portfolio.max_gross_exposure,
     )
 
+    # Initialize shadow books on first run
+    if not _SHADOW_BOOKS:
+        for name, config in SHADOW_CONFIGS.items():
+            _SHADOW_BOOKS[name] = ShadowBook(book_name=name, config=config)
+
     try:
         result = run_pipeline(
             run_date=run_date,
@@ -115,6 +124,7 @@ def run_daily_pipeline(
             sizing_config=sizing_config,
             prev_equity=prev_equity,
             prev_regime="CAUTION",
+            shadow_books=_SHADOW_BOOKS,
         )
 
         status = "completed"
