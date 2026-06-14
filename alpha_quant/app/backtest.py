@@ -304,7 +304,17 @@ def run_backtest(
             candidates = [c for c in all_considered if c.block_reason is None]
 
             current_positions = list(positions.values())
-            ranked = rank_candidates(candidates, config.max_positions, len(current_positions))
+            sector_map = {
+                sym: snap.sector
+                for sym, snap in mech_data.fundamentals.items()
+                if snap is not None and snap.sector is not None
+            }
+            ranked = rank_candidates(
+                candidates,
+                config.max_positions,
+                len(current_positions),
+                sector_map=sector_map,
+            )
             slots = config.max_positions - len(positions)
 
             for cand in ranked[:slots]:

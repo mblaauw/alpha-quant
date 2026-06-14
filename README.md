@@ -127,19 +127,17 @@ graph TB
 
 | ID | Mechanism | Domain Logic | Runtime Wiring | Notes |
 |----|-----------|:------------:|:--------------:|-------|
-| **M1** | Universe | ✅ Implemented | ❌ Not wired | `universe.select` exists in `domain/`, called from no app code |
-| **M2** | Regime | ✅ Implemented | ⚠️ Partial | Wired but VIX/breadth are hardcoded constants; only SPY EMA path is live |
-| **M3** | Technical | ✅ Implemented | ✅ Wired | Active: trend, RSI (Gaussian 52±22), MACD, volume, ATR |
-| **—** | Momentum | ✅ Implemented | ✅ Wired | 63-day lookback (~3-month). Spec says 12-1; reconciliation tracked in BETA-DA-9 |
-| **M4** | Quality | ✅ Implemented | ❌ Not wired | `fundamental.evaluate` exists, live gate is hardcoded `True` |
-| **M5** | Insider | ✅ Implemented | ❌ Not wired | `insider_signal.evaluate` exists but never called in runtime |
-| **M6** | Crowding | ✅ Implemented | ❌ Not wired | `crowding.evaluate` exists; blocks 14 days (spec says 10 — tracked in BETA-DA-9) |
-| **M7** | Blackout | ✅ Implemented | ❌ Not wired | `blackout.check` exists, live gate is hardcoded `True` |
-| **M8** | Composite | ✅ Implemented | ⚠️ Partial | Ranking runs but without sector cap; `sector_map` never passed |
+| **M1** | Universe | ✅ Implemented | ❌ Not wired | `universe.select` exists in `domain/`; pipeline uses static config list |
+| **M2** | Regime | ✅ Implemented | ⚠️ Partial | SPY EMA50/200 path live; VIX/breadth use hardcoded defaults |
+| **M3** | Technical | ✅ Implemented | ✅ Wired | Trend, RSI (Gaussian 52±22), MACD, volume, ATR |
+| **—** | Momentum | ✅ Implemented | ✅ Wired | 63-day (~3-month) lookback, bucketed score |
+| **M4** | Quality | ✅ Implemented | ✅ Wired | Fundamental gate (operating cash flow, D/E, accruals) |
+| **M5** | Insider | ✅ Implemented | ✅ Wired | Buy cluster boost; c-suite sell penalty (.05 per sell, max .30) |
+| **M6** | Crowding | ✅ Implemented | ✅ Wired | 14-day block on z>3; configurable via `_BLOCK_DAYS` |
+| **M7** | Blackout | ✅ Implemented | ✅ Wired | 3-day pre-earnings entry block |
+| **M8** | Composite | ✅ Implemented | ✅ Wired | 0.6·technical + 0.25·momentum + 0.15·insider; equal-weight sector cap (25% of slots) |
 
-> **Current running engine:** M3 technical + 63-day momentum + partial M2 (SPY only) + M8 ranking (no sector cap), gated by a single `composite_score ≥ 0.5·degradation` threshold.
->
-> Wiring M1/M4/M5/M6/M7 into the runtime path is tracked in [BETA-DA-1](https://github.com/mblaauw/alpha-quant/issues/327).
+> Each mechanism's runtime path is verified by pipeline behavioral tests (426 tests). See [BETA-DA-8](https://github.com/mblaauw/alpha-quant/issues/334).
 
 ## CLI Commands
 
