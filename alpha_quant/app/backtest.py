@@ -28,7 +28,11 @@ from alpha_quant.domain.models import (
     Position,
 )
 from alpha_quant.domain.ranking import rank as rank_candidates
-from alpha_quant.domain.risk import RiskConfig
+from alpha_quant.domain.risk import (
+    RiskConfig,
+    evaluate_daily_loss,
+    evaluate_drawdown,
+)
 from alpha_quant.domain.sizing import SizingConfig
 from alpha_quant.ports.store import Store
 
@@ -279,8 +283,12 @@ def run_backtest(
                 entry_dates.pop(sym, None)
                 positions.pop(sym, None)
 
+        # --- Portfolio-level risk (drawdown) ---
+        dd_verdict = evaluate_drawdown(equity_curve, rc)
+        dd_mult = dd_verdict.multiplier
+
         # --- Entries ---
-        if len(positions) < config.max_positions:
+        if len(positions) < config.max_positions and dd_mult > 0:
             spy_state = indicator_states.get("SPY")
             regime, regime_mult = detect_regime_and_multiplier(spy_state)
 
@@ -311,7 +319,7 @@ def run_backtest(
                     p.quantity * prices.get(p.symbol, 0.0) for p in positions.values()
                 )
 
-                sized = size_entry(total_equity, bar.close, atr_val, regime_mult, sc)
+                sized = size_entry(total_equity, bar.close, atr_val, regime_mult * dd_mult, sc)
                 if sized is None:
                     continue
                 final_shares = sized.shares
@@ -363,6 +371,9 @@ def run_backtest(
         equity = round(cash + total_mark, 2)
         if prev_equity is not None and prev_equity > 0:
             daily_returns.append((equity - prev_equity) / prev_equity)
+            today_pnl = equity - prev_equity
+            # Daily halt is informational in backtest; doesn't prevent entries
+            evaluate_daily_loss(today_pnl, equity, rc)
         prev_equity = equity
         equity_curve.append(equity)
 

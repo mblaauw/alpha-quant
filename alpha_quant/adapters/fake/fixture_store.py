@@ -154,6 +154,12 @@ class FixtureStore(Store):
             return None
         return max(matching, key=lambda s: s.date)
 
+    def load_portfolio_snapshots(
+        self, book: str = "PAPER", limit: int = 500
+    ) -> list[PortfolioSnapshot]:
+        matching = [s for s in self._portfolio_snapshots if s.book == book]
+        return sorted(matching, key=lambda s: s.date)[:limit]
+
     @override
     def save_journal(self, entry: JournalEntry) -> None:
         self._journals[entry.date] = entry
