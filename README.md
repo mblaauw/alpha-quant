@@ -5,7 +5,7 @@
 </div>
 # Alpha-Quant
 
-Deterministic, daily-cadence, long-only equity trading system
+Deterministic, daily-cadence, long-only equity paper-trading engine
 
 [![CI](https://github.com/mblaauw/alpha-quant/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mblaauw/alpha-quant/actions)
 [![Beta Release](https://img.shields.io/badge/status-beta-yellow)](https://github.com/mblaauw/alpha-quant/milestone/8)
@@ -20,14 +20,25 @@ Deterministic, daily-cadence, long-only equity trading system
 
 ## Overview
 
-Alpha-Quant is a deterministic, daily-cadence, long-only equity trading system with an **internal paper-trading engine** — no broker dependency. The system uses a ports-and-adapters (hexagonal) architecture where the domain core contains zero I/O and every connector has a fixture-backed fake twin.
+Alpha-Quant is a deterministic, daily-cadence, long-only equity paper-trading system built on a ports-and-adapters (hexagonal) architecture. It evaluates US equities through a multi-mechanism decision engine (M1–M8), runs a conservative fill model shared across backtest and paper modes, and generates structured trading decisions with LLM-narrated daily journals.
 
-**Key principles:**
-- **Deterministic** — same config + same data = same decisions, every run
+**Who is this for?** Quantitative researchers and algorithmic traders who want to prototype, backtest, and paper-trade systematic equity strategies without a broker dependency. The system is designed for research transparency — every mechanism has an ablation counterpart for walk-forward validation, and the core domain logic is pure Python with zero I/O.
+
+**What problem does it solve?** Bridging the gap between strategy research and paper execution with:
+- A single fill model across backtest, paper, replay, and shadow books (no simulated/real divergence)
+- Mechanism-level attribution (which factors drove each decision)
+- Walk-forward validation infrastructure (shadow books that isolate each mechanism's contribution)
+- Deterministic replay for auditability
+
+> **⚠️ Beta status:** This is a research/paper-trading system. It is **not financial advice**. The decision engine is under active development — several mechanisms are implemented as domain logic but not yet wired into the runtime path (see [Beta Release milestone](https://github.com/mblaauw/alpha-quant/milestone/8) for open items).
+
+### Key Principles
+
+- **Deterministic** — same config + same data = same decisions, every run (I7)
 - **Degrade, never block** — source failures degrade gracefully; only price staleness halts
-- **One fill model** — backtest, replay, paper, and shadow books all share the same conservative fill semantics
+- **One fill model** — backtest, replay, paper, and shadow books all share the same conservative fill semantics (`domain/fills.py`)
 - **LLM is explainer only** — never in the decision path; narration polishes recorded reasoning
-- **Walk-forward by design** — ≤3 tuned parameters, every mechanism beats its ablation or is flagged off
+- **Walk-forward by design** — every mechanism has an ablation shadow book; if removal improves performance, the mechanism is flagged for review (infrastructure in place, runtime wiring in progress — see BETA-DA-4)
 
 ## Quick Start
 
@@ -52,63 +63,118 @@ uv run pytest
 
 ## Architecture
 
-Alpha-Quant implements a **medallion architecture** with four strict zones:
+Alpha-Quant follows a **ports-and-adapters (hexagonal) architecture** where the domain core has zero I/O and every external dependency is accessed through a port interface with both fake and real adapter implementations.
 
+```mermaid
+graph TB
+    subgraph Adapters["Adapters (outer ring)"]
+        direction TB
+        FA["Fake Adapters<br/>fixture_store, virtual_clock,<br/>canned_llm, fixture_market_data,<br/>fixture_fundamentals, fixture_insider,<br/>fixture_sentiment, fake_broker,<br/>fake_event_sink"]
+        RA["Real Adapters<br/>eodhd_connector, sec_connector,<br/>openinsider_connector, reddit_connector,<br/>alpaca_connector, llm_adapter,<br/>system_clock, real_event_sink"]
+    end
+
+    subgraph Ports["Port Interfaces"]
+        P1["Clock"]
+        P2["MarketData"]
+        P3["Fundamentals"]
+        P4["InsiderFeed"]
+        P5["SentimentFeed"]
+        P6["Store"]
+        P7["Broker"]
+        P8["EventSink"]
+        P9["LLM"]
+    end
+
+    subgraph Domain["Domain Core (zero I/O)"]
+        M["Models: Position, Candidate,<br/>Decision, Bar, Fill, Order"]
+        R["Risk: stops, trails, takes,<br/>drawdown, daily loss"]
+        S["Sizing: kelly-lite, risk parity"]
+        E["Events: domain event types,<br/>event logging"]
+        I["Invariants: I1–I11 checks"]
+        D["Derive: incremental indicators<br/>(numpy, O(1) recurrence)"]
+        DEC["Mechanisms: M1 universe, M2 regime,<br/>M3 technical, M4 quality,<br/>M5 insider, M6 crowding,<br/>M7 blackout, M8 ranking"]
+    end
+
+    subgraph App["Application Services"]
+        PL["Pipeline: daily orchestration"]
+        BT["Backtest: event-driven simulator"]
+        PP["PaperPortfolio: position mgmt"]
+        SH["ShadowBook: ablation books"]
+        RP["Replay: golden replay (stub)"]
+        LB["CLI: run, backtest, journal,<br/>ask, report, status, halt"]
+        ST["Store: canonical schema,<br/>DuckDB state persistence"]
+        DSH["Dashboard: Streamlit UI"]
+    end
+
+    Adapters -->|implement| Ports
+    Ports -->|used by| Domain
+    App -->|uses| Ports
+    App -->|imports| Domain
+    Ports -.->|no dependency| App
+    Domain -.->|no imports from outside| Ports
 ```
-CONNECTORS          RAW VAULT          CANONICAL STORE        DECISION ENGINE
-  EODHD         ┌─────────────┐   ┌──────────────────┐   ┌──────────────────┐
-  Alpaca   ────▶│ append-only │──▶│ Parquet (bars)   │──▶│ M1–M8 mechanisms │
-  SEC      ────▶│ zstd blobs  │   │ DuckDB (state)   │   │ risk, sizing,    │
-  OpenIns. ────▶│ + manifest  │   │                  │   │ fill model       │
-  Reddit   ────▶│             │   │                  │   │ paper engine     │
-                └─────────────┘   └──────────────────┘   └──────────────────┘
-```
+
+### Layer Rules
+
+| Layer | Can Import | Cannot Import |
+|-------|-----------|---------------|
+| `domain/` | Python stdlib, numpy, pydantic | `app/`, `adapters/`, `ports/` |
+| `ports/` | `domain/` (types only) | `adapters/`, `app/` |
+| `adapters/` | `ports/`, `domain/` (types only) | `app/` |
+| `app/` | `domain/`, `ports/` | — |
 
 ### Decision Mechanisms (M1–M8)
 
-| Module | Purpose |
-|--------|---------|
-| **M1** Universe | Filter by liquidity, price, SEC validity |
-| **M2** Regime | RISK_ON / CAUTION / RISK_OFF (SPY EMA50/200) |
-| **M3** Technical | Trend, momentum, RSI, MACD, volume, ATR |
-| **M4** Quality | OCF, D/E, accruals, earnings surprise |
-| **M5** Insider | Cluster signal (Cohen/Malloy/Pomorski 2012) |
-| **M6** Crowding | Reddit mention z-score veto |
-| **M7** Blackout | Earnings blackout window |
-| **M8** Composite | Weighted ranking + gates |
+| ID | Mechanism | Domain Logic | Runtime Wiring | Notes |
+|----|-----------|:------------:|:--------------:|-------|
+| **M1** | Universe | ✅ Implemented | ❌ Not wired | `universe.select` exists in `domain/`, called from no app code |
+| **M2** | Regime | ✅ Implemented | ⚠️ Partial | Wired but VIX/breadth are hardcoded constants; only SPY EMA path is live |
+| **M3** | Technical | ✅ Implemented | ✅ Wired | Active: trend, RSI (Gaussian 52±22), MACD, volume, ATR |
+| **—** | Momentum | ✅ Implemented | ✅ Wired | 63-day lookback (~3-month). Spec says 12-1; reconciliation tracked in BETA-DA-9 |
+| **M4** | Quality | ✅ Implemented | ❌ Not wired | `fundamental.evaluate` exists, live gate is hardcoded `True` |
+| **M5** | Insider | ✅ Implemented | ❌ Not wired | `insider_signal.evaluate` exists but never called in runtime |
+| **M6** | Crowding | ✅ Implemented | ❌ Not wired | `crowding.evaluate` exists; blocks 14 days (spec says 10 — tracked in BETA-DA-9) |
+| **M7** | Blackout | ✅ Implemented | ❌ Not wired | `blackout.check` exists, live gate is hardcoded `True` |
+| **M8** | Composite | ✅ Implemented | ⚠️ Partial | Ranking runs but without sector cap; `sector_map` never passed |
 
-### Documentation
-
-| Document | Description |
-|----------|-------------|
-| [Design Specification](DESIGN.md) | Full system design (v1.2) |
-| [Architecture Diagrams](docs/architecture/README.md) | C4 model (LikeC4) |
-| [ADR Log](docs/adr/README.md) | 28 Architecture Decision Records |
-| [Backlog](docs/planning/BACKLOG.md) | Historical backlog (retired — see GitHub issues) |
-| [Roadmap](docs/planning/ROADMAP.md) | Beta release status |
+> **Current running engine:** M3 technical + 63-day momentum + partial M2 (SPY only) + M8 ranking (no sector cap), gated by a single `composite_score ≥ 0.5·degradation` threshold.
+>
+> Wiring M1/M4/M5/M6/M7 into the runtime path is tracked in [BETA-DA-1](https://github.com/mblaauw/alpha-quant/issues/327).
 
 ## CLI Commands
 
 | Command | Status | Description |
 |---------|--------|-------------|
 | `alpha-quant bootstrap` | ✅ Ready | Generate deterministic fixture data for development |
-| `alpha-quant replay` | 🔧 Partial | Golden replay (metadata only; DAG replay tracked in #97) |
-| `alpha-quant run` | ✅ Ready | Daily pipeline |
-| `alpha-quant backtest` | ✅ Ready | Event-driven backtester |
+| `alpha-quant replay` | 🔧 Partial | Golden replay — metadata only; DAG wiring tracked in BETA-DA-2 |
+| `alpha-quant run` | ✅ Ready | Daily pipeline (indicator derive, decide, size, fill, persist, narrate) |
+| `alpha-quant backtest` | ✅ Ready | Event-driven backtester (single fill model) |
 | `alpha-quant journal` | ✅ Ready | Daily journal with LLM narration |
-| `alpha-quant ask` | ✅ Ready | Query recorded decisions |
-| `alpha-quant report` | ✅ Ready | Weekly/monthly reports |
-| `alpha-quant status` | ✅ Ready | Full system status |
+| `alpha-quant ask` | ✅ Ready | Query recorded decisions and events |
+| `alpha-quant report` | ✅ Ready | Weekly/monthly reports (from DB or latest snapshot) |
+| `alpha-quant status` | ✅ Ready | Full system status (portfolio, equity, positions, risk) |
 | `alpha-quant halt` | ✅ Ready | Halt or resume pipeline |
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Design Specification](DESIGN.md) | Full system design (v1.2) |
+| [Architecture Diagrams](docs/architecture/README.md) | C4 model (LikeC4 DSL) |
+| [ADR Log](docs/adr/README.md) | 28 Architecture Decision Records |
+| [Concept Cards](alpha_quant/concepts/) | 22 mechanism descriptions (ablation, ATR, crowding, momentum, etc.) |
+| [GitHub Issues](https://github.com/mblaauw/alpha-quant/issues) | Active backlog — prioritised by P0–P3 |
+| [Roadmap](docs/planning/ROADMAP.md) | Beta release status and known limitations |
 
 ## Development
 
 ```bash
 make check          # Ruff lint
 make format         # Ruff format
-make type           # Type check
+make type           # Type check (ty)
 make bootstrap      # Generate fixtures
-uv run pytest       # Run tests
+uv run pytest       # Run tests (397 passing)
+make bless-golden   # Update golden replay fixture hash
 ```
 
 ## Configuration
@@ -134,6 +200,8 @@ See [config.local.toml.example](config.local.toml.example) for available options
 | HTTP | httpx + tenacity retry |
 | Logging | structlog (JSON) |
 | Testing | pytest + hypothesis |
+| Linting | ruff (lint + format) |
+| Type checking | ty (astral) |
 
 ## License
 

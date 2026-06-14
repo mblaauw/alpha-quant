@@ -192,9 +192,7 @@ class TestDashboardDBHelpers:
         assert df.empty
 
     def test_load_journals_populated(self, db: duckdb.DuckDBPyConnection) -> None:
-        db.execute(
-            "INSERT INTO journal_entries VALUES ('2026-06-11', 'Journal content')"
-        )
+        db.execute("INSERT INTO journal_entries VALUES ('2026-06-11', 'Journal content')")
         df = _load_journals(db)
         assert len(df) == 1
 
@@ -203,9 +201,7 @@ class TestDashboardDBHelpers:
         assert df.empty
 
     def test_load_reports_populated(self, db: duckdb.DuckDBPyConnection) -> None:
-        db.execute(
-            "INSERT INTO reports VALUES ('2026-06-11', 'weekly', 'Report content')"
-        )
+        db.execute("INSERT INTO reports VALUES ('2026-06-11', 'weekly', 'Report content')")
         df = _load_reports(db)
         assert len(df) == 1
 
