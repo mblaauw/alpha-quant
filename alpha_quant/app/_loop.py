@@ -301,6 +301,9 @@ def decide_candidates(
             ablation,
         )
 
+        fund_snap = data.fundamentals.get(symbol)
+        sector = fund_snap.sector if fund_snap else cand.sector
+
         all_gates_pass = all(gate_results.values())
 
         if not all_gates_pass:
@@ -308,6 +311,7 @@ def decide_candidates(
             result.append(
                 cand.model_copy(
                     update={
+                        "sector": sector,
                         "scores": {**cand.scores, **extra_scores},
                         "gate_results": gate_results,
                         "block_reason": block_reason or f"blocked_by_{gate_block}",
@@ -317,6 +321,7 @@ def decide_candidates(
         else:
             updated = cand.model_copy(
                 update={
+                    "sector": sector,
                     "scores": {**cand.scores, **extra_scores},
                     "gate_results": gate_results,
                 }

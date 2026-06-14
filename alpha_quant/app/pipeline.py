@@ -401,6 +401,11 @@ def run(
     entry_decisions: list[Decision] = []
     effective_mult = regime_mult * dd_verdict.multiplier
     entry_cost: float = 0.0
+    sector_map = {
+        sym: snap.sector
+        for sym, snap in mech_data.fundamentals.items()
+        if snap is not None and snap.sector is not None
+    }
     if slots > 0 and effective_mult > 0:
         all_considered = decide_candidates(
             universe,
@@ -450,7 +455,12 @@ def run(
             )
 
         current_positions = [p for p in store.load_positions() if p.quantity > 0]
-        ranked = rank_candidates(candidates, cfg.max_positions, len(current_positions))
+        ranked = rank_candidates(
+            candidates,
+            cfg.max_positions,
+            len(current_positions),
+            sector_map=sector_map,
+        )
 
         for cand in ranked[:slots]:
             bar = get_bar_for_date(all_bars, cand.symbol, run_date)
@@ -564,7 +574,12 @@ def run(
                     sh_candidates.append(cand)
 
                 sh_current = len(shadow_book.positions)
-                sh_ranked = rank_candidates(sh_candidates, cfg.max_positions, sh_current)
+                sh_ranked = rank_candidates(
+                    sh_candidates,
+                    cfg.max_positions,
+                    sh_current,
+                    sector_map=sector_map,
+                )
 
                 sh_orders: list[Order] = []
                 for cand in sh_ranked[:slots]:
