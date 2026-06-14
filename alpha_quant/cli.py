@@ -285,14 +285,28 @@ def cmd_report(args: argparse.Namespace) -> None:
 
     config = load_config(args.config)
     store = CanonicalStore(base_path=Path("data"))
-    snap = store.load_latest_portfolio_snapshot()
-    if snap is not None:
-        print(f"[alpha-quant] report ({args.type}):")
-        print(f"  equity: {snap.equity:.2f}")
-        print(f"  cash: {snap.cash:.2f}")
-        print(f"  date: {snap.date}")
+
+    row = store._state_conn.execute(
+        "SELECT report_date, content FROM reports"
+        " WHERE report_type = ? ORDER BY report_date DESC LIMIT 1",
+        [args.type],
+    ).fetchone()
+
+    if row is not None:
+        report_date, content = row
+        print(f"[alpha-quant] report ({args.type}) — {report_date}:")
+        print()
+        print(content)
     else:
-        print("[alpha-quant] report: no portfolio data found")
+        snap = store.load_latest_portfolio_snapshot()
+        if snap is not None:
+            print(f"[alpha-quant] report ({args.type}): no stored report found")
+            print(
+                f"  Latest snapshot: equity={snap.equity:.2f},"
+                f" cash={snap.cash:.2f}, date={snap.date}"
+            )
+        else:
+            print("[alpha-quant] report: no portfolio data found")
     if args.verbose_config:
         print(json.dumps(redact_config(config), indent=2, default=str))
 
