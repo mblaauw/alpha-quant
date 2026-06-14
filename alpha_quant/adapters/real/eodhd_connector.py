@@ -9,13 +9,12 @@ from alpha_quant.domain.exceptions import DataNormalizationError
 from alpha_quant.domain.models import Bar, EarningsEntry, FundamentalsSnapshot
 from alpha_quant.domain.normalize import _parse_date
 from alpha_quant.ports.fundamentals import Fundamentals
-from alpha_quant.ports.market_data import MarketData
 
 if TYPE_CHECKING:
     from alpha_quant.app.vault import Vault
 
 
-class EODHDConnector(BaseConnector, MarketData, Fundamentals):
+class EODHDConnector(BaseConnector, Fundamentals):
     def __init__(
         self,
         *,
@@ -69,7 +68,6 @@ class EODHDConnector(BaseConnector, MarketData, Fundamentals):
             volume=_float(entry.get("volume")) or 0.0,
         )
 
-    @override
     def daily_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
         raw = self._get_json(
             f"eod/{symbol}",
