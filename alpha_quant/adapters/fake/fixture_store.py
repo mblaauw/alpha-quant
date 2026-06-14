@@ -28,6 +28,9 @@ from alpha_quant.ports.store import Store
 class FixtureStore(Store):
     def __init__(self) -> None:
         self._bars: dict[tuple[str, date], list[Bar]] = {}
+        self._fundamentals: dict[str, list[FundamentalsSnapshot]] = {}
+        self._insider_tx: dict[str, list[InsiderTransaction]] = {}
+        self._mentions: dict[str, list[MentionCount]] = {}
         self._orders: dict[str, Order] = {}
         self._fills: dict[str, list[Fill]] = {}
         self._positions: list[Position] = []
@@ -133,27 +136,27 @@ class FixtureStore(Store):
 
     @override
     def load_fundamentals(self, symbol: str) -> list[FundamentalsSnapshot]:
-        return []
+        return self._fundamentals.get(symbol, [])
 
     @override
     def load_insider_transactions(self, symbol: str) -> list[InsiderTransaction]:
-        return []
+        return self._insider_tx.get(symbol, [])
 
     @override
     def load_mentions(self, symbol: str) -> list[MentionCount]:
-        return []
+        return self._mentions.get(symbol, [])
 
     @override
     def save_fundamentals(self, symbol: str, snapshots: list[FundamentalsSnapshot]) -> None:
-        pass
+        self._fundamentals[symbol] = snapshots
 
     @override
     def save_insider_transactions(self, symbol: str, txns: list[InsiderTransaction]) -> None:
-        pass
+        self._insider_tx[symbol] = txns
 
     @override
     def save_mentions(self, symbol: str, mentions: list[MentionCount]) -> None:
-        pass
+        self._mentions[symbol] = mentions
 
     @override
     def save_portfolio_snapshot(self, snapshot: PortfolioSnapshot) -> None:

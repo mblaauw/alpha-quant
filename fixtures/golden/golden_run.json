@@ -1,0 +1,248 @@
+{
+  "decisions": [
+    {
+      "action": "enter",
+      "confidence": 0.6721,
+      "date": "2024-01-01",
+      "decision_id": "2ea7460025d6771d",
+      "symbol": "SPY"
+    },
+    {
+      "action": "enter",
+      "confidence": 0.66,
+      "date": "2024-01-01",
+      "decision_id": "e72bf4096682a47d",
+      "symbol": "TSLA"
+    },
+    {
+      "action": "enter",
+      "confidence": 0.6185,
+      "date": "2024-01-01",
+      "decision_id": "1ea4967ab56d3689",
+      "symbol": "^VIX"
+    },
+    {
+      "action": "enter",
+      "confidence": 0.5948,
+      "date": "2024-01-01",
+      "decision_id": "30f794770b56f6f9",
+      "symbol": "COP"
+    },
+    {
+      "action": "enter",
+      "confidence": 0.5935,
+      "date": "2024-01-01",
+      "decision_id": "188e1599df5ed01d",
+      "symbol": "ABBV"
+    },
+    {
+      "action": "enter",
+      "confidence": 0.5768,
+      "date": "2024-01-01",
+      "decision_id": "a491b553f1854e9c",
+      "symbol": "SCHW"
+    },
+    {
+      "action": "enter",
+      "confidence": 0.5762,
+      "date": "2024-01-01",
+      "decision_id": "ccb52a65b03a1770",
+      "symbol": "PG"
+    },
+    {
+      "action": "exit",
+      "confidence": 1.0,
+      "date": "2024-01-05",
+      "decision_id": "708ed9462502c2b4",
+      "symbol": "^VIX"
+    },
+    {
+      "action": "enter",
+      "confidence": 0.6213,
+      "date": "2024-01-05",
+      "decision_id": "3fe8db94a01cd31f",
+      "symbol": "SPY"
+    },
+    {
+      "action": "enter",
+      "confidence": 0.64,
+      "date": "2024-01-22",
+      "decision_id": "e1762cc256651ebc",
+      "symbol": "TGT"
+    }
+  ],
+  "equity_curve": [
+    {
+      "day": 0,
+      "equity": 100525.28
+    },
+    {
+      "day": 1,
+      "equity": 100373.43
+    },
+    {
+      "day": 2,
+      "equity": 100445.86
+    },
+    {
+      "day": 3,
+      "equity": 99885.34
+    },
+    {
+      "day": 4,
+      "equity": 86796.77
+    },
+    {
+      "day": 5,
+      "equity": 87380.28
+    },
+    {
+      "day": 6,
+      "equity": 87708.85
+    },
+    {
+      "day": 7,
+      "equity": 88228.97
+    },
+    {
+      "day": 8,
+      "equity": 87940.43
+    },
+    {
+      "day": 9,
+      "equity": 88157.93
+    },
+    {
+      "day": 10,
+      "equity": 87188.41
+    },
+    {
+      "day": 11,
+      "equity": 87318.72
+    },
+    {
+      "day": 12,
+      "equity": 86774.02
+    },
+    {
+      "day": 13,
+      "equity": 86554.86
+    },
+    {
+      "day": 14,
+      "equity": 86390.62
+    },
+    {
+      "day": 15,
+      "equity": 86096.86
+    },
+    {
+      "day": 16,
+      "equity": 86240.19
+    },
+    {
+      "day": 17,
+      "equity": 86287.65
+    },
+    {
+      "day": 18,
+      "equity": 86426.21
+    },
+    {
+      "day": 19,
+      "equity": 87032.92
+    },
+    {
+      "day": 20,
+      "equity": 87716.16
+    },
+    {
+      "day": 21,
+      "equity": 86988.08
+    },
+    {
+      "day": 22,
+      "equity": 86495.06
+    }
+  ],
+  "fills": [
+    {
+      "fill_id": "0e2e9e182b38fe0a9e8ac9dc4b2c786f31911e1112c8151128d2569854ef8dd1",
+      "price": 109.82,
+      "quantity": 117.0,
+      "symbol": "SPY"
+    },
+    {
+      "fill_id": "5e7e6cf43be503ecfef7d6a570e73e886863c929f11dc4400b51a89989472436",
+      "price": 96.95,
+      "quantity": 132.0,
+      "symbol": "TSLA"
+    },
+    {
+      "fill_id": "75d84b2c19f2cb84325f03cd572e11540257c3086f1cce3df24384ccfdfc3ea1",
+      "price": 91.27,
+      "quantity": 147.0,
+      "symbol": "^VIX"
+    },
+    {
+      "fill_id": "7577883a602781f75f4a2bb8237c027bcdd672c7945992245ee9fa7eeb15ef1d",
+      "price": 111.11,
+      "quantity": 119.0,
+      "symbol": "COP"
+    },
+    {
+      "fill_id": "034c8e41481b0d851fdc95fd1da52df68b37724790fa613075caf741002264e0",
+      "price": 103.69,
+      "quantity": 128.0,
+      "symbol": "ABBV"
+    },
+    {
+      "fill_id": "731944299a26db95e13f1fb2168cf3138cffaf107aa3af098cc3d95f4f9d8d80",
+      "price": 112.09,
+      "quantity": 113.0,
+      "symbol": "SCHW"
+    },
+    {
+      "fill_id": "fd940e375d601eb486a70edb343f982783745bcfa4c876d1f25001b45b7f161b",
+      "price": 91.48,
+      "quantity": 139.0,
+      "symbol": "PG"
+    },
+    {
+      "fill_id": "0e06c6eda7370e3f77bda6f6619b61d6ea81201fd32be36af5979665427ffc02",
+      "price": 84.33,
+      "quantity": -147.0,
+      "symbol": "^VIX"
+    },
+    {
+      "fill_id": "114cc5af4342be0ad188f2baca01263739f2e227098d6b4a879630159fe28c07",
+      "price": 109.58,
+      "quantity": 115.0,
+      "symbol": "SPY"
+    },
+    {
+      "fill_id": "eddcb85edd039624d889716a6b0c1b37de3102fc3a1ef099deaca26cbd9e16f8",
+      "price": 135.76,
+      "quantity": 41.0,
+      "symbol": "TGT"
+    }
+  ],
+  "meta": {
+    "command": "replay",
+    "config_hash": "f8e43fbdf811d9fd",
+    "fixture_hash": "c159034fce97abe9f140dcd4d51890732cf8ff3c4dc4c61b669382bdca58df73",
+    "fixture_path": "fixtures/v1",
+    "from_date": "2024-01-01",
+    "to_date": "2024-01-31"
+  },
+  "metrics": {
+    "cagr_pct": -79.6,
+    "max_drawdown_pct": -14.35,
+    "num_fills": 10,
+    "num_trades": 10,
+    "total_return_pct": -13.5
+  },
+  "symbols": {
+    "total": 52
+  }
+}
