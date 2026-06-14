@@ -172,9 +172,15 @@ class CanonicalStore(Store):
             "  unrealized_pl DOUBLE,"
             "  realized_pl DOUBLE,"
             "  sector VARCHAR,"
-            "  decision_id VARCHAR"
+            "  decision_id VARCHAR,"
+            "  entry_date DATE,"
+            "  high_since_entry DOUBLE,"
+            "  partial_taken BOOLEAN NOT NULL DEFAULT FALSE"
             ")"
         )
+        conn.execute("ALTER TABLE positions ADD COLUMN IF NOT EXISTS entry_date DATE")
+        conn.execute("ALTER TABLE positions ADD COLUMN IF NOT EXISTS high_since_entry DOUBLE")
+        conn.execute("ALTER TABLE positions ADD COLUMN IF NOT EXISTS partial_taken BOOLEAN")
         conn.execute(
             "CREATE TABLE IF NOT EXISTS equity_curve ("
             "  equity_date DATE NOT NULL,"
@@ -404,8 +410,9 @@ class CanonicalStore(Store):
         self._state_conn.execute(
             "INSERT OR REPLACE INTO positions"
             " (symbol, quantity, entry_price, avg_cost, current_price, stop_price, trail_price,"
-            "  market_value, unrealized_pl, realized_pl, sector, decision_id)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "  market_value, unrealized_pl, realized_pl, sector, decision_id,"
+            "  entry_date, high_since_entry, partial_taken)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 position.symbol,
                 position.quantity,
@@ -419,6 +426,9 @@ class CanonicalStore(Store):
                 position.realized_pl,
                 position.sector,
                 position.decision_id,
+                position.entry_date,
+                position.high_since_entry,
+                position.partial_taken,
             ],
         )
 
@@ -426,7 +436,8 @@ class CanonicalStore(Store):
     def load_positions(self) -> list[Position]:
         cols = (
             "symbol, quantity, entry_price, avg_cost, current_price, stop_price, trail_price,"
-            " market_value, unrealized_pl, realized_pl, sector, decision_id"
+            " market_value, unrealized_pl, realized_pl, sector, decision_id,"
+            " entry_date, high_since_entry, partial_taken"
         )
         rows = self._state_conn.execute(f"SELECT {cols} FROM positions").fetchall()
         return [
@@ -443,6 +454,9 @@ class CanonicalStore(Store):
                 realized_pl=r[9],
                 sector=r[10],
                 decision_id=r[11],
+                entry_date=r[12],
+                high_since_entry=r[13],
+                partial_taken=r[14],
             )
             for r in rows
         ]
