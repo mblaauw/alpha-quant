@@ -35,6 +35,7 @@ def _empty_state(symbol: str, dt: date) -> dict[str, float]:
         "rsi": np.nan,
         "atr": np.nan,
         "prev_close": np.nan,
+        "bar_count": 0.0,
     }
 
 
@@ -90,6 +91,8 @@ def update_indicator_state(state: IndicatorState, bar: Bar) -> IndicatorState:
     m_sig = _update_ema(src["macd_signal"], m_line, _ALPHA_9)
     m_hist = m_line - m_sig
 
+    bc = src.get("bar_count", 0.0) + 1.0
+
     pc = src["prev_close"]
     if not _isnan(pc):
         ra_g, ra_l, rsi = _update_rsi(src["rsi_avg_gain"], src["rsi_avg_loss"], price, pc)
@@ -112,6 +115,7 @@ def update_indicator_state(state: IndicatorState, bar: Bar) -> IndicatorState:
         "rsi": rsi,
         "atr": atr,
         "prev_close": price,
+        "bar_count": bc,
     }
 
     return IndicatorState(symbol=state.symbol, date=bar.date, values=v)
