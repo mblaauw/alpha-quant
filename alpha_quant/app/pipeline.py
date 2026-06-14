@@ -4,17 +4,16 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
-import numpy as np
 import structlog
 
 from alpha_quant.app._loop import (
-    bars_up_to,
+    MechanismData,
     compute_atr,
+    decide_candidates,
     detect_regime_and_multiplier,
     ensure_spy,
     evaluate_risk_actions,
     get_bar_for_date,
-    score_candidate,
     size_entry,
 )
 from alpha_quant.app.halt import write_halt
@@ -347,50 +346,80 @@ def run(
 
     entry_decisions: list[Decision] = []
     if slots > 0 and regime_mult > 0:
-        candidates: list[Candidate] = []
+        # Load mechanism data (M4, M5, M6, M7)
+        mech_data = MechanismData()
         for symbol in universe:
-            bar = get_bar_for_date(all_bars, symbol, run_date)
-            state = indicator_states.get(symbol)
-            if bar is None or state is None:
-                continue
-            vals = state.values
-            if np.isnan(vals.get("rsi", np.nan)):
-                continue
+            try:
+                fund = store.load_fundamentals(symbol)
+                if fund:
+                    mech_data.fundamentals[symbol] = fund[0]
+            except Exception:
+                pass
+            try:
+                txns = store.load_insider_transactions(symbol)
+                if txns:
+                    mech_data.insider_txns[symbol] = txns
+            except Exception:
+                pass
+            try:
+                earnings = store.load_earnings(symbol)
+                if earnings:
+                    mech_data.earnings[symbol] = earnings
+            except Exception:
+                pass
+            try:
+                mentions = store.load_mentions(symbol)
+                if mentions:
+                    mech_data.mentions[symbol] = mentions
+            except Exception:
+                pass
 
-            bars_to_date = bars_up_to(all_bars, symbol, run_date)
-            cand = score_candidate(symbol, bars_to_date, bar, state, run_date, regime)
-            cscore = cand.composite_score
+        all_considered = decide_candidates(
+            universe,
+            all_bars,
+            indicator_states,
+            run_date,
+            regime,
+            mech_data,
+        )
+        gate_threshold = 0.5 * m3_threshold_multiplier(deg)
 
-            gate_block: str | None = None
-            gate_threshold = 0.5 * m3_threshold_multiplier(deg)
-
-            if cscore < gate_threshold:
-                gate_block = "composite_below_threshold"
-
-            if gate_block:
+        candidates: list[Candidate] = []
+        for cand in all_considered:
+            if cand.block_reason is not None:
                 events.append(
                     CandidateBlocked(
                         run_id=run_id,
                         source="pipeline",
-                        symbol=symbol,
-                        reason=gate_block,
+                        symbol=cand.symbol,
+                        reason=cand.block_reason,
+                        gate="mechanism",
+                    )
+                )
+                continue
+
+            if cand.composite_score < gate_threshold:
+                events.append(
+                    CandidateBlocked(
+                        run_id=run_id,
+                        source="pipeline",
+                        symbol=cand.symbol,
+                        reason="composite_below_threshold",
                         gate="ranking",
                     )
                 )
-            else:
-                candidates.append(cand)
-                events.append(
-                    CandidateScored(
-                        run_id=run_id,
-                        source="pipeline",
-                        symbol=symbol,
-                        composite_score=cscore,
-                        components={
-                            "technical": cand.scores["technical"],
-                            "momentum": cand.scores["momentum"],
-                        },
-                    )
+                continue
+
+            candidates.append(cand)
+            events.append(
+                CandidateScored(
+                    run_id=run_id,
+                    source="pipeline",
+                    symbol=cand.symbol,
+                    composite_score=cand.composite_score,
+                    components=dict(cand.scores),
                 )
+            )
 
         current_positions = [p for p in store.load_positions() if p.quantity > 0]
         ranked = rank_candidates(candidates, cfg.max_positions, len(current_positions))

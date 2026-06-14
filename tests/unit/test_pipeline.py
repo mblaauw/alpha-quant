@@ -162,7 +162,7 @@ class TestPipelineCore:
             patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
             patch("alpha_quant.app.pipeline.ensure_spy") as mock_ensure,
             patch("alpha_quant.app.pipeline.get_bar_for_date") as mock_bar,
-            patch("alpha_quant.app.pipeline.score_candidate") as mock_score,
+            patch("alpha_quant.app.pipeline.decide_candidates") as mock_decide,
             patch("alpha_quant.app.pipeline.rank_candidates") as mock_rank,
             patch("alpha_quant.app.pipeline.compute_atr") as mock_atr,
             patch("alpha_quant.app.pipeline.size_entry") as mock_size,
@@ -173,7 +173,7 @@ class TestPipelineCore:
             mock_bar.side_effect = lambda *a, **kw: (
                 a[-1] if a and isinstance(a[-1], Bar) else _bar(100.0)
             )
-            mock_score.return_value = _FakeCandidate()
+            mock_decide.return_value = [_FakeCandidate()]
             mock_rank.return_value = [_FakeCandidate()]
             mock_atr.return_value = 2.0
             mock_size.return_value = type(
@@ -260,6 +260,194 @@ class _FakeIndicatorState:
 
 class _FakeCandidate:
     symbol = "AAPL"
+    block_reason: str | None = None
     composite_score: float = 0.8
     scores: dict[str, float] = {"technical": 0.8, "momentum": 0.3}
+    gate_results: dict[str, bool] = {"fundamental": True, "insider": True, "crowding": True, "blackout": True}
     regime: str = "RISK_ON"
+
+    def model_copy(self, *, update: dict | None = None) -> _FakeCandidate:
+        c = _FakeCandidate()
+        for k, v in self.__dict__.items():
+            setattr(c, k, v)
+        if update:
+            for k, v in update.items():
+                setattr(c, k, v)
+        return c
+
+
+class TestDecideCandidates:
+    """Behavioral tests for shared decide_candidates() gates M4–M7 (AC #10)."""
+
+    def test_m7_earnings_blackout_blocks(self) -> None:
+        from datetime import date
+
+        from alpha_quant.app._loop import MechanismData, decide_candidates
+        from alpha_quant.domain.models import EarningsEntry
+
+        mech_data = MechanismData(
+            earnings={
+                "AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 6, 12), fiscal_quarter="Q2")],
+            },
+        )
+        bars = {"AAPL": [Bar(symbol="AAPL", date=date(2026, 6, 11), open=100, high=101, low=99, close=100, volume=1_000_000)]}
+        states = {"AAPL": _FakeIndicatorState()}
+
+        with (
+            patch("alpha_quant.app._loop.score_candidate") as mock_score,
+            patch("alpha_quant.app._loop.check_blackout") as mock_bo,
+        ):
+            mock_score.return_value = _FakeCandidate()
+            mock_bo.return_value = "BLOCK"
+
+            result = decide_candidates(
+                ["AAPL"], bars, states, date(2026, 6, 11), "RISK_ON", mech_data
+            )
+
+        assert len(result) == 1
+        assert result[0].block_reason == "earnings_blackout"
+        assert result[0].gate_results["blackout"] is False
+
+    def test_m4_fundamental_blocks(self) -> None:
+        from datetime import date
+
+        from alpha_quant.app._loop import MechanismData, decide_candidates
+        from alpha_quant.domain.fundamental import QualityVerdict
+        from alpha_quant.domain.models import EarningsEntry, FundamentalsSnapshot
+
+        mech_data = MechanismData(
+            fundamentals={"AAPL": FundamentalsSnapshot(symbol="AAPL", as_of_date=date(2026, 6, 11), market_cap=1e12)},
+            earnings={"AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]},
+        )
+        bars = {"AAPL": [Bar(symbol="AAPL", date=date(2026, 6, 11), open=100, high=101, low=99, close=100, volume=1_000_000)]}
+        states = {"AAPL": _FakeIndicatorState()}
+
+        with (
+            patch("alpha_quant.app._loop.score_candidate") as mock_score,
+            patch("alpha_quant.app._loop.evaluate_fundamental") as mock_fund,
+            patch("alpha_quant.app._loop.check_blackout") as mock_bo,
+        ):
+            mock_score.return_value = _FakeCandidate()
+            mock_fund.return_value = QualityVerdict(passed=False, reason="low_quality")
+            mock_bo.return_value = None
+
+            result = decide_candidates(
+                ["AAPL"], bars, states, date(2026, 6, 11), "RISK_ON", mech_data
+            )
+
+        assert len(result) == 1
+        assert result[0].block_reason == "low_quality"
+        assert result[0].gate_results["fundamental"] is False
+
+    def test_m5_insider_blocks_on_negative_signal(self) -> None:
+        from datetime import date
+
+        from alpha_quant.app._loop import MechanismData, decide_candidates
+        from alpha_quant.domain.fundamental import QualityVerdict
+        from alpha_quant.domain.insider_signal import InsiderVerdict
+        from alpha_quant.domain.models import EarningsEntry, FundamentalsSnapshot, InsiderTransaction
+
+        mech_data = MechanismData(
+            fundamentals={"AAPL": FundamentalsSnapshot(symbol="AAPL", as_of_date=date(2026, 6, 11), market_cap=1e12)},
+            insider_txns={"AAPL": [InsiderTransaction(symbol="AAPL", filing_date=date(2026, 6, 10), transaction_date=date(2026, 6, 8), owner="CEO", title="CEO", transaction_type="Sell", shares_traded=-10000, price=100, shares_held=50000)]},
+            earnings={"AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]},
+        )
+        bars = {"AAPL": [Bar(symbol="AAPL", date=date(2026, 6, 11), open=100, high=101, low=99, close=100, volume=1_000_000)]}
+        states = {"AAPL": _FakeIndicatorState()}
+
+        with (
+            patch("alpha_quant.app._loop.score_candidate") as mock_score,
+            patch("alpha_quant.app._loop.evaluate_fundamental") as mock_fund,
+            patch("alpha_quant.app._loop.check_blackout") as mock_bo,
+            patch("alpha_quant.app._loop.evaluate_insider") as mock_insider,
+        ):
+            mock_score.return_value = _FakeCandidate()
+            mock_fund.return_value = QualityVerdict(passed=True, reason=None)
+            mock_bo.return_value = None
+            mock_insider.return_value = InsiderVerdict(score=-1.0, reason="insider_selling")
+
+            result = decide_candidates(
+                ["AAPL"], bars, states, date(2026, 6, 11), "RISK_ON", mech_data
+            )
+
+        assert len(result) == 1
+        assert result[0].block_reason == "insider_selling"
+        assert result[0].gate_results["insider"] is False
+
+    def test_m6_crowding_blocks(self) -> None:
+        from datetime import date
+
+        from alpha_quant.app._loop import MechanismData, decide_candidates
+        from alpha_quant.domain.crowding import CrowdingVerdict
+        from alpha_quant.domain.models import EarningsEntry, MentionCount
+
+        mention_dates = [date(2026, 6, d) for d in range(1, 12)]
+        mech_data = MechanismData(
+            mentions={
+                "AAPL": [MentionCount(symbol="AAPL", mention_date=d, source="twitter", count=500)
+                         for d in mention_dates] +
+                        [MentionCount(symbol="AAPL", mention_date=date(2026, 6, 11), source="twitter", count=5000)],
+            },
+            earnings={"AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]},
+        )
+        bars = {"AAPL": [Bar(symbol="AAPL", date=date(2026, 6, 11), open=100, high=101, low=99, close=100, volume=1_000_000)]}
+        states = {"AAPL": _FakeIndicatorState()}
+
+        with (
+            patch("alpha_quant.app._loop.score_candidate") as mock_score,
+            patch("alpha_quant.app._loop.check_blackout") as mock_bo,
+            patch("alpha_quant.app._loop.evaluate_crowding") as mock_crowd,
+        ):
+            mock_score.return_value = _FakeCandidate()
+            mock_bo.return_value = None
+            mock_crowd.return_value = CrowdingVerdict(blocked=True, reason="high_mentions", blocked_until=None)
+
+            result = decide_candidates(
+                ["AAPL"], bars, states, date(2026, 6, 11), "RISK_ON", mech_data
+            )
+
+        assert len(result) == 1
+        assert result[0].block_reason == "high_mentions"
+        assert result[0].gate_results["crowding"] is False
+
+    def test_all_gates_pass_with_extra_scores(self) -> None:
+        from datetime import date
+
+        from alpha_quant.app._loop import MechanismData, decide_candidates
+        from alpha_quant.domain.crowding import CrowdingVerdict
+        from alpha_quant.domain.fundamental import QualityVerdict
+        from alpha_quant.domain.insider_signal import InsiderVerdict
+        from alpha_quant.domain.models import EarningsEntry, FundamentalsSnapshot, InsiderTransaction, MentionCount
+
+        mech_data = MechanismData(
+            fundamentals={"AAPL": FundamentalsSnapshot(symbol="AAPL", as_of_date=date(2026, 6, 11), market_cap=1e12)},
+            insider_txns={"AAPL": [InsiderTransaction(symbol="AAPL", filing_date=date(2026, 6, 10), transaction_date=date(2026, 6, 8), owner="CEO", title="CEO", transaction_type="Buy", shares_traded=5000, price=100, shares_held=55000)]},
+            mentions={
+                "AAPL": [MentionCount(symbol="AAPL", mention_date=date(2026, 6, 10), source="twitter", count=50)],
+            },
+            earnings={"AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]},
+        )
+        bars = {"AAPL": [Bar(symbol="AAPL", date=date(2026, 6, 11), open=100, high=101, low=99, close=100, volume=1_000_000)]}
+        states = {"AAPL": _FakeIndicatorState()}
+
+        with (
+            patch("alpha_quant.app._loop.score_candidate") as mock_score,
+            patch("alpha_quant.app._loop.evaluate_fundamental") as mock_fund,
+            patch("alpha_quant.app._loop.check_blackout") as mock_bo,
+            patch("alpha_quant.app._loop.evaluate_insider") as mock_insider,
+            patch("alpha_quant.app._loop.evaluate_crowding") as mock_crowd,
+        ):
+            mock_score.return_value = _FakeCandidate()
+            mock_fund.return_value = QualityVerdict(passed=True, reason=None)
+            mock_bo.return_value = None
+            mock_insider.return_value = InsiderVerdict(score=2.5, reason=None)
+            mock_crowd.return_value = CrowdingVerdict(blocked=False, blocked_until=None, reason=None)
+
+            result = decide_candidates(
+                ["AAPL"], bars, states, date(2026, 6, 11), "RISK_ON", mech_data
+            )
+
+        assert len(result) == 1
+        assert result[0].block_reason is None
+        for gate in ("fundamental", "insider", "crowding", "blackout"):
+            assert result[0].gate_results[gate] is True, f"gate {gate} should pass"

@@ -11,7 +11,10 @@ from alpha_quant.domain.models import (
     Decision,
     EarningsEntry,
     Fill,
+    FundamentalsSnapshot,
     IndicatorState,
+    InsiderTransaction,
+    MentionCount,
     Order,
     PortfolioSnapshot,
     Position,
@@ -39,6 +42,15 @@ class BarStore(ABC):
 
     @abstractmethod
     def load_earnings(self, symbol: str) -> list[EarningsEntry]: ...
+
+    @abstractmethod
+    def load_fundamentals(self, symbol: str) -> list[FundamentalsSnapshot]: ...
+
+    @abstractmethod
+    def load_insider_transactions(self, symbol: str) -> list[InsiderTransaction]: ...
+
+    @abstractmethod
+    def load_mentions(self, symbol: str) -> list[MentionCount]: ...
 
 
 class DecisionStore(ABC):

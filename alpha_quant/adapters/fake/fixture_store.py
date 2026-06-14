@@ -13,7 +13,10 @@ from alpha_quant.domain.models import (
     Decision,
     EarningsEntry,
     Fill,
+    FundamentalsSnapshot,
     IndicatorState,
+    InsiderTransaction,
+    MentionCount,
     Order,
     PortfolioSnapshot,
     Position,
@@ -126,6 +129,18 @@ class FixtureStore(Store):
 
     @override
     def load_earnings(self, symbol: str) -> list[EarningsEntry]:
+        return []
+
+    @override
+    def load_fundamentals(self, symbol: str) -> list[FundamentalsSnapshot]:
+        return []
+
+    @override
+    def load_insider_transactions(self, symbol: str) -> list[InsiderTransaction]:
+        return []
+
+    @override
+    def load_mentions(self, symbol: str) -> list[MentionCount]:
         return []
 
     @override

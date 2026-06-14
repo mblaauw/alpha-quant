@@ -7,21 +7,20 @@ from datetime import date
 import numpy as np
 
 from alpha_quant.app._loop import (
-    bars_up_to,
+    MechanismData,
     compute_atr,
+    decide_candidates,
     detect_regime_and_multiplier,
     ensure_spy,
     evaluate_risk_actions,
     get_date_bars,
     load_all_bars,
-    score_candidate,
     size_entry,
 )
 from alpha_quant.domain.ablation import compute_spy_buy_and_hold
 from alpha_quant.domain.derive import backfill_indicator_state, update_indicator_state
 from alpha_quant.domain.fills import FillConfig, fill_entry_order, fill_stop_loss
 from alpha_quant.domain.models import (
-    Candidate,
     Decision,
     Fill,
     IndicatorState,
@@ -176,6 +175,33 @@ def run_backtest(
     symbols = ensure_spy(config.symbols)
     all_bars = load_all_bars(store, symbols, lookback_start, config.end_date)
 
+    mech_data = MechanismData()
+    for symbol in config.symbols:
+        try:
+            fund = store.load_fundamentals(symbol)
+            if fund:
+                mech_data.fundamentals[symbol] = fund[0]
+        except Exception:
+            pass
+        try:
+            txns = store.load_insider_transactions(symbol)
+            if txns:
+                mech_data.insider_txns[symbol] = txns
+        except Exception:
+            pass
+        try:
+            earnings = store.load_earnings(symbol)
+            if earnings:
+                mech_data.earnings[symbol] = earnings
+        except Exception:
+            pass
+        try:
+            mentions = store.load_mentions(symbol)
+            if mentions:
+                mech_data.mentions[symbol] = mentions
+        except Exception:
+            pass
+
     trading_dates = _trading_dates(store, config.start_date, config.end_date)
     if not trading_dates or not all_bars.get("SPY"):
         return BacktestResult(config=config)
@@ -257,19 +283,15 @@ def run_backtest(
             spy_state = indicator_states.get("SPY")
             regime, regime_mult = detect_regime_and_multiplier(spy_state)
 
-            candidates: list[Candidate] = []
-            for symbol in config.symbols:
-                bar = date_bars.get(symbol)
-                state = indicator_states.get(symbol)
-                if bar is None or state is None:
-                    continue
-                if np.isnan(state.values.get("rsi", np.nan)):
-                    continue
-
-                bars_to_date = bars_up_to(all_bars, symbol, trade_date)
-                candidates.append(
-                    score_candidate(symbol, bars_to_date, bar, state, trade_date, regime),
-                )
+            all_considered = decide_candidates(
+                config.symbols,
+                all_bars,
+                indicator_states,
+                trade_date,
+                regime,
+                mech_data,
+            )
+            candidates = [c for c in all_considered if c.block_reason is None]
 
             current_positions = list(positions.values())
             ranked = rank_candidates(candidates, config.max_positions, len(current_positions))
