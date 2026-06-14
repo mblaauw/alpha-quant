@@ -190,9 +190,13 @@ class CanonicalStore(Store):
             "  equity DOUBLE NOT NULL,"
             "  cash DOUBLE NOT NULL DEFAULT 0,"
             "  nav DOUBLE NOT NULL DEFAULT 0,"
+            "  regime VARCHAR NOT NULL DEFAULT 'CAUTION',"
             "  book VARCHAR NOT NULL DEFAULT 'PAPER',"
             "  PRIMARY KEY (equity_date, book)"
             ")"
+        )
+        conn.execute(
+            "ALTER TABLE equity_curve ADD COLUMN IF NOT EXISTS regime VARCHAR DEFAULT 'CAUTION'"
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_equity_curve_book "
@@ -564,35 +568,39 @@ class CanonicalStore(Store):
     @override
     def save_portfolio_snapshot(self, snapshot: PortfolioSnapshot) -> None:
         book = snapshot.book or "PAPER"
+        reg = snapshot.regime or "CAUTION"
         self._state_conn.execute(
             "INSERT OR REPLACE INTO equity_curve"
-            " (equity_date, equity, cash, nav, book)"
-            " VALUES (?, ?, ?, ?, ?)",
-            [snapshot.date, snapshot.equity, snapshot.cash, snapshot.equity, book],
+            " (equity_date, equity, cash, nav, regime, book)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            [snapshot.date, snapshot.equity, snapshot.cash, snapshot.equity, reg, book],
         )
 
     @override
     def load_latest_portfolio_snapshot(self, book: str = "PAPER") -> PortfolioSnapshot | None:
         row = self._state_conn.execute(
-            "SELECT equity_date, cash, equity FROM equity_curve"
+            "SELECT equity_date, cash, equity, regime FROM equity_curve"
             " WHERE book = ?"
             " ORDER BY equity_date DESC LIMIT 1",
             [book],
         ).fetchone()
         if row is None:
             return None
-        return PortfolioSnapshot(date=row[0], cash=row[1], equity=row[2], book=book)
+        return PortfolioSnapshot(date=row[0], cash=row[1], equity=row[2], regime=row[3], book=book)
 
     @override
     def load_portfolio_snapshots(
         self, book: str = "PAPER", limit: int = 500
     ) -> list[PortfolioSnapshot]:
         rows = self._state_conn.execute(
-            "SELECT equity_date, cash, equity FROM equity_curve"
+            "SELECT equity_date, cash, equity, regime FROM equity_curve"
             " WHERE book = ? ORDER BY equity_date ASC LIMIT ?",
             [book, limit],
         ).fetchall()
-        return [PortfolioSnapshot(date=r[0], cash=r[1], equity=r[2], book=book) for r in rows]
+        return [
+            PortfolioSnapshot(date=r[0], cash=r[1], equity=r[2], regime=r[3], book=book)
+            for r in rows
+        ]
 
     def add_quarantine(self, symbol: str, reason: str, severity: str = "QUARANTINE") -> None:
         self._state_conn.execute(

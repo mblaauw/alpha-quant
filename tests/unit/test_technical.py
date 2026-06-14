@@ -29,7 +29,7 @@ def _state(**values: float) -> IndicatorState:
 class TestScore:
     def test_returns_technical_score(self) -> None:
         bars = [_bar(100)] * 64
-        state = _state(prev_close=100, ema50=95, rsi=55, macd_histogram=0.5, atr=1.0)
+        state = _state(processed_close=100, ema50=95, rsi=55, macd_histogram=0.5, atr=1.0)
         result = score(bars, state)
         assert isinstance(result, TechnicalScore)
 
@@ -41,13 +41,13 @@ class TestScore:
 
     def test_zero_score_when_close_is_nan(self) -> None:
         bars = [_bar(100)]
-        state = _state(prev_close=float("nan"))
+        state = _state(processed_close=float("nan"))
         result = score(bars, state)
         assert result.score == 0.0
 
     def test_score_between_0_and_1(self) -> None:
         bars = [_bar(100)] * 64
-        state = _state(prev_close=100, ema50=95, rsi=55, macd_histogram=0.5, atr=1.0)
+        state = _state(processed_close=100, ema50=95, rsi=55, macd_histogram=0.5, atr=1.0)
         for _ in range(10):
             result = score(bars, state)
             assert 0.0 <= result.score <= 1.0

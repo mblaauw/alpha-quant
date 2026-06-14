@@ -224,7 +224,7 @@ class UniverseMember(BaseModel):
 
     symbol: str
     price: float | None = None
-    volume_adv: float | None = None
+    dollar_volume_median: float | None = None
     market_cap: float | None = None
     sector: str | None = None
     passes_m1: bool = False
@@ -266,4 +266,5 @@ class PortfolioSnapshot(BaseModel):
     date: date
     cash: float
     equity: float
+    regime: str = "CAUTION"
     book: str = "PAPER"

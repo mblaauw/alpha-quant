@@ -75,6 +75,7 @@ def _mock_run_result(
         events: list
         violations: list
         halted: bool
+        current_regime: str | None
         prev_equity: float | None
         new_equity: float | None
 
@@ -86,6 +87,7 @@ def _mock_run_result(
         events=list(range(events)),
         violations=violations or [],
         halted=halted,
+        current_regime="RISK_ON",
         prev_equity=100_000.0,
         new_equity=101_000.0,
     )
@@ -110,6 +112,9 @@ class _FakeStore:
 
     def load_latest_portfolio_snapshot(self) -> None:
         return None
+
+    def save_portfolio_snapshot(self, snapshot: object) -> None:
+        pass
 
 
 def _mock_violation(check: str) -> object:

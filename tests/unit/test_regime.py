@@ -15,7 +15,7 @@ def _state(
         symbol="SPY",
         date=date(2026, 6, 11),
         values={
-            "prev_close": close,
+            "processed_close": close,
             "ema50": ema50,
             "ema200": ema200,
             "bar_count": bar_count,

@@ -34,7 +34,7 @@ def _empty_state(symbol: str, dt: date) -> dict[str, float]:
         "rsi_avg_loss": np.nan,
         "rsi": np.nan,
         "atr": np.nan,
-        "prev_close": np.nan,
+        "processed_close": np.nan,
         "bar_count": 0.0,
     }
 
@@ -93,7 +93,7 @@ def update_indicator_state(state: IndicatorState, bar: Bar) -> IndicatorState:
 
     bc = src.get("bar_count", 0.0) + 1.0
 
-    pc = src["prev_close"]
+    pc = src["processed_close"]
     if not _isnan(pc):
         ra_g, ra_l, rsi = _update_rsi(src["rsi_avg_gain"], src["rsi_avg_loss"], price, pc)
         atr = _update_atr(src["atr"], bar.high, bar.low, pc)
@@ -114,7 +114,7 @@ def update_indicator_state(state: IndicatorState, bar: Bar) -> IndicatorState:
         "rsi_avg_loss": ra_l,
         "rsi": rsi,
         "atr": atr,
-        "prev_close": price,
+        "processed_close": price,
         "bar_count": bc,
     }
 

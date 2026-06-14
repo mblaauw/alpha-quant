@@ -25,7 +25,7 @@ def detect(
     breadth: float | None,
     warmup_bars: int = _EMA200_WARMUP_BARS,
 ) -> Regime:
-    spy_close = spy_indicator.values.get("prev_close")
+    spy_close = spy_indicator.values.get("processed_close")
     spy_ema50 = spy_indicator.values.get("ema50")
     spy_ema200 = spy_indicator.values.get("ema200")
     bar_count = spy_indicator.values.get("bar_count", 0.0)
