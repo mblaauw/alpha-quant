@@ -84,6 +84,7 @@ def run_daily_pipeline(
 
     prev = store.load_latest_portfolio_snapshot()
     prev_equity = prev.equity if prev else None
+    prev_regime = prev.regime if prev else "CAUTION"
 
     logger.info(
         "pipeline_start",
@@ -123,7 +124,7 @@ def run_daily_pipeline(
             risk_config=risk_config,
             sizing_config=sizing_config,
             prev_equity=prev_equity,
-            prev_regime="CAUTION",
+            prev_regime=prev_regime,
             shadow_books=_SHADOW_BOOKS,
         )
 

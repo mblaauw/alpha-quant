@@ -46,6 +46,7 @@ from alpha_quant.domain.models import (
     Fill,
     IndicatorState,
     Order,
+    PortfolioSnapshot,
     Position,
 )
 from alpha_quant.domain.ranking import rank as rank_candidates
@@ -519,6 +520,15 @@ def run(
         daily_halt_actions = evaluate_daily_loss(today_pnl, today_equity, rc)
         for action in daily_halt_actions:
             events.append(action)
+
+        # Persist main book portfolio snapshot with regime
+        main_snap = PortfolioSnapshot(
+            date=run_date,
+            cash=today_cash,
+            equity=today_equity,
+            regime=regime,
+        )
+        store.save_portfolio_snapshot(main_snap)
 
     # --- 7. Shadow books ---
     if shadow_books is not None:

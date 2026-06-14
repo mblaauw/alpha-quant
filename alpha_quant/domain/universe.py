@@ -70,7 +70,7 @@ def select(
                 UniverseMember(
                     symbol=symbol,
                     price=price,
-                    volume_adv=adv,
+                    dollar_volume_median=adv,
                     passes_m1=False,
                     fail_reason=f"ADV ${adv:,.0f} below ${min_adv:,.0f}",
                 )
@@ -85,7 +85,7 @@ def select(
             UniverseMember(
                 symbol=symbol,
                 price=price,
-                volume_adv=adv,
+                dollar_volume_median=adv,
                 market_cap=market_cap,
                 sector=sector,
                 passes_m1=True,

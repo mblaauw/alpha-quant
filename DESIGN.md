@@ -368,7 +368,7 @@ Weekly rebalance = step 6 considers replacements; daily runs manage risk and fil
 
 ## 14. Backtesting and evaluation
 
-No vectorbt for portfolio simulation (path-dependent constraints); event-driven daily loop over `domain/fills.py` — a decade in seconds at this scale; vectorbt for single-signal research only. **One fill model across backtest/replay/paper/shadows ⇒ comparable by construction.** Costs: 5 bps + half-spread on every fill. Walk-forward only (3y/1y), ≤3 tuned parameters. Baselines always: SPY + RULES_ONLY; every mechanism beats its ablation or is flagged off. Metrics: CAGR, max DD, Sharpe, Sortino, exposure-adjusted return, turnover, win rate, payoff. Live-gate criteria retained for the future broker decision (§9.4).
+No vectorbt for portfolio simulation (path-dependent constraints); event-driven daily loop over `domain/fills.py` — a decade in seconds at this scale; vectorbt for single-signal research only. **One fill model across backtest/replay/paper/shadows ⇒ comparable by construction.** Costs: 5 bps + half-spread on every fill. Walk-forward only (3y/1y), ≤3 core research parameters (threshold score, RSI center, Kelly fraction). Many system-level config knobs exist (stop ATR multiples, trailing thresholds, drawdown ladder, sector limits) but are fixed per walk-forward window. Baselines always: SPY + RULES_ONLY; every mechanism beats its ablation or is flagged off. Metrics: CAGR, max DD, Sharpe, Sortino, exposure-adjusted return, turnover, win rate, payoff. Live-gate criteria retained for the future broker decision (§9.4).
 
 ---
 
@@ -408,4 +408,4 @@ I13. `alpaca-py` trading module is never imported (lint rule); Alpaca is data-on
 
 ## 17. Retained red flags
 
-No LLM stock-picking/sizing; no agent swarms; no intraday data; no derivatives; no custom risk models; ≤3 tuned parameters, walk-forward only; no signal that loses to its ablation; no narration that invents numbers; no optimistic stop fills — gaps fill at the open.
+No LLM stock-picking/sizing; no agent swarms; no intraday data; no derivatives; no custom risk models; ≤3 core research parameters (walk-forward optimized: threshold, RSI center, Kelly fraction); system-level knobs fixed per window; no signal that loses to its ablation; no narration that invents numbers; no optimistic stop fills — gaps fill at the open.

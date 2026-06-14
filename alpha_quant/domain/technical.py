@@ -17,7 +17,7 @@ class TechnicalScore:
 
 def score(bars: list[Bar], indicator: IndicatorState) -> TechnicalScore:
     vals = indicator.values
-    close = vals.get("prev_close")
+    close = vals.get("processed_close")
 
     if close is None or _isnan(close):
         return TechnicalScore(0.0)

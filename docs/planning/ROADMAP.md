@@ -35,7 +35,6 @@ The system is in **Beta Release** with the following capabilities:
 
 ### Known Limitations
 - `replay` command is metadata-only — real DAG replay not wired (tracked in #97)
-- Drawdown/daily-loss evaluation not yet wired into pipeline risk loop
 - Live broker integration is out of scope — paper trading only
 - Broker evaluation docs pending paper trading data
 

@@ -116,6 +116,7 @@ def cmd_run(args: argparse.Namespace) -> None:
 
     prev = store.load_latest_portfolio_snapshot()
     prev_equity = prev.equity if prev else None
+    prev_regime = prev.regime if prev else "CAUTION"
 
     run_date = date.today()
 
@@ -128,7 +129,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         risk_config=risk_config,
         sizing_config=sizing_config,
         prev_equity=prev_equity,
-        prev_regime="CAUTION",
+        prev_regime=prev_regime,
     )
 
     status = "completed"

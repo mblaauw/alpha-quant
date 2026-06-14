@@ -29,7 +29,7 @@ def _make_indicator() -> IndicatorState:
         symbol="SPY",
         date=date(2026, 6, 11),
         values={
-            "prev_close": 100.0,
+            "processed_close": 100.0,
             "ema12": 101.0,
             "ema20": 100.5,
             "ema50": 99.0,
