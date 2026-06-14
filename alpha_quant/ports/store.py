@@ -94,6 +94,11 @@ class PositionStore(ABC):
     @abstractmethod
     def load_latest_portfolio_snapshot(self, book: str = "PAPER") -> PortfolioSnapshot | None: ...
 
+    @abstractmethod
+    def load_portfolio_snapshots(
+        self, book: str = "PAPER", limit: int = 500
+    ) -> list[PortfolioSnapshot]: ...
+
 
 class EventStore(ABC):
     """Domain event read/write interface."""

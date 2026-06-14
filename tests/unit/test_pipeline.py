@@ -4,7 +4,7 @@ from datetime import date
 from unittest.mock import patch
 
 from alpha_quant.app.pipeline import RunResult, run
-from alpha_quant.domain.models import Bar, Position
+from alpha_quant.domain.models import Bar, PortfolioSnapshot, Position
 from alpha_quant.domain.risk import RiskConfig
 
 
@@ -40,10 +40,15 @@ def _make_bars(count: int = 400, start_price: float = 100.0) -> list[Bar]:
 
 
 class _FakeStore:
-    def __init__(self, bars: dict[str, list[Bar]] | None = None) -> None:
+    def __init__(
+        self,
+        bars: dict[str, list[Bar]] | None = None,
+        snapshots: list[PortfolioSnapshot] | None = None,
+    ) -> None:
         self._bars = bars or {}
         self._positions: list[Position] = []
         self.saved_events: list[object] = []
+        self._snapshots = snapshots or []
 
     def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
         return self._bars.get(symbol, [])
@@ -51,8 +56,9 @@ class _FakeStore:
     def load_positions(self) -> list[Position]:
         return self._positions
 
-    def load_latest_portfolio_snapshot(self, book: str = "PAPER") -> None:
-        return None
+    def load_latest_portfolio_snapshot(self, book: str = "PAPER") -> PortfolioSnapshot | None:
+        matching = [s for s in self._snapshots if s.book == book]
+        return max(matching, key=lambda s: s.date) if matching else None
 
     def save_position(self, position: Position) -> None:
         pass
@@ -65,6 +71,15 @@ class _FakeStore:
 
     def save_portfolio_snapshot(self, snapshot: object) -> None:
         pass
+
+    def load_portfolio_snapshots(
+        self, book: str = "PAPER", limit: int = 500
+    ) -> list[PortfolioSnapshot]:
+        matching = sorted(
+            [s for s in self._snapshots if s.book == book],
+            key=lambda s: s.date,
+        )
+        return matching[:limit]
 
     def transaction(self) -> object:
         class _Txn:
@@ -242,6 +257,56 @@ class TestPipelineCore:
                 universe=["SPY", "AAPL"],
             )
         assert result.halted is True
+
+    def test_drawdown_reduces_entry_sizing(self) -> None:
+        spy_bars = _make_bars(400, 100.0)
+        aapl_bars = _make_bars(400, 150.0)
+        snapshots = [
+            PortfolioSnapshot(date=date(2026, 6, 10), cash=80_000.0, equity=80_000.0),
+            PortfolioSnapshot(date=date(2026, 6, 9), cash=100_000.0, equity=100_000.0),
+        ]
+        store = _FakeStore(bars={"SPY": spy_bars, "AAPL": aapl_bars}, snapshots=snapshots)
+        with (
+            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
+        ):
+            mock_backfill.return_value = _FakeIndicatorState()
+            mock_regime.return_value = ("RISK_ON", 1.0)
+            result = run(
+                run_date=date(2026, 6, 11),
+                store=store,
+                universe=["SPY", "AAPL"],
+                risk_config=RiskConfig(dd_ladder=[[0.1, 0.5]]),
+                prev_equity=100_000.0,
+            )
+        assert isinstance(result, RunResult)
+        dd_events = [e for e in result.events if getattr(e, "action_type", None) == "drawdown_cut"]
+        assert len(dd_events) > 0, "drawdown_cut event should be emitted when equity drops 20%"
+
+    def test_daily_halt_on_equity_drop(self) -> None:
+        spy_bars = _make_bars(400, 100.0)
+        aapl_bars = _make_bars(400, 150.0)
+        # Prev snapshot had equity=100K but only cash=50K (50K was in positions
+        # that are now gone) → today_equity = 50K, daily loss = 50% → halt
+        snapshots = [
+            PortfolioSnapshot(date=date(2026, 6, 10), cash=50_000.0, equity=100_000.0),
+        ]
+        store = _FakeStore(bars={"SPY": spy_bars, "AAPL": aapl_bars}, snapshots=snapshots)
+        with (
+            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
+        ):
+            mock_backfill.return_value = _FakeIndicatorState()
+            mock_regime.return_value = ("RISK_ON", 1.0)
+            result = run(
+                run_date=date(2026, 6, 11),
+                store=store,
+                universe=["SPY", "AAPL"],
+                risk_config=RiskConfig(daily_loss_halt_pct=0.01),
+            )
+        assert isinstance(result, RunResult)
+        halt_events = [e for e in result.events if hasattr(e, "action_type") and e.action_type == "daily_halt"]
+        assert len(halt_events) > 0, "daily_halt should emit when equity drops from 100K to 50K"
 
 
 class _FakeIndicatorState:

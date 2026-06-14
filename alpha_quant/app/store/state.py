@@ -583,6 +583,17 @@ class CanonicalStore(Store):
             return None
         return PortfolioSnapshot(date=row[0], cash=row[1], equity=row[2], book=book)
 
+    @override
+    def load_portfolio_snapshots(
+        self, book: str = "PAPER", limit: int = 500
+    ) -> list[PortfolioSnapshot]:
+        rows = self._state_conn.execute(
+            "SELECT equity_date, cash, equity FROM equity_curve"
+            " WHERE book = ? ORDER BY equity_date ASC LIMIT ?",
+            [book, limit],
+        ).fetchall()
+        return [PortfolioSnapshot(date=r[0], cash=r[1], equity=r[2], book=book) for r in rows]
+
     def add_quarantine(self, symbol: str, reason: str, severity: str = "QUARANTINE") -> None:
         self._state_conn.execute(
             "INSERT OR REPLACE INTO quarantine (symbol, reason, quarantined_date, severity)"

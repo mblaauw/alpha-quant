@@ -49,7 +49,11 @@ from alpha_quant.domain.models import (
     Position,
 )
 from alpha_quant.domain.ranking import rank as rank_candidates
-from alpha_quant.domain.risk import RiskConfig
+from alpha_quant.domain.risk import (
+    RiskConfig,
+    evaluate_daily_loss,
+    evaluate_drawdown,
+)
 from alpha_quant.domain.sizing import SizingConfig
 from alpha_quant.domain.validate import validate_bars, validate_indicator_state
 from alpha_quant.ports.store import Store
@@ -352,6 +356,13 @@ def run(
                 )
             )
 
+    # --- 5b. Portfolio-level risk (drawdown) ---
+    equity_snapshots = store.load_portfolio_snapshots()
+    dd_verdict = evaluate_drawdown([s.equity for s in equity_snapshots], rc)
+    if dd_verdict.multiplier < 1.0:
+        for action in dd_verdict.actions:
+            events.append(action)
+
     # --- 6. Decide (score + rank + size) ---
     new_positions_count = len([p for p in store.load_positions() if p.quantity > 0])
     slots = cfg.max_positions - new_positions_count
@@ -387,7 +398,9 @@ def run(
     gate_threshold = 0.5 * m3_threshold_multiplier(deg)
 
     entry_decisions: list[Decision] = []
-    if slots > 0 and regime_mult > 0:
+    effective_mult = regime_mult * dd_verdict.multiplier
+    entry_cost: float = 0.0
+    if slots > 0 and effective_mult > 0:
         all_considered = decide_candidates(
             universe,
             all_bars,
@@ -446,11 +459,12 @@ def run(
             atr_val = compute_atr(state, bar.close)
 
             pop_equity = (prev_equity or 100_000.0) + cash_adjust
-            sized = size_entry(pop_equity, bar.close, atr_val, regime_mult, sc)
+            sized = size_entry(pop_equity, bar.close, atr_val, effective_mult, sc)
             if sized is None:
                 continue
             final_shares = sized.shares
             cost = round(final_shares * bar.close, 2)
+            entry_cost += cost
 
             decision_id = uuid.uuid4().hex[:16]
             stop_price = round(bar.close - rc.stop_atr_mult * atr_val, 2)
@@ -490,6 +504,21 @@ def run(
             )
 
     decisions.extend(entry_decisions)
+
+    # --- 6b. Daily loss check ---
+    prev_snap = store.load_latest_portfolio_snapshot()
+    if prev_snap is not None:
+        today_cash = prev_snap.cash + cash_adjust - entry_cost
+        all_positions = store.load_positions()
+        today_market_value = sum(
+            max(prices.get(pos.symbol, pos.current_price or 0.0), 0.0) * max(pos.quantity, 0)
+            for pos in all_positions
+        )
+        today_equity = today_cash + today_market_value
+        today_pnl = today_equity - prev_snap.equity
+        daily_halt_actions = evaluate_daily_loss(today_pnl, today_equity, rc)
+        for action in daily_halt_actions:
+            events.append(action)
 
     # --- 7. Shadow books ---
     if shadow_books is not None:
