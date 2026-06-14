@@ -114,6 +114,8 @@ class PaperPortfolio:
                 market_value=cost,
                 stop_price=None,
                 decision_id=decision_id,
+                entry_date=bar.date,
+                high_since_entry=bar.high,
             )
             self._store.save_position(position)
 
@@ -232,6 +234,10 @@ class PaperPortfolio:
                             update={
                                 "stop_price": new_stop,
                                 "trail_price": new_stop,
+                                "high_since_entry": max(
+                                    position.high_since_entry or position.entry_price or 0.0,
+                                    bar.high,
+                                ),
                             }
                         )
                     )
@@ -261,6 +267,10 @@ class PaperPortfolio:
                             "realized_pl": (position.realized_pl or 0) + realized_pl,
                             "current_price": fill.price,
                             "market_value": 0.0,
+                            "high_since_entry": max(
+                                position.high_since_entry or position.entry_price or 0.0,
+                                bar.high,
+                            ),
                         }
                     )
                 )
@@ -286,6 +296,11 @@ class PaperPortfolio:
                             "market_value": remaining_value,
                             "realized_pl": (position.realized_pl or 0) + realized_pl,
                             "current_price": fill.price,
+                            "partial_taken": True,
+                            "high_since_entry": max(
+                                position.high_since_entry or position.entry_price or 0.0,
+                                bar.high,
+                            ),
                         }
                     )
                 )

@@ -242,9 +242,63 @@ def run(
         if bar is None:
             continue
         state = indicator_states.get(sym)
-        risk_actions = evaluate_risk_actions(pos, bar, state, rc, run_date, run_date)
+        risk_actions = evaluate_risk_actions(pos, bar, state, rc, run_date)
 
         for action in risk_actions:
+            if action.action_type == "trail_stop":
+                updated_stop = pos.model_copy(
+                    update={
+                        "stop_price": action.price,
+                        "high_since_entry": max(
+                            pos.high_since_entry or pos.entry_price or 0.0,
+                            bar.high,
+                        ),
+                    }
+                )
+                store.save_position(updated_stop)
+                events.append(
+                    StopAdjusted(
+                        run_id=run_id,
+                        source="pipeline",
+                        symbol=sym,
+                        old_stop=pos.stop_price or 0.0,
+                        new_stop=action.price or 0.0,
+                    )
+                )
+                continue
+
+            if action.action_type == "partial_take":
+                reduce_qty = abs(action.shares)
+                remaining = pos.quantity - reduce_qty
+                pl = round((action.price or bar.close) - pos.avg_cost, 2) * reduce_qty
+                updated = pos.model_copy(
+                    update={
+                        "quantity": remaining,
+                        "realized_pl": (pos.realized_pl or 0) + pl,
+                        "current_price": action.price or bar.close,
+                        "market_value": remaining * (action.price or bar.close),
+                        "partial_taken": True,
+                        "high_since_entry": max(
+                            pos.high_since_entry or pos.entry_price or 0.0,
+                            bar.high,
+                        ),
+                    }
+                )
+                store.save_position(updated)
+                proceed = round(reduce_qty * (action.price or bar.close), 2)
+                cash_adjust += proceed
+                decisions.append(
+                    Decision(
+                        symbol=sym,
+                        date=run_date,
+                        action="partial_take",
+                        confidence=1.0,
+                        reasons=[action.reason],
+                        decision_id=uuid.uuid4().hex[:16],
+                    )
+                )
+                continue
+
             exit_order_id = f"{sym}_exit_{run_id[:8]}"
             exit_fill = fill_stop_loss(pos, bar, exit_order_id, config=fc)
             if exit_fill is None:
@@ -267,6 +321,10 @@ def run(
                     "realized_pl": (pos.realized_pl or 0) + pl,
                     "current_price": exit_fill.price,
                     "market_value": 0.0,
+                    "high_since_entry": max(
+                        pos.high_since_entry or pos.entry_price or 0.0,
+                        bar.high,
+                    ),
                 }
             )
             store.save_position(updated)
@@ -280,15 +338,6 @@ def run(
                     confidence=1.0,
                     reasons=[action.reason],
                     decision_id=uuid.uuid4().hex[:16],
-                )
-            )
-            events.append(
-                StopAdjusted(
-                    run_id=run_id,
-                    source="pipeline",
-                    symbol=sym,
-                    old_stop=pos.stop_price or 0.0,
-                    new_stop=0.0,
                 )
             )
 
@@ -372,6 +421,8 @@ def run(
                 stop_price=stop_price,
                 market_value=cost,
                 decision_id=decision_id,
+                entry_date=run_date,
+                high_since_entry=bar.high,
             )
             store.save_position(pos)
 
