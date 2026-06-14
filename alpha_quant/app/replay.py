@@ -1,13 +1,180 @@
 import hashlib
 import json
+from datetime import date
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+import pyarrow.parquet as pq
+
+from alpha_quant.adapters.fake.fixture_store import FixtureStore
+from alpha_quant.app._loop import (
+    compute_atr,
+    decide_candidates,
+    detect_regime_and_multiplier,
+    ensure_spy,
+    evaluate_risk_actions,
+    get_date_bars,
+    load_all_bars,
+    size_entry,
+)
 from alpha_quant.app.catalog import compute_manifest_hash
 from alpha_quant.app.config import AppConfig, redact_config
+from alpha_quant.domain.derive import backfill_indicator_state, update_indicator_state
+from alpha_quant.domain.fills import FillConfig, fill_entry_order, fill_stop_loss
+from alpha_quant.domain.models import (
+    Bar,
+    Decision,
+    Fill,
+    FundamentalsSnapshot,
+    IndicatorState,
+    InsiderTransaction,
+    MentionCount,
+    Order,
+    Position,
+)
+from alpha_quant.domain.ranking import rank as rank_candidates
+from alpha_quant.domain.risk import RiskConfig
+from alpha_quant.domain.sizing import SizingConfig
 
-if TYPE_CHECKING:
-    from alpha_quant.app.store import CanonicalStore
+_LOOKBACK_DAYS = 400
+
+
+def _make_id(seed: str) -> str:
+    return hashlib.sha256(seed.encode()).hexdigest()[:16]
+
+
+def _load_parquet_bars(path: Path) -> list[Bar]:
+    table = pq.read_table(path)
+    bars: list[Bar] = []
+    for i in range(len(table)):
+        bars.append(
+            Bar(
+                symbol=str(table.column("symbol")[i]),
+                date=date.fromisoformat(str(table.column("date")[i])),
+                open=float(table.column("open")[i]),
+                high=float(table.column("high")[i]),
+                low=float(table.column("low")[i]),
+                close=float(table.column("close")[i]),
+                volume=float(table.column("volume")[i]),
+                adj_close=(
+                    float(table.column("adj_close")[i].as_py())
+                    if (
+                        table.schema.get_field_index("adj_close") >= 0
+                        and table.column("adj_close")[i].as_py() is not None
+                    )
+                    else None
+                ),
+            )
+        )
+    return bars
+
+
+def _col_opt(table, col):
+    v = table.column(col)[0]
+    return str(v) if v is not None else None
+
+
+def _float_col_opt(table, col):
+    v = table.column(col)[0]
+    return float(v) if v is not None else None
+
+
+def _load_parquet_fundamentals(path: Path) -> FundamentalsSnapshot:
+    table = pq.read_table(path)
+    return FundamentalsSnapshot(
+        symbol=str(table.column("symbol")[0]),
+        as_of_date=date.fromisoformat(str(table.column("as_of_date")[0])),
+        market_cap=_float_col_opt(table, "market_cap"),
+        pe_ratio=_float_col_opt(table, "pe_ratio"),
+        eps_ttm=_float_col_opt(table, "eps_ttm"),
+        dividend_yield=_float_col_opt(table, "dividend_yield"),
+        sector=_col_opt(table, "sector"),
+        industry=_col_opt(table, "industry"),
+    )
+
+
+def _load_parquet_insider(path: Path) -> list[InsiderTransaction]:
+    table = pq.read_table(path)
+    txns: list[InsiderTransaction] = []
+    for i in range(len(table)):
+        filing = table.column("filing_date")[i]
+        trans = table.column("transaction_date")[i]
+        txns.append(
+            InsiderTransaction(
+                symbol=str(table.column("symbol")[i]),
+                filing_date=date.fromisoformat(str(filing)) if filing else None,
+                transaction_date=date.fromisoformat(str(trans)) if trans else None,
+                owner=str(table.column("owner")[i]) if table.column("owner")[i] else "",
+                title=str(table.column("title")[i]) if table.column("title")[i] else "",
+                transaction_type=str(table.column("transaction_type")[i]),
+                shares_traded=float(table.column("shares_traded")[i]),
+                price=float(table.column("price")[i]),
+                shares_held=float(table.column("shares_held")[i]),
+            )
+        )
+    return txns
+
+
+def _load_parquet_mentions(path: Path) -> list[MentionCount]:
+    table = pq.read_table(path)
+    mentions: list[MentionCount] = []
+    for i in range(len(table)):
+        mentions.append(
+            MentionCount(
+                symbol=str(table.column("symbol")[i]),
+                mention_date=date.fromisoformat(str(table.column("date")[i])),
+                source=str(table.column("source")[i]),
+                count=int(table.column("count")[i]),
+            )
+        )
+    return mentions
+
+
+def _load_fixtures(
+    fixture_path: Path,
+    symbols: list[str],
+) -> dict[str, Any]:
+    data: dict[str, Any] = {"bars": {}, "fundamentals": {}, "insider": {}, "mentions": {}}
+    for sym in symbols:
+        bar_path = fixture_path / "bars" / f"{sym}.parquet"
+        if bar_path.exists():
+            data["bars"][sym] = _load_parquet_bars(bar_path)
+        fund_path = fixture_path / "fundamentals" / f"{sym}.parquet"
+        if fund_path.exists():
+            data["fundamentals"][sym] = _load_parquet_fundamentals(fund_path)
+        ins_path = fixture_path / "insider_tx" / f"{sym}.parquet"
+        if ins_path.exists():
+            data["insider"][sym] = _load_parquet_insider(ins_path)
+        ment_path = fixture_path / "mentions" / f"{sym}.parquet"
+        if ment_path.exists():
+            data["mentions"][sym] = _load_parquet_mentions(ment_path)
+    return data
+
+
+def _populate_store(store: FixtureStore, fixture_data: dict[str, Any]) -> None:
+    for sym, bars in fixture_data["bars"].items():
+        if bars:
+            store.save_bars(sym, bars)
+    for sym, snap in fixture_data["fundamentals"].items():
+        if snap is not None:
+            store.save_fundamentals(sym, [snap])
+    for sym, txns in fixture_data["insider"].items():
+        if txns:
+            store.save_insider_transactions(sym, txns)
+    for sym, mentions in fixture_data["mentions"].items():
+        if mentions:
+            store.save_mentions(sym, mentions)
+
+
+def _trading_dates(bars: dict[str, list[Bar]], start: date, end: date) -> list[date]:
+    spy_bars = bars.get("SPY", [])
+    seen: set[date] = set()
+    result: list[date] = []
+    for b in spy_bars:
+        if b.date not in seen and start <= b.date <= end:
+            seen.add(b.date)
+            result.append(b.date)
+    return result
 
 
 def run_replay(
@@ -15,28 +182,8 @@ def run_replay(
     from_date: str,
     to_date: str,
     fixture_path: str | None = None,
-    store: CanonicalStore | None = None,
+    store: Any = None,
 ) -> dict[str, Any]:
-    """Stub replay — builds a static metadata dict, runs no DAG.
-
-    Currently this function produces a synthetic "golden_pass" result without
-    actually running any pipeline stages. This gives false confidence in I7.
-
-    Stages to wire incrementally as they land (tracked in #97):
-      1. indicator engine (derive.py) — load fixture bars, run backfill, emit events
-      2. universe selection (universe.py) — M1 filter against fixture data
-      3. regime detection (domain/regime.py when it exists)
-      4. risk management (domain/risk.py when it exists)
-      5. decision engine gates + scoring (M3-M8 when they exist)
-      6. order simulation + fill model
-      7. paper book + shadow books
-      8. narration
-
-    Each wiring step:
-      - Replaces the static claim (e.g. "ingest": true) with an actual run
-      - Changes the golden output hash (expected — re-bless via make bless-golden)
-      - Must be deterministic (I7) — same fixture + config = same output
-    """
     cfg_redacted = redact_config(config)
     config_hash = hashlib.sha256(json.dumps(cfg_redacted, sort_keys=True).encode()).hexdigest()[:16]
 
@@ -44,10 +191,259 @@ def run_replay(
     if fixture_path:
         fixture_hash = compute_manifest_hash(fixture_path)
 
-    run_id: str | None = None
-    if store is not None:
-        fv = config.data.fixture_version if hasattr(config.data, "fixture_version") else ""
-        run_id = store.register_run("replay", config_hash, fv)
+    f_start = date.fromisoformat(from_date)
+    f_end = date.fromisoformat(to_date)
+    fp = Path(fixture_path) if fixture_path else Path("fixtures/v1")
+
+    symbols = list(config.bootstrap.symbols) + list(config.bootstrap.include_benchmarks)
+    fixture_data = _load_fixtures(fp, symbols)
+
+    fstore = FixtureStore()
+    _populate_store(fstore, fixture_data)
+
+    lookback_start = date.fromordinal(f_start.toordinal() - _LOOKBACK_DAYS)
+    fb_keys = list(fixture_data["bars"].keys())
+    all_bars = load_all_bars(fstore, ensure_spy(fb_keys), lookback_start, f_end)
+
+    fill_config = FillConfig()
+    risk_config = RiskConfig()
+    sizing_config = SizingConfig()
+
+    mech_data: Any = None
+    mech_fundamentals: dict[str, FundamentalsSnapshot | None] = {}
+    for sym in symbols:
+        try:
+            fund = fstore.load_fundamentals(sym)
+            if fund:
+                mech_fundamentals[sym] = fund[0]
+        except Exception:
+            pass
+
+    mech_insider: dict[str, list[InsiderTransaction]] = {}
+    for sym in symbols:
+        try:
+            txns = fstore.load_insider_transactions(sym)
+            if txns:
+                mech_insider[sym] = list(txns)
+        except Exception:
+            pass
+
+    mech_mentions: dict[str, list[MentionCount]] = {}
+    for sym in symbols:
+        try:
+            mentions = fstore.load_mentions(sym)
+            if mentions:
+                mech_mentions[sym] = list(mentions)
+        except Exception:
+            pass
+
+    from alpha_quant.app._loop import MechanismData
+
+    mech_data = MechanismData(
+        fundamentals=mech_fundamentals,
+        insider_txns=mech_insider,
+        mentions=mech_mentions,
+    )
+
+    trading_dates = _trading_dates(fixture_data["bars"], f_start, f_end)
+    indicator_states: dict[str, IndicatorState] = {}
+
+    cash: float = getattr(config.paper, "starting_equity", 100_000.0)
+    positions: dict[str, Position] = {}
+    decisions: list[Decision] = []
+    all_fills: list[Fill] = []
+    equity_curve: list[float] = []
+    last_close: dict[str, float] = {}
+
+    sector_map = {
+        sym: snap.sector
+        for sym, snap in mech_fundamentals.items()
+        if snap is not None and snap.sector is not None
+    }
+
+    for trade_date in trading_dates:
+        date_bars = get_date_bars(all_bars, trade_date)
+
+        spy_bar = date_bars.get("SPY")
+        if spy_bar is None:
+            continue
+
+        for symbol, bar in date_bars.items():
+            prev = indicator_states.get(symbol)
+            if prev is None:
+                prev_bars = [b for b in all_bars.get(symbol, []) if b.date < trade_date]
+                bootstrap = prev_bars + [bar]
+                indicator_states[symbol] = backfill_indicator_state(bootstrap)
+            else:
+                indicator_states[symbol] = update_indicator_state(prev, bar)
+
+        prices: dict[str, float] = {s: b.close for s, b in date_bars.items()}
+
+        # Risk exits
+        for sym in list(positions.keys()):
+            pos = positions[sym]
+            if pos.quantity <= 0:
+                continue
+            bar = date_bars.get(sym)
+            if bar is None:
+                continue
+            state = indicator_states.get(sym)
+            risk_actions = evaluate_risk_actions(pos, bar, state, risk_config, trade_date)
+
+            for action in risk_actions:
+                if action.action_type in ("stop", "trail_stop", "time_stop"):
+                    oid = f"{sym}_exit_{trade_date.isoformat()}"
+                    fill = fill_stop_loss(pos, bar, order_id=oid, config=fill_config)
+                    if fill is None:
+                        continue
+                    proceeds = round(abs(fill.quantity) * fill.price, 2)
+                    cash += proceeds
+                    all_fills.append(fill)
+                    decisions.append(
+                        Decision(
+                            symbol=sym,
+                            date=trade_date,
+                            action="exit",
+                            confidence=1.0,
+                            reasons=[action.reason],
+                            decision_id=_make_id(f"exit_{sym}_{trade_date}"),
+                        )
+                    )
+                    positions.pop(sym, None)
+                elif action.action_type == "partial_take":
+                    if pos.quantity <= 0:
+                        continue
+                    sell_qty = min(abs(action.shares), pos.quantity)
+                    proceeds = round(sell_qty * (action.price or bar.close), 2)
+                    cash += proceeds
+                    remaining = pos.quantity - sell_qty
+                    updated = pos.model_copy(
+                        update={
+                            "quantity": remaining,
+                            "market_value": remaining * (action.price or bar.close),
+                            "partial_taken": True,
+                        }
+                    )
+                    positions[sym] = updated
+                    decisions.append(
+                        Decision(
+                            symbol=sym,
+                            date=trade_date,
+                            action="partial_take",
+                            confidence=1.0,
+                            reasons=[action.reason],
+                            decision_id=_make_id(f"partial_{sym}_{trade_date}"),
+                        )
+                    )
+
+        # Regime + entries
+        if len(positions) < len(symbols):
+            spy_state = indicator_states.get("SPY")
+            regime, regime_mult = detect_regime_and_multiplier(spy_state)
+
+            all_considered = decide_candidates(
+                list(fixture_data["bars"].keys()),
+                all_bars,
+                indicator_states,
+                trade_date,
+                regime,
+                mech_data,
+            )
+            candidates = [c for c in all_considered if c.block_reason is None]
+
+            ranked = rank_candidates(
+                candidates, len(symbols), len(positions), sector_map=sector_map
+            )
+            slots = len(symbols) - len(positions)
+
+            for cand in ranked[:slots]:
+                bar = date_bars.get(cand.symbol)
+                state = indicator_states.get(cand.symbol)
+                if bar is None or state is None:
+                    continue
+                prev = last_close.get(cand.symbol, 0.0)
+                atr_val = compute_atr(state, bar.close)
+
+                total_equity = cash + sum(
+                    p.quantity * prices.get(p.symbol, 0.0) for p in positions.values()
+                )
+                sized = size_entry(total_equity, bar.close, atr_val, regime_mult, sizing_config)
+                if sized is None:
+                    continue
+                final_shares = sized.shares
+
+                order_id = _make_id(f"order_{cand.symbol}_{trade_date}")
+                order = Order(
+                    order_id=order_id,
+                    symbol=cand.symbol,
+                    action="buy",
+                    quantity=float(final_shares),
+                    order_type="market",
+                    status="submitted",
+                )
+                fill = fill_entry_order(order, bar, prev, config=fill_config)
+                if fill is None:
+                    continue
+                fill_price = fill.price
+                cost = round(float(final_shares) * fill_price, 2)
+                if cost > cash:
+                    continue
+
+                cash -= cost
+                all_fills.append(fill)
+                stop_price = round(fill_price - risk_config.stop_atr_mult * atr_val, 2)
+
+                pos = Position(
+                    symbol=cand.symbol,
+                    quantity=float(final_shares),
+                    entry_price=fill_price,
+                    avg_cost=fill_price,
+                    current_price=fill_price,
+                    stop_price=stop_price,
+                    market_value=cost,
+                    decision_id=_make_id(f"entry_{cand.symbol}_{trade_date}"),
+                    entry_date=trade_date,
+                    high_since_entry=bar.high,
+                )
+                positions[cand.symbol] = pos
+                decisions.append(
+                    Decision(
+                        symbol=cand.symbol,
+                        date=trade_date,
+                        action="enter",
+                        confidence=cand.composite_score,
+                        reasons=["replay"],
+                        decision_id=_make_id(f"enter_{cand.symbol}_{trade_date}"),
+                    )
+                )
+
+        # Mark to market
+        total_mark = 0.0
+        for sym, pos in positions.items():
+            price = prices.get(sym)
+            if price is not None:
+                mv = round(pos.quantity * price, 2)
+                total_mark += mv
+                positions[sym] = pos.model_copy(update={"current_price": price, "market_value": mv})
+
+        equity = round(cash + total_mark, 2)
+        equity_curve.append(equity)
+
+        for symbol, bar in date_bars.items():
+            last_close[symbol] = bar.close
+
+    # Compute metrics
+    initial_equity = getattr(config.paper, "starting_equity", 100_000.0)
+    total_return = (equity_curve[-1] - initial_equity) / initial_equity if equity_curve else 0.0
+    years = len(equity_curve) / 252.0 if len(equity_curve) > 0 else 1.0
+    cagr = (1.0 + total_return) ** (1.0 / years) - 1.0 if years > 0 else 0.0
+
+    import numpy as np
+
+    eq_arr = np.array(equity_curve) if equity_curve else np.array([initial_equity])
+    peak = np.maximum.accumulate(eq_arr)
+    dd = (eq_arr - peak) / peak
+    max_dd = float(np.min(dd)) if len(dd) > 0 else 0.0
 
     output: dict[str, Any] = {
         "meta": {
@@ -57,37 +453,38 @@ def run_replay(
             "fixture_path": fixture_path,
             "fixture_hash": fixture_hash,
             "config_hash": config_hash,
-            "run_id": run_id,
-        },
-        "system": {
-            "python": "3.14",
-            "platform": "deterministic",
-            "config_version": config_hash,
         },
         "symbols": {
-            "total": len(config.bootstrap.symbols) + len(config.bootstrap.include_benchmarks),
-            "primary": len(config.bootstrap.symbols),
-            "benchmarks": len(config.bootstrap.include_benchmarks),
+            "total": len(ensure_spy(list(fixture_data["bars"].keys()))),
         },
-        "pipeline": {
-            "status": "golden_pass",
-            "stages": [
-                "ingest",
-                "validate",
-                "derive",
-                "regime",
-                "risk",
-                "decide",
-                "simulate",
-                "persist",
-                "narrate",
-            ],
-            "completed": 9,
+        "decisions": [
+            {
+                "symbol": d.symbol,
+                "date": str(d.date),
+                "action": d.action,
+                "confidence": d.confidence,
+                "decision_id": d.decision_id,
+            }
+            for d in decisions
+        ],
+        "fills": [
+            {
+                "fill_id": f.fill_id,
+                "symbol": f.symbol,
+                "quantity": f.quantity,
+                "price": f.price,
+            }
+            for f in all_fills
+        ],
+        "equity_curve": [{"day": i, "equity": round(e, 2)} for i, e in enumerate(equity_curve)],
+        "metrics": {
+            "total_return_pct": round(total_return * 100, 2),
+            "cagr_pct": round(cagr * 100, 2),
+            "max_drawdown_pct": round(max_dd * 100, 2),
+            "num_trades": len(decisions),
+            "num_fills": len(all_fills),
         },
     }
-
-    if store is not None and run_id is not None:
-        store.complete_run(run_id, "golden_pass", fixture_hash)
 
     return output
 
