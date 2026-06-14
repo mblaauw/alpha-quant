@@ -7,7 +7,8 @@
 
 Deterministic, daily-cadence, long-only equity trading system
 
-[![CI](https://github.com/mblaauw/alpha-quant/actions/workflows/ci.yml/badge.svg)](https://github.com/mblaauw/alpha-quant/actions)
+[![CI](https://github.com/mblaauw/alpha-quant/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mblaauw/alpha-quant/actions)
+[![Beta Release](https://img.shields.io/badge/status-beta-yellow)](https://github.com/mblaauw/alpha-quant/milestone/8)
 [![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://python.org)
 [![ty checked](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ty/main/assets/badge/v0.json)](https://github.com/astral-sh/ty)
 [![Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
@@ -83,22 +84,22 @@ CONNECTORS          RAW VAULT          CANONICAL STORE        DECISION ENGINE
 | [Design Specification](DESIGN.md) | Full system design (v1.2) |
 | [Architecture Diagrams](docs/architecture/README.md) | C4 model (LikeC4) |
 | [ADR Log](docs/adr/README.md) | 28 Architecture Decision Records |
-| [Backlog](docs/planning/BACKLOG.md) | Full project backlog |
-| [Roadmap](docs/planning/ROADMAP.md) | Implementation roadmap |
+| [Backlog](docs/planning/BACKLOG.md) | Historical backlog (retired — see GitHub issues) |
+| [Roadmap](docs/planning/ROADMAP.md) | Beta release status |
 
 ## CLI Commands
 
 | Command | Status | Description |
 |---------|--------|-------------|
 | `alpha-quant bootstrap` | ✅ Ready | Generate deterministic fixture data for development |
-| `alpha-quant replay` | 🔨 Stub | Golden replay (incremental wiring in progress) |
-| `alpha-quant run` | 📋 Planned | Daily pipeline (P2.14) |
-| `alpha-quant backtest` | 📋 Planned | Event-driven backtester (P2.13) |
-| `alpha-quant journal` | 📋 Planned | Daily journal with LLM narration (P4.5) |
-| `alpha-quant ask` | 📋 Planned | Query recorded decisions (P4.8) |
-| `alpha-quant report` | 📋 Planned | Weekly/monthly reports (P4.6) |
-| `alpha-quant status` | 📋 Planned | Full system status (P5.4) |
-| `alpha-quant halt` | 📋 Planned | Halt or resume pipeline (P5.4) |
+| `alpha-quant replay` | 🔧 Partial | Golden replay (metadata only; DAG replay tracked in #97) |
+| `alpha-quant run` | ✅ Ready | Daily pipeline |
+| `alpha-quant backtest` | ✅ Ready | Event-driven backtester |
+| `alpha-quant journal` | ✅ Ready | Daily journal with LLM narration |
+| `alpha-quant ask` | ✅ Ready | Query recorded decisions |
+| `alpha-quant report` | ✅ Ready | Weekly/monthly reports |
+| `alpha-quant status` | ✅ Ready | Full system status |
+| `alpha-quant halt` | ✅ Ready | Halt or resume pipeline |
 
 ## Development
 
