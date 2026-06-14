@@ -317,6 +317,76 @@ class TestPipelineCore:
         halt_events = [e for e in result.events if hasattr(e, "action_type") and e.action_type == "daily_halt"]
         assert len(halt_events) > 0, "daily_halt should emit when equity drops from 100K to 50K"
 
+    def test_m1_missing_bars_skips_symbol(self) -> None:
+        """Symbol with no bars produces no decision."""
+        spy_bars = _make_bars(400, 100.0)
+        store = _FakeStore(bars={"SPY": spy_bars})
+        with (
+            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
+        ):
+            mock_backfill.return_value = _FakeIndicatorState()
+            mock_regime.return_value = ("RISK_ON", 1.0)
+            result = run(
+                run_date=date(2026, 6, 11),
+                store=store,
+                universe=["SPY", "AAPL"],
+                risk_config=RiskConfig(),
+                prev_equity=100_000.0,
+            )
+        assert isinstance(result, RunResult)
+        aapl_decisions = [d for d in result.decisions if d.symbol == "AAPL"]
+        assert len(aapl_decisions) == 0, "AAPL should have no decisions (no bars)"
+
+    def test_m2_regime_off_blocks_entries(self) -> None:
+        """RISK_OFF regime (regime_mult=0) produces no entry decisions."""
+        spy_bars = _make_bars(400, 100.0)
+        aapl_bars = _make_bars(400, 150.0)
+        store = _FakeStore(bars={"SPY": spy_bars, "AAPL": aapl_bars})
+        with (
+            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
+        ):
+            mock_backfill.return_value = _FakeIndicatorState()
+            mock_regime.return_value = ("RISK_OFF", 0.0)
+            result = run(
+                run_date=date(2026, 6, 11),
+                store=store,
+                universe=["SPY", "AAPL"],
+                risk_config=RiskConfig(),
+                prev_equity=100_000.0,
+            )
+        assert isinstance(result, RunResult)
+        entry_decisions = [d for d in result.decisions if d.action == "enter"]
+        assert len(entry_decisions) == 0, "RISK_OFF should prevent entries"
+
+    def test_gate_blocked_emits_candidate_blocked_events(self) -> None:
+        """Blocked candidates produce CandidateBlocked events with gate info."""
+        spy_bars = _make_bars(400, 100.0)
+        aapl_bars = _make_bars(400, 150.0)
+        store = _FakeStore(bars={"SPY": spy_bars, "AAPL": aapl_bars})
+        with (
+            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("alpha_quant.app.pipeline.decide_candidates") as mock_decide,
+        ):
+            mock_backfill.return_value = _FakeIndicatorState()
+            mock_regime.return_value = ("RISK_ON", 1.0)
+            blocked = _FakeCandidate()
+            blocked.block_reason = "low_quality"
+            blocked.gate_results = {"fundamental": False, "insider": True, "crowding": True, "blackout": True}
+            mock_decide.return_value = [blocked]
+            result = run(
+                run_date=date(2026, 6, 11),
+                store=store,
+                universe=["SPY", "AAPL"],
+                risk_config=RiskConfig(),
+                prev_equity=100_000.0,
+            )
+        assert isinstance(result, RunResult)
+        blocked_events = [e for e in result.events if type(e).__name__ == "CandidateBlocked"]
+        assert len(blocked_events) > 0, "blocked candidate should produce CandidateBlocked events"
+
     def test_mark_to_market_updates_positions(self) -> None:
         spy_bars = _make_bars(400, 100.0)
         aapl_bars = _make_bars(400, 150.0)
