@@ -18,6 +18,9 @@ from alpha_quant.app.store.canonical import (
     load_corp_actions,
     load_earnings,
     read_bars,
+    read_fundamentals,
+    read_insider_transactions,
+    read_mentions,
     write_dataset,
 )
 from alpha_quant.domain.events import DomainEvent
@@ -545,6 +548,18 @@ class CanonicalStore(Store):
     @override
     def load_earnings(self, symbol: str) -> list[EarningsEntry]:
         return load_earnings(self._analytical, self._base, symbol)
+
+    @override
+    def load_fundamentals(self, symbol: str) -> list[FundamentalsSnapshot]:
+        return read_fundamentals(self._analytical, self._base, symbol)
+
+    @override
+    def load_insider_transactions(self, symbol: str) -> list[InsiderTransaction]:
+        return read_insider_transactions(self._analytical, self._base, symbol)
+
+    @override
+    def load_mentions(self, symbol: str) -> list[MentionCount]:
+        return read_mentions(self._analytical, self._base, symbol)
 
     @override
     def save_portfolio_snapshot(self, snapshot: PortfolioSnapshot) -> None:

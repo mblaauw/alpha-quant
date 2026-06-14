@@ -18,6 +18,9 @@ from alpha_quant.domain.models import (
     Bar,
     CorporateAction,
     EarningsEntry,
+    FundamentalsSnapshot,
+    InsiderTransaction,
+    MentionCount,
 )
 
 logger = structlog.get_logger()
@@ -205,6 +208,113 @@ def load_earnings(
             eps_actual=r[3],
             revenue_estimate=r[4],
             revenue_actual=r[5],
+        )
+        for r in result
+    ]
+
+
+def read_fundamentals(
+    analytical: duckdb.DuckDBPyConnection, base: Path, symbol: str
+) -> list[FundamentalsSnapshot]:
+    data_path = str(base / "canonical" / "fundamentals" / "**" / "*.parquet")
+    pcol = partition_col("fundamentals")
+    hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
+    try:
+        result = analytical.execute(
+            f"""
+            SELECT symbol, "{pcol}" AS as_of_date, market_cap, pe_ratio, eps_ttm,
+                   dividend_yield, sector, industry, operating_cash_flow,
+                   total_liabilities, total_debt, total_equity, revenue,
+                   net_income, accruals
+            FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
+            WHERE symbol = ?
+            ORDER BY "{pcol}" DESC
+            """,
+            [symbol],
+        ).fetchall()
+    except (duckdb.CatalogException, duckdb.IOException):
+        return []
+    return [
+        FundamentalsSnapshot(
+            symbol=r[0],
+            as_of_date=r[1],
+            market_cap=r[2],
+            pe_ratio=r[3],
+            eps_ttm=r[4],
+            dividend_yield=r[5],
+            sector=r[6],
+            industry=r[7],
+            operating_cash_flow=r[8],
+            total_liabilities=r[9],
+            total_debt=r[10],
+            total_equity=r[11],
+            revenue=r[12],
+            net_income=r[13],
+            accruals=r[14],
+        )
+        for r in result
+    ]
+
+
+def read_insider_transactions(
+    analytical: duckdb.DuckDBPyConnection, base: Path, symbol: str
+) -> list[InsiderTransaction]:
+    data_path = str(base / "canonical" / "insider_transactions" / "**" / "*.parquet")
+    pcol = partition_col("insider_transactions")
+    hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
+    try:
+        result = analytical.execute(
+            f"""
+            SELECT symbol, "{pcol}" AS filing_date, transaction_date, owner, title,
+                   transaction_type, shares_traded, price, shares_held
+            FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
+            WHERE symbol = ?
+            ORDER BY "{pcol}" DESC
+            """,
+            [symbol],
+        ).fetchall()
+    except (duckdb.CatalogException, duckdb.IOException):
+        return []
+    return [
+        InsiderTransaction(
+            symbol=r[0],
+            filing_date=r[1],
+            transaction_date=r[2],
+            owner=r[3],
+            title=r[4],
+            transaction_type=r[5],
+            shares_traded=r[6],
+            price=r[7],
+            shares_held=r[8],
+        )
+        for r in result
+    ]
+
+
+def read_mentions(
+    analytical: duckdb.DuckDBPyConnection, base: Path, symbol: str
+) -> list[MentionCount]:
+    data_path = str(base / "canonical" / "mentions" / "**" / "*.parquet")
+    pcol = partition_col("mentions")
+    hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
+    try:
+        result = analytical.execute(
+            f"""
+            SELECT symbol, "{pcol}" AS mention_date, source, count
+            FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
+            WHERE symbol = ?
+            ORDER BY "{pcol}" DESC
+            """,
+            [symbol],
+        ).fetchall()
+    except (duckdb.CatalogException, duckdb.IOException):
+        return []
+    return [
+        MentionCount(
+            symbol=r[0],
+            mention_date=r[1],
+            source=r[2],
+            count=r[3],
         )
         for r in result
     ]
