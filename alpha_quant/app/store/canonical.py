@@ -232,7 +232,7 @@ def read_fundamentals(
             """,
             [symbol],
         ).fetchall()
-    except (duckdb.CatalogException, duckdb.IOException):
+    except (duckdb.CatalogException, duckdb.IOException):  # fmt: skip
         return []
     return [
         FundamentalsSnapshot(
@@ -273,7 +273,7 @@ def read_insider_transactions(
             """,
             [symbol],
         ).fetchall()
-    except (duckdb.CatalogException, duckdb.IOException):
+    except (duckdb.CatalogException, duckdb.IOException):  # fmt: skip
         return []
     return [
         InsiderTransaction(
@@ -307,7 +307,7 @@ def read_mentions(
             """,
             [symbol],
         ).fetchall()
-    except (duckdb.CatalogException, duckdb.IOException):
+    except (duckdb.CatalogException, duckdb.IOException):  # fmt: skip
         return []
     return [
         MentionCount(
