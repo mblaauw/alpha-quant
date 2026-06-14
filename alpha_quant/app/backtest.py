@@ -17,7 +17,7 @@ from alpha_quant.app._loop import (
     load_all_bars,
     size_entry,
 )
-from alpha_quant.domain.ablation import compute_spy_buy_and_hold
+from alpha_quant.domain.ablation import AblationConfig, compute_spy_buy_and_hold
 from alpha_quant.domain.derive import backfill_indicator_state, update_indicator_state
 from alpha_quant.domain.fills import FillConfig, fill_entry_order, fill_stop_loss
 from alpha_quant.domain.models import (
@@ -42,6 +42,7 @@ class BacktestConfig:
     symbols: list[str]
     initial_equity: float = 100_000.0
     max_positions: int = 10
+    ablation: AblationConfig | None = None
 
 
 @dataclass
@@ -290,6 +291,7 @@ def run_backtest(
                 trade_date,
                 regime,
                 mech_data,
+                ablation=config.ablation,
             )
             candidates = [c for c in all_considered if c.block_reason is None]
 

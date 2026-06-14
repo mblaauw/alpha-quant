@@ -51,7 +51,7 @@ class _FakeStore:
     def load_positions(self) -> list[Position]:
         return self._positions
 
-    def load_latest_portfolio_snapshot(self) -> None:
+    def load_latest_portfolio_snapshot(self, book: str = "PAPER") -> None:
         return None
 
     def save_position(self, position: Position) -> None:
@@ -62,6 +62,9 @@ class _FakeStore:
 
     def save_event(self, event: object) -> None:
         self.saved_events.append(event)
+
+    def save_portfolio_snapshot(self, snapshot: object) -> None:
+        pass
 
     def transaction(self) -> object:
         class _Txn:
@@ -260,11 +263,13 @@ class _FakeIndicatorState:
 
 class _FakeCandidate:
     symbol = "AAPL"
+    date = date(2026, 6, 11)
     block_reason: str | None = None
     composite_score: float = 0.8
     scores: dict[str, float] = {"technical": 0.8, "momentum": 0.3}
     gate_results: dict[str, bool] = {"fundamental": True, "insider": True, "crowding": True, "blackout": True}
     regime: str = "RISK_ON"
+    sector: str | None = None
 
     def model_copy(self, *, update: dict | None = None) -> _FakeCandidate:
         c = _FakeCandidate()
@@ -451,3 +456,173 @@ class TestDecideCandidates:
         assert result[0].block_reason is None
         for gate in ("fundamental", "insider", "crowding", "blackout"):
             assert result[0].gate_results[gate] is True, f"gate {gate} should pass"
+
+
+class TestShadowAblation:
+    """Behavioral tests for ablation toggles (AC #6, #7, #8)."""
+
+    def test_no_insider_unblocks_negative_signal(self) -> None:
+        """NO_INSIDER produces different outcome than FULL when M5 blocks."""
+        from datetime import date
+
+        from alpha_quant.app._loop import MechanismData, decide_candidates
+        from alpha_quant.domain.ablation import AblationConfig
+        from alpha_quant.domain.fundamental import QualityVerdict
+        from alpha_quant.domain.insider_signal import InsiderVerdict
+        from alpha_quant.domain.models import EarningsEntry, FundamentalsSnapshot, InsiderTransaction
+    
+        mech_data = MechanismData(
+            fundamentals={"AAPL": FundamentalsSnapshot(symbol="AAPL", as_of_date=date(2026, 6, 11), market_cap=1e12)},
+            insider_txns={"AAPL": [InsiderTransaction(symbol="AAPL", filing_date=date(2026, 6, 10), transaction_date=date(2026, 6, 8), owner="CEO", title="CEO", transaction_type="Sell", shares_traded=-10000, price=100, shares_held=50000)]},
+            earnings={"AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]},
+        )
+        bars = {"AAPL": [Bar(symbol="AAPL", date=date(2026, 6, 11), open=100, high=101, low=99, close=100, volume=1_000_000)]}
+        states = {"AAPL": _FakeIndicatorState()}
+        no_insider = AblationConfig(disable_insider=True)
+
+        with (
+            patch("alpha_quant.app._loop.score_candidate") as mock_score,
+            patch("alpha_quant.app._loop.evaluate_fundamental") as mock_fund,
+            patch("alpha_quant.app._loop.check_blackout") as mock_bo,
+            patch("alpha_quant.app._loop.evaluate_insider") as mock_insider,
+        ):
+            mock_score.return_value = _FakeCandidate()
+            mock_fund.return_value = QualityVerdict(passed=True, reason=None)
+            mock_bo.return_value = None
+            mock_insider.return_value = InsiderVerdict(score=-2.0, reason="insider_selling")
+
+            full_result = decide_candidates(
+                ["AAPL"], bars, states, date(2026, 6, 11), "RISK_ON", mech_data,
+            )
+            ablated_result = decide_candidates(
+                ["AAPL"], bars, states, date(2026, 6, 11), "RISK_ON", mech_data,
+                ablation=no_insider,
+            )
+
+        # FULL should block due to negative insider
+        assert len(full_result) == 1
+        assert full_result[0].block_reason is not None
+        assert full_result[0].gate_results["insider"] is False
+
+        # NO_INSIDER should pass (M5 skipped)
+        assert len(ablated_result) == 1
+        assert ablated_result[0].block_reason is None
+        assert ablated_result[0].gate_results["insider"] is True
+
+    def test_no_crowding_veto_unblocks_crowding_block(self) -> None:
+        """NO_CROWDING_VETO produces different outcome than FULL when M6 blocks."""
+        from datetime import date
+
+        from alpha_quant.app._loop import MechanismData, decide_candidates
+        from alpha_quant.domain.ablation import AblationConfig
+        from alpha_quant.domain.crowding import CrowdingVerdict
+        from alpha_quant.domain.models import EarningsEntry, MentionCount
+
+        mech_data = MechanismData(
+            mentions={"AAPL": [MentionCount(symbol="AAPL", mention_date=date(2026, 6, 10), source="twitter", count=1000)]},
+            earnings={"AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]},
+        )
+        bars = {"AAPL": [Bar(symbol="AAPL", date=date(2026, 6, 11), open=100, high=101, low=99, close=100, volume=1_000_000)]}
+        states = {"AAPL": _FakeIndicatorState()}
+        no_crowding = AblationConfig(disable_crowding_veto=True)
+
+        with (
+            patch("alpha_quant.app._loop.score_candidate") as mock_score,
+            patch("alpha_quant.app._loop.check_blackout") as mock_bo,
+            patch("alpha_quant.app._loop.evaluate_crowding") as mock_crowd,
+        ):
+            mock_score.return_value = _FakeCandidate()
+            mock_bo.return_value = None
+            mock_crowd.return_value = CrowdingVerdict(blocked=True, reason="high_mentions", blocked_until=None)
+
+            full_result = decide_candidates(
+                ["AAPL"], bars, states, date(2026, 6, 11), "RISK_ON", mech_data,
+            )
+            ablated_result = decide_candidates(
+                ["AAPL"], bars, states, date(2026, 6, 11), "RISK_ON", mech_data,
+                ablation=no_crowding,
+            )
+
+        # FULL should block due to crowding veto
+        assert len(full_result) == 1
+        assert full_result[0].block_reason is not None
+        assert full_result[0].gate_results["crowding"] is False
+
+        # NO_CROWDING_VETO should pass (M6 skipped)
+        assert len(ablated_result) == 1
+        assert ablated_result[0].block_reason is None
+        assert ablated_result[0].gate_results["crowding"] is True
+
+    def test_pipeline_accepts_shadow_books(self) -> None:
+        """Pipeline.run processes shadow books and persists their snapshots."""
+        from alpha_quant.app.pipeline import PipelineConfig, run as run_pipeline
+        from alpha_quant.domain.ablation import AblationConfig, ShadowBook
+        from alpha_quant.domain.fills import FillConfig
+
+        spy_bars = _make_bars(400, 100.0)
+        aapl_bars = _make_bars(400, 150.0)
+        store = _FakeStore(bars={"SPY": spy_bars, "AAPL": aapl_bars})
+
+        shadow_book = ShadowBook("TEST_SHADOW", AblationConfig(disable_insider=True))
+
+        with (
+            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("alpha_quant.app.pipeline.decide_candidates") as mock_decide,
+        ):
+            mock_backfill.return_value = _FakeIndicatorState()
+            mock_regime.return_value = ("RISK_ON", 1.0)
+            mock_decide.return_value = [_FakeCandidate()]
+
+            result = run_pipeline(
+                run_date=date(2026, 6, 11),
+                store=store,
+                universe=["SPY", "AAPL"],
+                config=PipelineConfig(ablation=AblationConfig()),
+                fill_config=FillConfig(),
+                shadow_books={"TEST_SHADOW": shadow_book},
+            )
+
+        assert isinstance(result, RunResult)
+        assert result.run_id
+
+    def test_backtest_accepts_ablation_config(self) -> None:
+        """Backtest config passes ablation through to decide_candidates."""
+        from alpha_quant.app.backtest import BacktestConfig, run_backtest
+        from alpha_quant.domain.ablation import AblationConfig
+        from alpha_quant.domain.fills import FillConfig
+
+        spy_bars = _make_bars(400, 100.0)
+        aapl_bars = _make_bars(400, 150.0)
+        store = _FakeStore(bars={"SPY": spy_bars, "AAPL": aapl_bars})
+
+        bt_config = BacktestConfig(
+            start_date=date(2025, 1, 2),
+            end_date=date(2025, 1, 15),
+            symbols=["AAPL"],
+            initial_equity=100_000.0,
+            ablation=AblationConfig(disable_insider=True),
+        )
+
+        with (
+            patch("alpha_quant.app.backtest.backfill_indicator_state") as mock_backfill,
+            patch("alpha_quant.app.backtest.update_indicator_state") as mock_update,
+            patch("alpha_quant.app.backtest.detect_regime_and_multiplier") as mock_regime,
+            patch("alpha_quant.app.backtest.decide_candidates") as mock_decide,
+        ):
+            mock_backfill.return_value = _FakeIndicatorState()
+            mock_update.return_value = _FakeIndicatorState()
+            mock_regime.return_value = ("RISK_ON", 1.0)
+            mock_decide.return_value = []
+
+            result = run_backtest(
+                config=bt_config,
+                store=store,
+                fill_config=FillConfig(),
+            )
+
+        # Verify ablation was passed to decide_candidates
+        assert mock_decide.called
+        _, kwargs = mock_decide.call_args
+        assert kwargs.get("ablation") is not None
+        assert kwargs["ablation"].disable_insider is True

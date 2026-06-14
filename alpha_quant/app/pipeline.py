@@ -17,7 +17,10 @@ from alpha_quant.app._loop import (
     size_entry,
 )
 from alpha_quant.app.halt import write_halt
-from alpha_quant.domain.ablation import AblationConfig
+from alpha_quant.domain.ablation import (
+    AblationConfig,
+    ShadowBook,
+)
 from alpha_quant.domain.degradation import DegradationStatus, m3_threshold_multiplier
 from alpha_quant.domain.derive import backfill_indicator_state
 from alpha_quant.domain.events import (
@@ -36,7 +39,15 @@ from alpha_quant.domain.events import (
 )
 from alpha_quant.domain.fills import FillConfig, fill_stop_loss
 from alpha_quant.domain.invariants import InvariantViolation
-from alpha_quant.domain.models import Bar, Candidate, Decision, Fill, IndicatorState, Position
+from alpha_quant.domain.models import (
+    Bar,
+    Candidate,
+    Decision,
+    Fill,
+    IndicatorState,
+    Order,
+    Position,
+)
 from alpha_quant.domain.ranking import rank as rank_candidates
 from alpha_quant.domain.risk import RiskConfig
 from alpha_quant.domain.sizing import SizingConfig
@@ -81,6 +92,7 @@ def run(
     prev_equity: float | None = None,
     prev_regime: str = "CAUTION",
     degradation: DegradationStatus | None = None,
+    shadow_books: dict[str, ShadowBook] | None = None,
 ) -> RunResult:
     cfg = config or PipelineConfig()
     fc = fill_config or FillConfig()
@@ -344,36 +356,38 @@ def run(
     new_positions_count = len([p for p in store.load_positions() if p.quantity > 0])
     slots = cfg.max_positions - new_positions_count
 
+    # Load mechanism data (needed for main book and shadow books)
+    mech_data = MechanismData()
+    for symbol in universe:
+        try:
+            fund = store.load_fundamentals(symbol)
+            if fund:
+                mech_data.fundamentals[symbol] = fund[0]
+        except Exception:
+            pass
+        try:
+            txns = store.load_insider_transactions(symbol)
+            if txns:
+                mech_data.insider_txns[symbol] = txns
+        except Exception:
+            pass
+        try:
+            earnings = store.load_earnings(symbol)
+            if earnings:
+                mech_data.earnings[symbol] = earnings
+        except Exception:
+            pass
+        try:
+            mentions = store.load_mentions(symbol)
+            if mentions:
+                mech_data.mentions[symbol] = mentions
+        except Exception:
+            pass
+
+    gate_threshold = 0.5 * m3_threshold_multiplier(deg)
+
     entry_decisions: list[Decision] = []
     if slots > 0 and regime_mult > 0:
-        # Load mechanism data (M4, M5, M6, M7)
-        mech_data = MechanismData()
-        for symbol in universe:
-            try:
-                fund = store.load_fundamentals(symbol)
-                if fund:
-                    mech_data.fundamentals[symbol] = fund[0]
-            except Exception:
-                pass
-            try:
-                txns = store.load_insider_transactions(symbol)
-                if txns:
-                    mech_data.insider_txns[symbol] = txns
-            except Exception:
-                pass
-            try:
-                earnings = store.load_earnings(symbol)
-                if earnings:
-                    mech_data.earnings[symbol] = earnings
-            except Exception:
-                pass
-            try:
-                mentions = store.load_mentions(symbol)
-                if mentions:
-                    mech_data.mentions[symbol] = mentions
-            except Exception:
-                pass
-
         all_considered = decide_candidates(
             universe,
             all_bars,
@@ -381,8 +395,8 @@ def run(
             run_date,
             regime,
             mech_data,
+            ablation=cfg.ablation,
         )
-        gate_threshold = 0.5 * m3_threshold_multiplier(deg)
 
         candidates: list[Candidate] = []
         for cand in all_considered:
@@ -476,6 +490,96 @@ def run(
             )
 
     decisions.extend(entry_decisions)
+
+    # --- 7. Shadow books ---
+    if shadow_books is not None:
+        pop_equity = (prev_equity or 100_000.0) + cash_adjust
+        if mech_data is None:
+            mech_data = MechanismData()
+
+        for shadow_name, shadow_book in shadow_books.items():
+            sh_config = shadow_book._config
+            sh_results_fills: list[Fill] = []
+
+            # Skip if no slots (no new entries possible)
+            sh_has_cash = slots > 0 and regime_mult > 0
+
+            if sh_has_cash:
+                sh_considered = decide_candidates(
+                    universe,
+                    all_bars,
+                    indicator_states,
+                    run_date,
+                    regime,
+                    mech_data,
+                    ablation=sh_config,
+                )
+                sh_candidates: list[Candidate] = []
+                for cand in sh_considered:
+                    if cand.block_reason is not None:
+                        continue
+                    if cand.composite_score < gate_threshold:
+                        continue
+                    sh_candidates.append(cand)
+
+                sh_current = len(shadow_book.positions)
+                sh_ranked = rank_candidates(sh_candidates, cfg.max_positions, sh_current)
+
+                sh_orders: list[Order] = []
+                for cand in sh_ranked[:slots]:
+                    bar = get_bar_for_date(all_bars, cand.symbol, run_date)
+                    state = indicator_states.get(cand.symbol)
+                    if bar is None or state is None:
+                        continue
+                    atr_val = compute_atr(state, bar.close)
+                    sized = size_entry(pop_equity, bar.close, atr_val, regime_mult, sc)
+                    if sized is None:
+                        continue
+                    sh_orders.append(
+                        Order(
+                            order_id=f"{shadow_name}_{cand.symbol}_{uuid.uuid4().hex[:8]}",
+                            symbol=cand.symbol,
+                            action="buy",
+                            quantity=int(sized.shares),
+                            order_type="MARKET",
+                            status="submitted",
+                            submitted_at=datetime.now(UTC),
+                        )
+                    )
+
+                # Process entries
+                if sh_orders:
+                    first_sym = universe[0] if universe else "SPY"
+                    entry_bar = get_bar_for_date(all_bars, first_sym, run_date)
+                    if entry_bar is not None:
+                        prev_close = prices.get("SPY", entry_bar.close)
+                        fill_res = shadow_book.process_entry_orders(
+                            sh_orders,
+                            entry_bar,
+                            prev_close,
+                            fill_config=fc,
+                        )
+                        sh_results_fills.extend(fill_res.fills)
+                        violations.extend(fill_res.violations)
+
+            # Process risk actions for shadow positions
+            for shadow_pos in shadow_book.positions:
+                bar = get_bar_for_date(all_bars, shadow_pos.symbol, run_date)
+                if bar is None:
+                    continue
+                state = indicator_states.get(shadow_pos.symbol)
+                sh_risk_actions = evaluate_risk_actions(shadow_pos, bar, state, rc, run_date)
+                risk_res = shadow_book.process_risk_actions(sh_risk_actions, bar)
+                sh_results_fills.extend(risk_res.fills)
+                violations.extend(risk_res.violations)
+
+            # Mark to market and persist snapshot
+            prev_sh_snap = store.load_latest_portfolio_snapshot(book=shadow_name)
+            prev_sh_equity = prev_sh_snap.equity if prev_sh_snap else None
+            sh_snap = shadow_book.mark_to_market(run_date, prices, prev_sh_equity)
+            store.save_portfolio_snapshot(sh_snap)
+
+            fills.extend(sh_results_fills)
 
     # --- Self-consistency ---
     all_positions = store.load_positions()
