@@ -414,3 +414,21 @@ Each role evaluates their domain:
 - All code must pass: `ruff check`, `ruff format --check`, `ty check`
 - Python 3.14+, pydantic v2, type-annotated
 - No imports from `adapters/` or `data/` in port definitions
+
+## Known Tool Issues
+
+### `ruff format` corrupts `except (A, B):` tuple syntax
+
+`ruff format` (tested on current version) converts valid Python 3 `except (A, B):` syntax to Python 2 `except A, B:` syntax, which is a `SyntaxError` in Python 3. This affects any line like:
+
+```python
+except (SomeException, AnotherException):
+```
+
+**Workaround**: Always add `# fmt: skip` to any multi-exception `except` line:
+
+```python
+except (SomeException, AnotherException):  # fmt: skip
+```
+
+Check `git diff` after `make format` to ensure no `except` lines were corrupted.
