@@ -122,7 +122,7 @@
           "type": "integer"
         },
         "fixture_version": {
-          "default": "fx-2026-06-v1",
+          "default": "v1",
           "title": "Fixture Version",
           "type": "string"
         }
@@ -272,16 +272,6 @@
           "type": "integer"
         },
         "dd_ladder": {
-          "default": [
-            [
-              0.1,
-              0.5
-            ],
-            [
-              0.15,
-              0.0
-            ]
-          ],
           "items": {
             "items": {
               "type": "number"

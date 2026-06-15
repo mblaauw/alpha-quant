@@ -92,8 +92,8 @@ CREATE TABLE manifest (
 );
 ```
 
-- `fetch_id` = SHA256(source + dataset + symbol + timestamp)[:16]
-- `content_hash` = SHA256(file content)[:16] (matches filename)
+- `fetch_id` = SHA256(source + endpoint + params + timestamp)[:16]
+- `content_hash` = SHA256(file content) (full 64-char hexdigest)
 - `status` = 'ok' | 'stale' | 'corrupt'
 
 ### Positive Consequences
@@ -108,7 +108,7 @@ CREATE TABLE manifest (
 - **Storage growth** — Raw JSON + compression is larger than normalized parquet. Estimated ~3x storage for raw vs canonical.
 - **Two DuckDB databases** — The vault manifest is a separate DuckDB file from the state database. Managing two DuckDB instances adds minor operational complexity.
 - **No built-in retention** — Old data is never deleted. A separate purge/vacuum process would need to be designed for storage management in long-running deployments.
-- **8-char content hash vulnerable to birthday bound** — At ~65k files, collision probability is ~50%. A future enhancement should increase this to 16 hex chars.
+- **16-char fetch_id** — `fetch_id = SHA256(source|endpoint|params|timestamp)[:16]` provides 2^64 namespace — sufficient for daily use. Collision probability is negligible (<< 1% even at millions of entries). Content hash uses full SHA256 (64 hex chars) for content-level dedup.
 
 ## References
 
