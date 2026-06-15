@@ -134,15 +134,14 @@
 - **Effort:** Small (5 files, ~30 lines)
 - **Rationale:** Reduces drift risk between read and write column lists.
 
+### P2.14: Duplicated column-name lists across all store mixins
+- **Status:** ✅ Acceptable — column names co-located in each mixin; drift risk low
+
 ### P2.15: Re-export-only wrapper in `_loop.py`
-- **Files:** `alpha_quant/app/_loop.py:8-18`
-- **Change:** Remove pass-through re-exports of `score_candidate`, `compute_atr`, `evaluate_risk_actions`, `get_bar_for_date`, `get_date_bars`, `size_entry`, `bars_up_to` — import directly from `domain.loop_helpers` in consumers.
-- **Effort:** Small (2 files, ~10 lines)
-- **Rationale:** `_loop.py` adds no logic for these functions. Pure indirection.
-- **Files:** `alpha_quant/domain/risk.py`
-- **Change:** Add `dd_window_days` config option. When set, measure drawdown from rolling window peak instead of all-time.
-- **Effort:** Small (1 file, ~10 lines)
-- **Rationale:** Default 15% from all-time peak shuts down new entries permanently after a single crash. Rolling window allows recovery.
+- **Status:** ✅ Acceptable — `_loop.py` is a convenience layer for 3 consumers
+
+### P2.13: Make drawdown ladder rolling window instead of all-time peak
+- **Status:** ✅ Already implemented (risk.py:27 `dd_window_days`, :158 rolling window logic)
 
 ## P3 — Documentation & Workflow
 
