@@ -150,16 +150,19 @@ def read_bars(
     pcol = partition_col("bars")
     dedup_key = dedup_keys("bars")
     hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
-    result = analytical.execute(
-        f"""
-        SELECT DISTINCT ON ({dedup_key})
-               symbol, "{pcol}" AS date, open, high, low, close, volume, adj_close
-        FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
-        WHERE symbol = ? AND "{pcol}" >= ? AND "{pcol}" <= ?
-        ORDER BY {dedup_key} DESC
-        """,
-        [symbol, start, end],
-    ).fetchall()
+    try:
+        result = analytical.execute(
+            f"""
+            SELECT DISTINCT ON ({dedup_key})
+                   symbol, "{pcol}" AS date, open, high, low, close, volume, adj_close
+            FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
+            WHERE symbol = ? AND "{pcol}" >= ? AND "{pcol}" <= ?
+            ORDER BY {dedup_key} DESC
+            """,
+            [symbol, start, end],
+        ).fetchall()
+    except (duckdb.CatalogException, duckdb.IOException):  # fmt: skip
+        return []
 
     return [
         Bar(
