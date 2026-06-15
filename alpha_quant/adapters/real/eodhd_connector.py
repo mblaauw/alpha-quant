@@ -48,7 +48,15 @@ class EODHDConnector(BaseConnector, Fundamentals):
         response = self.fetch(url, merged)
         return response.json()
 
-    def _parse_bar(self, entry: dict[str, Any], symbol: str) -> Bar:
+    def _get_json_with_lineage(
+        self, path: str, params: dict[str, str] | None = None
+    ) -> tuple[Any, str | None]:
+        url = self._build_url(path)
+        merged = self._params(**(params or {}))
+        fr = self.fetch_with_lineage(url, merged)
+        return fr.response.json(), fr.fetch_id
+
+    def _parse_bar(self, entry: dict[str, Any], symbol: str, fetch_id: str | None = None) -> Bar:
         try:
             bar_date = datetime.strptime(entry["date"], "%Y-%m-%d").date()
         except (KeyError, ValueError, TypeError) as e:
@@ -66,10 +74,11 @@ class EODHDConnector(BaseConnector, Fundamentals):
             close=_float(entry.get("close")) or 0.0,
             adj_close=_float(entry.get("adjusted_close")),
             volume=_float(entry.get("volume")) or 0.0,
+            fetch_id=fetch_id,
         )
 
     def daily_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
-        raw = self._get_json(
+        raw, fetch_id = self._get_json_with_lineage(
             f"eod/{symbol}",
             {"from": start.isoformat(), "to": end.isoformat()},
         )
@@ -78,12 +87,12 @@ class EODHDConnector(BaseConnector, Fundamentals):
         for entry in raw:
             if not isinstance(entry, dict):
                 continue
-            bars.append(self._parse_bar(entry, symbol))
+            bars.append(self._parse_bar(entry, symbol, fetch_id))
         return bars
 
     @override
     def snapshot(self, symbol: str) -> FundamentalsSnapshot:
-        raw = self._get_json(f"fundamentals/{symbol}")
+        raw, fetch_id = self._get_json_with_lineage(f"fundamentals/{symbol}")
         _expect_type(raw, dict, "dict for fundamentals", source="eodhd")
 
         general = raw.get("General", {}) or {}
@@ -114,6 +123,7 @@ class EODHDConnector(BaseConnector, Fundamentals):
         return FundamentalsSnapshot(
             symbol=symbol,
             as_of_date=as_of_date,
+            fetch_id=fetch_id,
             market_cap=_float(highlights.get("MarketCapitalization")),
             pe_ratio=_float(highlights.get("PERatio")),
             eps_ttm=_float(highlights.get("EPS")),
@@ -131,7 +141,7 @@ class EODHDConnector(BaseConnector, Fundamentals):
 
     @override
     def earnings_calendar(self, start: date, end: date) -> list[EarningsEntry]:
-        raw = self._get_json(
+        raw, fetch_id = self._get_json_with_lineage(
             "calendar/earnings",
             {"from": start.isoformat(), "to": end.isoformat()},
         )
@@ -154,6 +164,7 @@ class EODHDConnector(BaseConnector, Fundamentals):
                 EarningsEntry(
                     symbol=entry.get("code", ""),
                     date=entry_date,
+                    fetch_id=fetch_id,
                     eps_estimate=_float(entry.get("eps_estimate")),
                     eps_actual=_float(entry.get("eps_actual")),
                     revenue_estimate=_float(entry.get("revenue_estimate")),
@@ -163,11 +174,11 @@ class EODHDConnector(BaseConnector, Fundamentals):
         return results
 
     def bulk_last_day(self, exchange: str = "US") -> list[Bar]:
-        raw = self._get_json(f"eod-bulk-last-day/{exchange}")
+        raw, fetch_id = self._get_json_with_lineage(f"eod-bulk-last-day/{exchange}")
         _expect_type(raw, list, "list for bulk_last_day", source="eodhd")
         bars: list[Bar] = []
         for entry in raw:
             if not isinstance(entry, dict):
                 continue
-            bars.append(self._parse_bar(entry, entry.get("code", "")))
+            bars.append(self._parse_bar(entry, entry.get("code", ""), fetch_id))
         return bars

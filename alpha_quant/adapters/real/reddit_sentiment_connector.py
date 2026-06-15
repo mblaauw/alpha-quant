@@ -108,15 +108,18 @@ class RedditSentimentConnector(BaseConnector, SentimentFeed):
             vault=vault,
         )
 
-    def _fetch_subreddit_new(self, sub: str) -> list[dict[str, Any]]:
+    def _fetch_subreddit_new_with_lineage(
+        self, sub: str
+    ) -> tuple[list[dict[str, Any]], str | None]:
         path = f"/r/{sub}/new.json"
         params: dict[str, str] = {"limit": "100"}
-        response = self.fetch(f"{self._base_url}{path}", params)
-        raw = response.json()
+        fr = self.fetch_with_lineage(f"{self._base_url}{path}", params)
+        raw = fr.response.json()
         children = raw.get("data", {}).get("children", [])
-        return [
+        posts = [
             c["data"] for c in children if isinstance(c, dict) and isinstance(c.get("data"), dict)
         ]
+        return posts, fr.fetch_id
 
     def _count_mentions(self, posts: list[dict[str, Any]]) -> dict[str, int]:
         counts: dict[str, int] = defaultdict(int)
@@ -141,7 +144,7 @@ class RedditSentimentConnector(BaseConnector, SentimentFeed):
 
         for sub in subreddits:
             try:
-                posts = self._fetch_subreddit_new(sub)
+                posts, fetch_id = self._fetch_subreddit_new_with_lineage(sub)
                 counts = self._count_mentions(posts)
                 for sym, count in counts.items():
                     if count > 0:
@@ -151,6 +154,7 @@ class RedditSentimentConnector(BaseConnector, SentimentFeed):
                                 mention_date=today,
                                 source=f"reddit/{sub}",
                                 count=count,
+                                fetch_id=fetch_id,
                             )
                         )
             except Exception as exc:
