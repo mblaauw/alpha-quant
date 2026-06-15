@@ -25,7 +25,6 @@ alpha-quant = "alpha_quant.cli:main"
 dev = [
     "pytest>=8.0",
     "pytest-cov>=6.0",
-    "hypothesis>=6.0",
     "ruff>=0.11",
     "ty>=0.0.40",
     "streamlit>=1.40",
