@@ -17,3 +17,5 @@ data/state.db
 fixtures/*/
 !fixtures/fx-*
 !fixtures/golden/
+logs/
+seed-ship-*
