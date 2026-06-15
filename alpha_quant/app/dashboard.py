@@ -21,6 +21,64 @@ st.set_page_config(
 DATA_DIR = Path("data")
 
 
+_HELP_TEXT: dict[str, str] = {
+    "Equity": "Current portfolio equity (cash + market value of all positions)",
+    "Total Return": "Cumulative return since first available equity data point",
+    "Open Positions": "Number of positions currently held with quantity > 0",
+    "Total Exposure": "Sum of market value of all open positions",
+    "Exposure %": "Total exposure as percentage of current equity",
+    "Unrealized P&L": "Total unrealized profit/loss across all open positions",
+    "Last Run Type": "Mode of the most recent pipeline run (daily, backtest, fixture)",
+    "Run Status": "Completion status of the most recent run",
+    "Run Date": "Date of the most recent pipeline run",
+    "Promoted": "Candidates promoted to entry in the latest run",
+    "Scored": "Candidates scored by the composite mechanism",
+    "Blocked": "Candidates blocked by quality gates",
+    "Fills": "Fills booked in the latest run",
+    "Total Market Value": "Sum of market value of all open positions",
+    "Near Stop (<5%)": "Positions where current price is within 5% of stop price",
+    "Total Realized P&L": "Total realized profit/loss from closed positions",
+}
+
+
+def _help_text(label: str) -> str:
+    return _HELP_TEXT.get(label, "")
+
+
+def _metric_card(label: str, value: str, delta: str | None = None) -> None:
+    st.metric(label=label, value=value, delta=delta, help=_help_text(label))
+
+
+def _section_header(title: str, description: str = "") -> None:
+    st.subheader(title)
+    if description:
+        st.caption(description)
+
+
+def _empty_state(message: str, icon: str = ":information_source:") -> None:
+    st.info(f"{icon} {message}")
+
+
+def _data_table(df: pd.DataFrame, height: int = 400) -> None:
+    st.dataframe(df, width="stretch", height=height)
+
+
+def _status_badge(state: str, text: str) -> None:
+    if state == "success":
+        st.success(text)
+    elif state == "warning":
+        st.warning(text)
+    elif state == "error":
+        st.error(text)
+    else:
+        st.info(text)
+
+
+def _jump_to_symbol(symbol: str) -> None:
+    st.session_state["jump_symbol"] = symbol
+    _status_badge("success", f"Symbol {symbol} selected — switch to Decision Explorer tab")
+
+
 def _safe_query(
     state: duckdb.DuckDBPyConnection, query: str, params: list | None = None
 ) -> pd.DataFrame:
@@ -81,8 +139,24 @@ def _load_reports(state: duckdb.DuckDBPyConnection) -> pd.DataFrame:
 def _load_latest_run(state: duckdb.DuckDBPyConnection) -> pd.DataFrame:
     return _safe_query(
         state,
-        "SELECT run_type, start_ts, end_ts, status, config_hash"
+        "SELECT run_id, run_type, start_ts, end_ts, status, config_hash"
         " FROM runs ORDER BY start_ts DESC LIMIT 1",
+    )
+
+
+def _load_all_runs(state: duckdb.DuckDBPyConnection) -> pd.DataFrame:
+    return _safe_query(
+        state,
+        "SELECT run_id, run_type, start_ts, end_ts, status, config_hash"
+        " FROM runs ORDER BY start_ts DESC LIMIT 10",
+    )
+
+
+def _load_run_events(state: duckdb.DuckDBPyConnection, run_id: str) -> pd.DataFrame:
+    return _safe_query(
+        state,
+        "SELECT event_type, timestamp, payload FROM events WHERE run_id = ? ORDER BY timestamp",
+        [run_id],
     )
 
 
@@ -102,167 +176,21 @@ def _load_staleness_events(state: duckdb.DuckDBPyConnection) -> pd.DataFrame:
     )
 
 
+def _load_symbol_options(state: duckdb.DuckDBPyConnection) -> pd.DataFrame:
+    return _safe_query(
+        state,
+        "SELECT DISTINCT symbol FROM decisions"
+        " UNION"
+        " SELECT DISTINCT symbol FROM positions WHERE quantity > 0"
+        " ORDER BY symbol",
+    )
+
+
 def _read_markdown(path: Path) -> str:
     try:
         return path.read_text()
     except (FileNotFoundError, PermissionError, IsADirectoryError) as e:
         return f"Error reading {path}: {e}"
-
-
-def home_tab(state: duckdb.DuckDBPyConnection) -> None:
-    st.header("System Status")
-
-    halted = is_halted()
-    if halted:
-        halt_info = read_halt()
-        reason = halt_info.get("reason", "unknown") if halt_info else "unknown"
-        st.error(f":warning: **System Halted** — Reason: {reason}")
-    else:
-        st.success(":white_check_mark: **System Running** — No active halts")
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    runs = _load_latest_run(state)
-    if not runs.empty:
-        last_run = runs.iloc[0]
-        col1.metric("Last Run Type", last_run.run_type.capitalize() if last_run.run_type else "—")
-        col2.metric("Run Status", last_run.status.capitalize() if last_run.status else "—")
-        col3.metric("Run Date", str(last_run.start_ts)[:10] if last_run.start_ts else "—")
-    else:
-        col1.metric("Last Run", "No runs found")
-        col2.metric("Run Status", "—")
-        col3.metric("Run Date", "—")
-
-    equity_df = _load_equity_curve(state)
-    latest_equity: float | None = float(equity_df.iloc[-1].equity) if not equity_df.empty else None
-
-    if latest_equity is not None:
-        col4.metric("Equity", f"${latest_equity:,.2f}")
-
-        st.subheader("Equity Curve")
-        st.line_chart(equity_df, x="equity_date", y="equity")
-
-        first_equity = float(equity_df.iloc[0].equity)
-        returns_text = (
-            f"{((latest_equity / first_equity - 1) * 100):+.2f}%" if len(equity_df) > 1 else "—"
-        )
-        st.metric("Total Return", returns_text)
-    else:
-        col4.metric("Equity", "—")
-        st.info("No equity data available. Run a backtest or start paper trading to see results.")
-
-    st.subheader("Data Health")
-
-    quarantined = _load_quarantine(state)
-    staleness = _load_staleness_events(state)
-
-    health_col1, health_col2 = st.columns(2)
-
-    if quarantined.empty and staleness.empty:
-        health_col1.success(":white_check_mark: All data sources healthy")
-        health_col2.metric("Quarantined Symbols", "0")
-    else:
-        if not quarantined.empty:
-            health_col1.warning(f":warning: {len(quarantined)} symbol(s) quarantined")
-            with health_col1:
-                st.dataframe(quarantined[["symbol", "reason", "severity"]], width="stretch")
-        else:
-            health_col1.success(":white_check_mark: No quarantined symbols")
-
-        if not staleness.empty:
-            health_col2.warning(f":warning: {len(staleness)} data staleness event(s)")
-        else:
-            health_col2.success(":white_check_mark: No data staleness detected")
-
-    st.subheader("Portfolio Summary")
-
-    positions = _load_positions(state)
-    if not positions.empty:
-        total_value = float(positions["market_value"].sum())
-        total_pl = float(positions["unrealized_pl"].sum())
-
-        equity = latest_equity if latest_equity is not None else 1.0
-        exposure_pct = (total_value / equity * 100) if equity > 0 else 0.0
-
-        pos_col1, pos_col2, pos_col3, pos_col4 = st.columns(4)
-        pos_col1.metric("Open Positions", len(positions))
-        pos_col2.metric("Total Exposure", f"${total_value:,.2f}")
-        pos_col3.metric("Exposure %", f"{exposure_pct:.1f}%")
-        pos_col4.metric("Unrealized P&L", f"${total_pl:+,.2f}")
-    else:
-        st.info("No open positions.")
-
-
-def portfolio_tab(state: duckdb.DuckDBPyConnection) -> None:
-    st.header("Portfolio")
-
-    positions = _load_positions(state)
-    if positions.empty:
-        st.info("No open positions.")
-        return
-
-    display = positions.copy()
-    total_value = float(positions["market_value"].sum())
-
-    if total_value > 0 and "market_value" in display.columns:
-        display["Exposure %"] = display["market_value"] / total_value * 100
-    else:
-        display["Exposure %"] = 0.0
-
-    if all(c in display.columns for c in ["current_price", "stop_price"]):
-        valid_mask = display["stop_price"].notna() & (display["stop_price"] > 0)
-        display["Risk-at-Stop $"] = 0.0
-        display["Dist-to-Stop %"] = 0.0
-        display.loc[valid_mask, "Risk-at-Stop $"] = (
-            display.loc[valid_mask, "current_price"] - display.loc[valid_mask, "stop_price"]
-        ) * display.loc[valid_mask, "quantity"]
-        display.loc[valid_mask, "Dist-to-Stop %"] = (
-            (display.loc[valid_mask, "current_price"] - display.loc[valid_mask, "stop_price"])
-            / display.loc[valid_mask, "current_price"]
-            * 100
-        )
-        display.loc[~valid_mask, "Dist-to-Stop %"] = None
-
-    if "partial_taken" in display.columns:
-        display["Partial"] = display["partial_taken"].map(
-            {True: ":white_check_mark: Yes", False: ""}
-        )
-
-    st.dataframe(display, width="stretch")
-
-    total_pl = float(positions["unrealized_pl"].sum())
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Market Value", f"${total_value:,.2f}")
-    col2.metric("Total Unrealized P&L", f"${total_pl:+,.2f}")
-    col3.metric("Open Positions", len(positions))
-
-    near_stop = 0
-    if "Dist-to-Stop %" in display.columns:
-        near_stop = (display["Dist-to-Stop %"].notna() & (display["Dist-to-Stop %"] < 5.0)).sum()
-    col4.metric("Near Stop (<5%)", near_stop)
-
-
-def reports_tab(state: duckdb.DuckDBPyConnection) -> None:
-    st.header("Reports")
-
-    reports = _load_reports(state)
-    if not reports.empty:
-        selected = st.selectbox(
-            "Select report",
-            [f"{r.report_date} ({r.report_type})" for _, r in reports.iterrows()],
-        )
-        if selected:
-            dt_str, rtype = selected.split(" (")
-            rtype = rtype.rstrip(")")
-            row = _safe_query(
-                state,
-                "SELECT content FROM reports WHERE report_date = ? AND report_type = ?",
-                [dt_str, rtype],
-            )
-            if not row.empty:
-                st.markdown(row.iloc[0]["content"])
-    else:
-        st.info("No reports available.")
 
 
 def _strip_frontmatter(markdown: str) -> str:
@@ -297,13 +225,417 @@ def _build_concepts_manifest(concepts_dir: Path) -> list[dict[str, str]]:
     return cards
 
 
+def _daily_briefing(state: duckdb.DuckDBPyConnection, run_id: str | None) -> None:
+    _section_header("Daily Briefing", "Latest run summary and portfolio changes")
+
+    halted = is_halted()
+    if halted:
+        halt_info = read_halt()
+        reason = halt_info.get("reason", "unknown") if halt_info else "unknown"
+        _status_badge("error", f"System Halted — Reason: {reason}")
+    else:
+        _status_badge("success", "System Running — No active halts")
+
+    runs = _load_latest_run(state)
+    if runs.empty:
+        return
+
+    last_run = runs.iloc[0]
+    run_type = str(last_run.run_type).capitalize() if last_run.run_type else "—"
+    status = str(last_run.status).capitalize() if last_run.status else "—"
+    run_date = str(last_run.start_ts)[:10] if last_run.start_ts else "—"
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Last Run Type", run_type, help=_help_text("Last Run Type"))
+    col2.metric("Run Status", status, help=_help_text("Run Status"))
+    col3.metric("Run Date", run_date, help=_help_text("Run Date"))
+
+    if run_id:
+        events_df = _load_run_events(state, run_id)
+        if not events_df.empty:
+            scored = len(events_df[events_df["event_type"] == "candidate_scored"])
+            blocked = len(events_df[events_df["event_type"] == "candidate_blocked"])
+            promoted = len(events_df[events_df["event_type"] == "candidate_promoted"])
+            filled = len(events_df[events_df["event_type"] == "fill_booked"])
+
+            _metric_card("Promoted", str(promoted))
+
+            with st.expander("Candidate Funnel"):
+                fc1, fc2, fc3, fc4 = st.columns(4)
+                fc1.metric("Scored", scored, help=_help_text("Scored"))
+                fc2.metric("Blocked", blocked, help=_help_text("Blocked"))
+                fc3.metric("Promoted", promoted, help=_help_text("Promoted"))
+                fc4.metric("Fills", filled, help=_help_text("Fills"))
+
+    equity_df = _load_equity_curve(state)
+    if len(equity_df) >= 2:
+        prev_eq = float(equity_df.iloc[-2].equity)
+        curr_eq = float(equity_df.iloc[-1].equity)
+        delta = curr_eq - prev_eq
+        delta_str = f"+${delta:,.2f}" if delta >= 0 else f"-${abs(delta):,.2f}"
+        st.caption(f"Equity: **${curr_eq:,.2f}** ({delta_str} from previous run)")
+    elif len(equity_df) == 1:
+        st.caption(f"Equity: **${float(equity_df.iloc[0].equity):,.2f}**")
+
+    quarantined = _load_quarantine(state)
+    staleness = _load_staleness_events(state)
+    attention_items: list[str] = []
+    if not quarantined.empty:
+        attention_items.append(f"{len(quarantined)} quarantined")
+    if not staleness.empty:
+        attention_items.append(f"{len(staleness)} staleness events")
+    if attention_items:
+        st.caption(f":warning: Attention: {'; '.join(attention_items)}")
+
+
+def _attention_center(state: duckdb.DuckDBPyConnection) -> None:
+    _section_header("Attention Center", "Items requiring review")
+
+    quarantined = _load_quarantine(state)
+    staleness = _load_staleness_events(state)
+    positions = _load_positions(state)
+    equity_df = _load_equity_curve(state)
+
+    items: list[dict[str, str]] = []
+
+    halted = is_halted()
+    if halted:
+        halt_info = read_halt()
+        reason = halt_info.get("reason", "unknown") if halt_info else "unknown"
+        items.append(
+            {
+                "severity": "critical",
+                "title": "System Halted",
+                "detail": f"Reason: {reason}",
+                "source": "system",
+            }
+        )
+
+    if not positions.empty and not equity_df.empty:
+        for _, pos in positions.iterrows():
+            stop = pos.get("stop_price")
+            current = pos.get("current_price")
+            if stop and current and stop > 0:
+                dist_pct = (current - stop) / current * 100
+                if dist_pct < 5.0:
+                    items.append(
+                        {
+                            "severity": "watch",
+                            "title": f"{pos['symbol']} near stop",
+                            "detail": f"Distance to stop: {dist_pct:.1f}%",
+                            "source": pos["symbol"],
+                        }
+                    )
+
+    for _, q in quarantined.iterrows():
+        items.append(
+            {
+                "severity": "warning",
+                "title": f"{q['symbol']} quarantined",
+                "detail": str(q.get("reason", "")),
+                "source": q["symbol"],
+            }
+        )
+
+    for _ in range(len(staleness)):
+        items.append(
+            {
+                "severity": "warning",
+                "title": "Data staleness detected",
+                "detail": "Some data sources may be stale",
+                "source": "data",
+            }
+        )
+
+    consistency_violations = _safe_query(
+        state,
+        "SELECT payload FROM events WHERE event_type = 'consistency_violation'"
+        " ORDER BY timestamp DESC LIMIT 5",
+    )
+    for _ in range(len(consistency_violations)):
+        items.append(
+            {
+                "severity": "critical",
+                "title": "Consistency violation",
+                "detail": "System invariants were violated",
+                "source": "system",
+            }
+        )
+
+    if not items:
+        _status_badge("success", ":white_check_mark: No action required")
+        return
+
+    severity_order = {"critical": 0, "warning": 1, "watch": 2}
+    items.sort(key=lambda x: severity_order.get(x["severity"], 99))
+
+    for item in items:
+        icon_map = {"critical": ":red_circle:", "warning": ":warning:", "watch": ":eyes:"}
+        icon = icon_map.get(item["severity"], ":information_source:")
+        st.markdown(f"{icon} **{item['title']}** — {item['detail']}")
+
+
+def _decision_funnel(state: duckdb.DuckDBPyConnection) -> None:
+    _section_header("Decision Funnel", "How candidates moved through the pipeline")
+
+    runs = _load_latest_run(state)
+    if runs.empty:
+        _empty_state("No run data available")
+        return
+
+    run_id = str(runs.iloc[0].get("run_id", ""))
+    if not run_id:
+        _empty_state("No run ID available")
+        return
+
+    events_df = _load_run_events(state, run_id)
+    if events_df.empty:
+        _empty_state("No events for latest run")
+        return
+
+    scored = events_df[events_df["event_type"] == "candidate_scored"]
+    blocked = events_df[events_df["event_type"] == "candidate_blocked"]
+    promoted = events_df[events_df["event_type"] == "candidate_promoted"]
+    filled = events_df[events_df["event_type"] == "fill_booked"]
+
+    fc1, fc2, fc3, fc4 = st.columns(4)
+    fc1.metric("Scored", len(scored), help=_help_text("Scored"))
+    fc2.metric("Blocked", len(blocked), help=_help_text("Blocked"))
+    fc3.metric("Promoted", len(promoted), help=_help_text("Promoted"))
+    fc4.metric("Fills", len(filled), help=_help_text("Fills"))
+
+    if not blocked.empty:
+        reasons: dict[str, int] = {}
+        for _, row in blocked.iterrows():
+            try:
+                payload = json.loads(row["payload"])
+            except (json.JSONDecodeError, TypeError, ValueError):  # fmt: skip
+                continue
+            gate = payload.get("gate", "unknown")
+            reasons[gate] = reasons.get(gate, 0) + 1
+        if reasons:
+            st.markdown("**Top block reasons:**")
+            reason_df = pd.DataFrame(
+                [
+                    {"Gate": gate, "Count": count}
+                    for gate, count in sorted(reasons.items(), key=lambda x: -x[1])
+                ]
+            )
+            _data_table(reason_df, height=len(reasons) * 35 + 10)
+
+    if not promoted.empty:
+        st.markdown("**Promoted symbols:**")
+        promo_rows: list[dict] = []
+        promo_symbols: list[str] = []
+        for _, row in promoted.iterrows():
+            try:
+                payload = json.loads(row["payload"])
+            except (json.JSONDecodeError, TypeError, ValueError):  # fmt: skip
+                continue
+            promo_rows.append(
+                {
+                    "Symbol": payload.get("symbol", "?"),
+                    "Score": payload.get("score", "?"),
+                    "Target Weight": payload.get("target_weight", "?"),
+                }
+            )
+            sym = str(payload.get("symbol", ""))
+            if sym:
+                promo_symbols.append(sym)
+        if promo_rows:
+            _data_table(pd.DataFrame(promo_rows), height=len(promo_rows) * 35 + 10)
+        if promo_symbols:
+            st.markdown("**Investigate promoted:**")
+            promo_cols = st.columns(min(len(promo_symbols), 6))
+            for i, sym in enumerate(promo_symbols[:6]):
+                if promo_cols[i].button(f"🔍 {sym}", key=f"inv_promo_{sym}"):
+                    _jump_to_symbol(sym)
+
+    if not blocked.empty:
+        with st.expander("View blocked symbols"):
+            block_rows: list[dict] = []
+            block_symbols: list[str] = []
+            for _, row in blocked.iterrows():
+                try:
+                    payload = json.loads(row["payload"])
+                except (json.JSONDecodeError, TypeError, ValueError):  # fmt: skip
+                    continue
+                block_rows.append(
+                    {
+                        "Symbol": payload.get("symbol", "?"),
+                        "Gate": payload.get("gate", "?"),
+                        "Reason": payload.get("reason", ""),
+                    }
+                )
+                sym = str(payload.get("symbol", ""))
+                if sym and sym not in block_symbols:
+                    block_symbols.append(sym)
+            if block_rows:
+                _data_table(pd.DataFrame(block_rows), height=min(len(block_rows) * 35 + 10, 400))
+            if block_symbols:
+                st.markdown("**Investigate blocked:**")
+                block_cols = st.columns(min(len(block_symbols), 6))
+                for i, sym in enumerate(block_symbols[:6]):
+                    if block_cols[i].button(f"🔍 {sym}", key=f"inv_block_{sym}"):
+                        _jump_to_symbol(sym)
+
+
+def _run_history(state: duckdb.DuckDBPyConnection) -> None:
+    _section_header("Run History", "Recent pipeline runs")
+
+    all_runs = _load_all_runs(state)
+    if all_runs.empty:
+        _empty_state("No runs found")
+        return
+
+    display = all_runs.copy()
+    if "start_ts" in display.columns:
+        display["date"] = display["start_ts"].astype(str).str[:10]
+    if "config_hash" in display.columns:
+        display["config"] = display["config_hash"].astype(str).str[:8]
+
+    cols = [c for c in ["date", "run_type", "status", "config"] if c in display.columns]
+    if cols:
+        _data_table(display[cols].head(10), height=min(10 * 35 + 10, 400))
+
+    if len(all_runs) >= 2:
+        configs = all_runs["config_hash"].dropna().unique()
+        if len(configs) > 1:
+            st.caption(f":warning: Config changed between runs ({len(configs)} distinct hashes)")
+
+
+def home_tab(state: duckdb.DuckDBPyConnection) -> None:
+    runs = _load_latest_run(state)
+    run_id: str | None = str(runs.iloc[0]["run_id"]) if not runs.empty else None
+
+    _daily_briefing(state, run_id)
+    _attention_center(state)
+
+    equity_df = _load_equity_curve(state)
+    if not equity_df.empty:
+        _section_header("Equity Curve")
+        st.line_chart(equity_df, x="equity_date", y="equity")
+        first_equity = float(equity_df.iloc[0].equity)
+        if len(equity_df) > 1:
+            latest_equity = float(equity_df.iloc[-1].equity)
+            _metric_card("Total Return", f"{((latest_equity / first_equity - 1) * 100):+.2f}%")
+        else:
+            _metric_card("Total Return", "—")
+    else:
+        _empty_state(
+            "No equity data available. Run a backtest or start paper trading to see results."
+        )
+
+    _decision_funnel(state)
+
+    _section_header("Portfolio Summary")
+    positions = _load_positions(state)
+    if not positions.empty:
+        total_value = float(positions["market_value"].sum())
+        total_pl = float(positions["unrealized_pl"].sum())
+        latest_equity_val: float = float(equity_df.iloc[-1].equity) if not equity_df.empty else 1.0
+        exposure_pct = (total_value / latest_equity_val * 100) if latest_equity_val > 0 else 0.0
+
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Open Positions", len(positions), help=_help_text("Open Positions"))
+        col2.metric("Total Exposure", f"${total_value:,.2f}", help=_help_text("Total Exposure"))
+        col3.metric("Exposure %", f"{exposure_pct:.1f}%", help=_help_text("Exposure %"))
+        col4.metric("Unrealized P&L", f"${total_pl:+,.2f}", help=_help_text("Unrealized P&L"))
+    else:
+        _empty_state("No open positions")
+
+    _run_history(state)
+
+
+def portfolio_tab(state: duckdb.DuckDBPyConnection) -> None:
+    _section_header("Portfolio Risk", "Position-level risk analysis")
+
+    positions = _load_positions(state)
+    if positions.empty:
+        _empty_state("No open positions")
+        return
+
+    display = positions.copy()
+    total_value = float(positions["market_value"].sum())
+    total_pl = float(positions["unrealized_pl"].sum())
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total Market Value", f"${total_value:,.2f}", help=_help_text("Total Market Value"))
+    col2.metric("Unrealized P&L", f"${total_pl:+,.2f}", help=_help_text("Unrealized P&L"))
+    col3.metric("Open Positions", len(positions), help=_help_text("Open Positions"))
+
+    if all(c in display.columns for c in ["current_price", "stop_price"]):
+        valid_mask = display["stop_price"].notna() & (display["stop_price"] > 0)
+        display["Dist-to-Stop %"] = 0.0
+        display["Risk-at-Stop $"] = 0.0
+        display.loc[valid_mask, "Dist-to-Stop %"] = (
+            (display.loc[valid_mask, "current_price"] - display.loc[valid_mask, "stop_price"])
+            / display.loc[valid_mask, "current_price"]
+            * 100
+        )
+        display.loc[valid_mask, "Risk-at-Stop $"] = (
+            display.loc[valid_mask, "current_price"] - display.loc[valid_mask, "stop_price"]
+        ) * display.loc[valid_mask, "quantity"]
+        display.loc[~valid_mask, "Dist-to-Stop %"] = None
+        near_stop = (display["Dist-to-Stop %"].notna() & (display["Dist-to-Stop %"] < 5.0)).sum()
+        col4.metric("Near Stop (<5%)", near_stop, help=_help_text("Near Stop (<5%)"))
+
+    if "partial_taken" in display.columns:
+        display["Partial"] = display["partial_taken"].map(
+            {True: ":white_check_mark: Yes", False: ""}
+        )
+
+    near_mask = (
+        display["Dist-to-Stop %"].notna() & (display["Dist-to-Stop %"] < 5.0)
+        if "Dist-to-Stop %" in display.columns
+        else pd.Series([False] * len(display))
+    )
+    if near_mask.any():
+        _status_badge("warning", f"{near_mask.sum()} position(s) near stop — review risk")
+
+    sort_col = "Dist-to-Stop %" if "Dist-to-Stop %" in display.columns else "market_value"
+    display = display.sort_values(by=sort_col, ascending=True, na_position="last")
+    _data_table(display, height=min(len(display) * 35 + 10, 500))
+
+    st.markdown("**Quick investigate:**")
+    sym_list = [str(p.get("symbol", "")) for _, p in positions.iterrows() if p.get("symbol")]
+    for row_start in range(0, len(sym_list), 6):
+        cols = st.columns(6)
+        for i, sym in enumerate(sym_list[row_start : row_start + 6]):
+            if cols[i].button(f"🔍 {sym}", key=f"inv_pos_{sym}"):
+                _jump_to_symbol(sym)
+
+
+def reports_tab(state: duckdb.DuckDBPyConnection) -> None:
+    _section_header("Reports")
+
+    reports = _load_reports(state)
+    if not reports.empty:
+        selected = st.selectbox(
+            "Select report",
+            [f"{r.report_date} ({r.report_type})" for _, r in reports.iterrows()],
+        )
+        if selected:
+            dt_str, rtype = selected.split(" (")
+            rtype = rtype.rstrip(")")
+            row = _safe_query(
+                state,
+                "SELECT content FROM reports WHERE report_date = ? AND report_type = ?",
+                [dt_str, rtype],
+            )
+            if not row.empty:
+                st.markdown(row.iloc[0]["content"])
+    else:
+        _empty_state("No reports available", ":memo:")
+
+
 def concepts_tab() -> None:
-    st.header("Concept Cards")
+    _section_header("Concept Cards", "Educational content on trading mechanisms")
 
     concepts_dir = Path(__file__).resolve().parent.parent / "concepts"
     cards = _build_concepts_manifest(concepts_dir)
     if not cards:
-        st.info("No concept cards found.")
+        _empty_state("No concept cards found", ":books:")
         return
 
     titles = {c["title"]: c["id"] for c in cards}
@@ -328,17 +660,37 @@ def concepts_tab() -> None:
         content = _read_markdown(card_path)
         st.markdown(_strip_frontmatter(content))
     elif selected and not selected.startswith("---"):
-        st.info("Select a concept to view its content.")
+        _empty_state("Select a concept to view its content", ":books:")
 
 
 def decision_tab(state: duckdb.DuckDBPyConnection) -> None:
-    st.header("Decision Explorer")
+    _section_header("Decision Explorer", "Investigate per-symbol decision and event history")
 
-    symbol = st.text_input("Symbol", placeholder="e.g. AAPL").strip().upper()
+    symbols_df = _load_symbol_options(state)
+    available_symbols: list[str] = symbols_df["symbol"].tolist() if not symbols_df.empty else []
 
-    if not symbol:
-        st.info("Enter a symbol to explore its decision history.")
-        return
+    jump_sym = st.session_state.pop("jump_symbol", "")
+    options = [""] + available_symbols
+    default_index = 0
+    if jump_sym and jump_sym in available_symbols:
+        default_index = options.index(jump_sym)
+
+    if available_symbols:
+        selected_symbol = st.selectbox(
+            "Choose a symbol",
+            options,
+            index=default_index,
+            format_func=lambda x: x or "Select a symbol...",
+        )
+        symbol = selected_symbol.strip().upper() if selected_symbol else ""
+        if not symbol:
+            _empty_state("Select or type a symbol to explore its history", ":mag:")
+            return
+    else:
+        symbol = st.text_input("Symbol", placeholder="e.g. AAPL").strip().upper()
+        if not symbol:
+            _empty_state("Enter a symbol to explore its decision history", ":mag:")
+            return
 
     decisions = _safe_query(
         state,
@@ -352,16 +704,17 @@ def decision_tab(state: duckdb.DuckDBPyConnection) -> None:
         state,
         "SELECT event_type, timestamp, payload FROM events"
         " WHERE event_type IN ('candidate_blocked', 'candidate_scored', 'candidate_promoted',"
-        "                      'stop_adjusted', 'partial_taken', 'time_stop_triggered')"
+        "                      'stop_adjusted', 'partial_taken', 'time_stop_triggered',"
+        "                      'fill_booked')"
         " AND payload->>'symbol' = ?"
         " ORDER BY timestamp DESC LIMIT 50",
         [symbol],
     )
 
-    st.subheader(f"Timeline for {symbol}")
+    st.markdown(f"**Timeline for {symbol}**")
 
-    if not decisions.empty and not events.empty:
-        combined = []
+    if not decisions.empty or not events.empty:
+        combined: list[dict[str, str]] = []
         for _, r in decisions.iterrows():
             combined.append(
                 {
@@ -386,13 +739,15 @@ def decision_tab(state: duckdb.DuckDBPyConnection) -> None:
             elif r.event_type == "stop_adjusted":
                 old = payload.get("old_stop", "?")
                 new = payload.get("new_stop", "?")
-                detail = f"Stop adjusted: {old} : {new}"
+                detail = f"Stop adjusted: {old} → {new}"
             elif r.event_type == "partial_taken":
                 qty = payload.get("quantity", "?")
                 price = payload.get("price", "?")
                 detail = f"Partial take: {qty} @ {price}"
             elif r.event_type == "time_stop_triggered":
                 detail = f"Time stop after {payload.get('days_held', '?')} days"
+            elif r.event_type == "fill_booked":
+                detail = "Fill booked"
             combined.append(
                 {
                     "date": str(r.timestamp)[:10],
@@ -404,17 +759,13 @@ def decision_tab(state: duckdb.DuckDBPyConnection) -> None:
 
         combined.sort(key=lambda x: x["date"], reverse=True)
         timeline = pd.DataFrame(combined)
-        st.dataframe(timeline, width="stretch")
-    elif not decisions.empty:
-        st.dataframe(decisions[["decision_date", "action", "confidence"]], width="stretch")
-    elif not events.empty:
-        st.dataframe(events[["timestamp", "event_type"]], width="stretch")
+        _data_table(timeline, height=min(len(timeline) * 35 + 10, 500))
     else:
-        st.info(f"No decision or event history found for symbol: {symbol}")
+        _empty_state(f"No history found for symbol: {symbol}", ":mag:")
 
 
 def journal_tab(state: duckdb.DuckDBPyConnection) -> None:
-    st.header("Daily Journal")
+    _section_header("Journal", "Daily journal entries")
 
     journals = _load_journals(state)
     if not journals.empty:
@@ -430,9 +781,12 @@ def journal_tab(state: duckdb.DuckDBPyConnection) -> None:
             if not row.empty:
                 st.markdown(row.iloc[0]["content"])
             else:
-                st.info("No journal entry for this date.")
+                _empty_state("No journal entry for this date", ":memo:")
     else:
-        st.info("No journal entries available. Run the pipeline to generate daily journals.")
+        _empty_state(
+            "No journal entries available. Run the pipeline to generate daily journals.",
+            ":memo:",
+        )
 
 
 def main() -> None:
@@ -448,12 +802,12 @@ def main() -> None:
 
     if not DATA_DIR.exists():
         st.warning(f"Data directory not found: {DATA_DIR}")
-        st.info("Run the pipeline at least once to generate data.")
+        _empty_state("Run the pipeline at least once to generate data.")
         return
 
     if not (DATA_DIR / "state.db").exists():
         st.warning(f"No state database found at {DATA_DIR / 'state.db'}")
-        st.info("Run the pipeline at least once to generate data.")
+        _empty_state("Run the pipeline at least once to generate data.")
         return
 
     conn = _connect()
@@ -463,7 +817,7 @@ def main() -> None:
     analytical, state = conn
 
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-        ["Home", "Portfolio", "Reports", "Concepts", "Daily Journal", "Decision Explorer"]
+        ["Home", "Portfolio Risk", "Reports", "Concept Cards", "Journal", "Decision Explorer"]
     )
 
     with tab1:
