@@ -3,7 +3,7 @@
 import httpx
 
 from alpha_quant.adapters.real.llm_adapter import OpenAILikeLLM
-from alpha_quant.app.config import LLMConfig
+from alpha_quant.ports.llm import LLMConfig
 
 
 def _config(**kwargs: str | int) -> LLMConfig:
