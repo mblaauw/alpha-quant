@@ -12,7 +12,7 @@ def _float(value: Any) -> float | None:
         return None
     try:
         return float(value)
-    except ValueError, TypeError:
+    except (ValueError, TypeError):  # fmt: skip
         return None
 
 
@@ -37,7 +37,7 @@ def _parse_date(value: str | None, *fmts: str) -> date | None:
     for fmt in formats:
         try:
             return datetime.strptime(value.strip(), fmt).date()
-        except ValueError, TypeError:
+        except (ValueError, TypeError):  # fmt: skip
             continue
     return None
 
@@ -65,7 +65,7 @@ def _parse_number(text: str | None) -> float | None:
     cleaned = cleaned.replace(",", "")
     try:
         return float(cleaned)
-    except ValueError, TypeError:
+    except (ValueError, TypeError):  # fmt: skip
         return None
 
 
