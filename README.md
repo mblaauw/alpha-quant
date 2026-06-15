@@ -1,8 +1,9 @@
 <div align="center">
 
 <div align="center">
-  <img src="docs/assets/logo.png" alt="Alpha-Quant Logo" width="200">
+  <img src="docs/assets/architecture-hexagonal.svg" alt="Alpha-Quant hexagonal architecture" width="900">
 </div>
+
 # Alpha-Quant
 
 Deterministic, daily-cadence, long-only equity paper-trading engine
