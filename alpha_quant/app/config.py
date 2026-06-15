@@ -26,7 +26,7 @@ class DataConfig(BaseModel):
     mode: str = "fixture"
     indicator_state: bool = True
     staleness_halt_hours: int = 30
-    fixture_version: str = "fx-2026-06-v1"
+    fixture_version: str = "v1"
 
     @field_validator("mode")
     @classmethod

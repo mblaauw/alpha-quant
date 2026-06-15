@@ -129,6 +129,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         fill_config=fill_config,
         risk_config=risk_config,
         sizing_config=sizing_config,
+        market_data=market_data,
         prev_equity=prev_equity,
         prev_regime=prev_regime,
     )

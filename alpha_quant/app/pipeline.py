@@ -57,6 +57,7 @@ from alpha_quant.domain.risk import (
 )
 from alpha_quant.domain.sizing import SizingConfig
 from alpha_quant.domain.validate import validate_bars, validate_indicator_state
+from alpha_quant.ports.market_data import MarketData
 from alpha_quant.ports.store import Store
 
 logger = structlog.get_logger()
@@ -94,6 +95,7 @@ def run(
     fill_config: FillConfig | None = None,
     risk_config: RiskConfig | None = None,
     sizing_config: SizingConfig | None = None,
+    market_data: MarketData | None = None,
     prev_equity: float | None = None,
     prev_regime: str = "CAUTION",
     degradation: DegradationStatus | None = None,
@@ -126,12 +128,19 @@ def run(
 
     all_bars: dict[str, list[Bar]] = {}
     for symbol in symbols:
+        bars: list[Bar] = []
         try:
             bars = store.load_bars(symbol, lookback_start, run_date)
-            if bars:
-                all_bars[symbol] = bars
-        except Exception as e:
-            logger.exception("bar_load_failed", symbol=symbol)
+        except Exception:
+            logger.warning("store_bar_load_failed", symbol=symbol)
+        if not bars and market_data is not None:
+            try:
+                bars = market_data.daily_bars(symbol, lookback_start, run_date)
+            except Exception:
+                logger.exception("market_data_bar_load_failed", symbol=symbol)
+        if bars:
+            all_bars[symbol] = bars
+        else:
             events.append(
                 SourceDegraded(
                     run_id=run_id,
@@ -144,7 +153,7 @@ def run(
                 ErrorOccurred(
                     run_id=run_id,
                     source="pipeline",
-                    error=str(e),
+                    error="No bar data from store or market_data",
                     context={"symbol": symbol, "operation": "bar_load"},
                 )
             )
@@ -517,30 +526,32 @@ def run(
     decisions.extend(entry_decisions)
 
     # --- 6b. Daily loss check ---
+    initial_cash = prev_equity or 100_000.0
     prev_snap = store.load_latest_portfolio_snapshot()
     if prev_snap is not None:
         today_cash = prev_snap.cash + cash_adjust - entry_cost
-        all_positions = store.load_positions()
-        today_market_value = sum(
-            max(prices.get(pos.symbol, pos.current_price or 0.0), 0.0) * max(pos.quantity, 0)
-            for pos in all_positions
-        )
-        today_equity = today_cash + today_market_value
+    else:
+        today_cash = initial_cash + cash_adjust - entry_cost
+    all_positions = store.load_positions()
+    today_market_value = sum(
+        max(prices.get(pos.symbol, pos.current_price or 0.0), 0.0) * max(pos.quantity, 0)
+        for pos in all_positions
+    )
+    today_equity = today_cash + today_market_value
+
+    if prev_snap is not None:
         today_pnl = today_equity - prev_snap.equity
         daily_halt_actions = evaluate_daily_loss(today_pnl, today_equity, rc)
         for action in daily_halt_actions:
             events.append(action)
 
-        # Persist main book portfolio snapshot with regime
-        main_snap = PortfolioSnapshot(
-            date=run_date,
-            cash=today_cash,
-            equity=today_equity,
-            regime=regime,
-        )
-        store.save_portfolio_snapshot(main_snap)
-    else:
-        today_equity = (prev_equity or 100_000.0) + cash_adjust - entry_cost
+    main_snap = PortfolioSnapshot(
+        date=run_date,
+        cash=today_cash,
+        equity=today_equity,
+        regime=regime,
+    )
+    store.save_portfolio_snapshot(main_snap)
 
     # --- 7. Shadow books ---
     if shadow_books is not None:

@@ -14,7 +14,7 @@ include_benchmarks = ["SPY", "^VIX"]
 [data]
 indicator_state = true
 staleness_halt_hours = 30
-fixture_version = "fx-2026-06-v1"
+fixture_version = "v1"
 
 [universe]
 min_price = 5.0
