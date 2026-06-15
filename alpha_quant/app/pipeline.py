@@ -28,6 +28,7 @@ from alpha_quant.domain.events import (
     CandidatePromoted,
     CandidateScored,
     ConsistencyViolation,
+    DataIngested,
     DataQuarantined,
     DrawdownLadderTripped,
     ErrorOccurred,
@@ -38,6 +39,7 @@ from alpha_quant.domain.events import (
     PipelineRunStarted,
     RegimeChanged,
     SourceDegraded,
+    StalenessHaltSet,
     StopAdjusted,
     TimeStopTriggered,
 )
@@ -140,6 +142,16 @@ def run(
         if not bars and market_data is not None:
             try:
                 bars = market_data.daily_bars(symbol, lookback_start, run_date)
+                if bars:
+                    events.append(
+                        DataIngested(
+                            run_id=run_id,
+                            source="pipeline",
+                            connector="market_data",
+                            symbol=symbol,
+                            records=len(bars),
+                        )
+                    )
             except Exception:
                 logger.exception("market_data_bar_load_failed", symbol=symbol)
         if bars:
@@ -200,6 +212,14 @@ def run(
             if vr.severity == "HALT":
                 halted = True
                 write_halt(reason=vr.check, run_id=run_id)
+                events.append(
+                    StalenessHaltSet(
+                        run_id=run_id,
+                        source="pipeline",
+                        symbol=symbol,
+                        hours_since_last=0.0,
+                    )
+                )
 
     # --- 3. Derive indicators ---
     indicator_states: dict[str, IndicatorState] = {}
