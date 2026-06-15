@@ -9,8 +9,30 @@ import streamlit as st
 import structlog
 
 from alpha_quant.app.halt import is_halted, read_halt
+from alpha_quant.domain.events import (
+    CandidateBlocked,
+    CandidatePromoted,
+    CandidateScored,
+    ConsistencyViolation,
+    FillBooked,
+    PartialTaken,
+    StalenessHaltSet,
+    StopAdjusted,
+    TimeStopTriggered,
+)
 
 logger = structlog.get_logger()
+
+
+_EVT_CANDIDATE_SCORED = CandidateScored.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
+_EVT_CANDIDATE_BLOCKED = CandidateBlocked.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
+_EVT_CANDIDATE_PROMOTED = CandidatePromoted.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
+_EVT_FILL_BOOKED = FillBooked.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
+_EVT_STOP_ADJUSTED = StopAdjusted.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
+_EVT_PARTIAL_TAKEN = PartialTaken.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
+_EVT_TIME_STOP_TRIGGERED = TimeStopTriggered.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
+_EVT_STALENESS_HALT_SET = StalenessHaltSet.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
+_EVT_CONSISTENCY_VIOLATION = ConsistencyViolation.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
 
 st.set_page_config(
     page_title="Alpha Quant Dashboard",
@@ -171,7 +193,7 @@ def _load_quarantine(state: duckdb.DuckDBPyConnection) -> pd.DataFrame:
 def _load_staleness_events(state: duckdb.DuckDBPyConnection) -> pd.DataFrame:
     return _safe_query(
         state,
-        "SELECT payload FROM events WHERE event_type = 'staleness_halt_set'"
+        f"SELECT payload FROM events WHERE event_type = '{_EVT_STALENESS_HALT_SET}'"
         " ORDER BY timestamp DESC LIMIT 5",
     )
 
@@ -253,10 +275,10 @@ def _daily_briefing(state: duckdb.DuckDBPyConnection, run_id: str | None) -> Non
     if run_id:
         events_df = _load_run_events(state, run_id)
         if not events_df.empty:
-            scored = len(events_df[events_df["event_type"] == "candidate_scored"])
-            blocked = len(events_df[events_df["event_type"] == "candidate_blocked"])
-            promoted = len(events_df[events_df["event_type"] == "candidate_promoted"])
-            filled = len(events_df[events_df["event_type"] == "fill_booked"])
+            scored = len(events_df[events_df["event_type"] == _EVT_CANDIDATE_SCORED])
+            blocked = len(events_df[events_df["event_type"] == _EVT_CANDIDATE_BLOCKED])
+            promoted = len(events_df[events_df["event_type"] == _EVT_CANDIDATE_PROMOTED])
+            filled = len(events_df[events_df["event_type"] == _EVT_FILL_BOOKED])
 
             _metric_card("Promoted", str(promoted))
 
@@ -349,7 +371,7 @@ def _attention_center(state: duckdb.DuckDBPyConnection) -> None:
 
     consistency_violations = _safe_query(
         state,
-        "SELECT payload FROM events WHERE event_type = 'consistency_violation'"
+        f"SELECT payload FROM events WHERE event_type = '{_EVT_CONSISTENCY_VIOLATION}'"
         " ORDER BY timestamp DESC LIMIT 5",
     )
     for _ in range(len(consistency_violations)):
@@ -393,10 +415,10 @@ def _decision_funnel(state: duckdb.DuckDBPyConnection) -> None:
         _empty_state("No events for latest run")
         return
 
-    scored = events_df[events_df["event_type"] == "candidate_scored"]
-    blocked = events_df[events_df["event_type"] == "candidate_blocked"]
-    promoted = events_df[events_df["event_type"] == "candidate_promoted"]
-    filled = events_df[events_df["event_type"] == "fill_booked"]
+    scored = events_df[events_df["event_type"] == _EVT_CANDIDATE_SCORED]
+    blocked = events_df[events_df["event_type"] == _EVT_CANDIDATE_BLOCKED]
+    promoted = events_df[events_df["event_type"] == _EVT_CANDIDATE_PROMOTED]
+    filled = events_df[events_df["event_type"] == _EVT_FILL_BOOKED]
 
     fc1, fc2, fc3, fc4 = st.columns(4)
     fc1.metric("Scored", len(scored), help=_help_text("Scored"))
@@ -700,14 +722,24 @@ def decision_tab(state: duckdb.DuckDBPyConnection) -> None:
         [symbol],
     )
 
+    evt_in = ", ".join(
+        f"'{t}'"
+        for t in [
+            _EVT_CANDIDATE_BLOCKED,
+            _EVT_CANDIDATE_SCORED,
+            _EVT_CANDIDATE_PROMOTED,
+            _EVT_STOP_ADJUSTED,
+            _EVT_PARTIAL_TAKEN,
+            _EVT_TIME_STOP_TRIGGERED,
+            _EVT_FILL_BOOKED,
+        ]
+    )
     events = _safe_query(
         state,
-        "SELECT event_type, timestamp, payload FROM events"
-        " WHERE event_type IN ('candidate_blocked', 'candidate_scored', 'candidate_promoted',"
-        "                      'stop_adjusted', 'partial_taken', 'time_stop_triggered',"
-        "                      'fill_booked')"
-        " AND payload->>'symbol' = ?"
-        " ORDER BY timestamp DESC LIMIT 50",
+        f"SELECT event_type, timestamp, payload FROM events"
+        f" WHERE event_type IN ({evt_in})"
+        f" AND payload->>'symbol' = ?"
+        f" ORDER BY timestamp DESC LIMIT 50",
         [symbol],
     )
 
@@ -730,23 +762,23 @@ def decision_tab(state: duckdb.DuckDBPyConnection) -> None:
             except (json.JSONDecodeError, TypeError, ValueError):  # fmt: skip
                 payload = {}
             detail = ""
-            if r.event_type == "candidate_blocked":
+            if r.event_type == _EVT_CANDIDATE_BLOCKED:
                 detail = f"Blocked at gate={payload.get('gate', '?')}: {payload.get('reason', '')}"
-            elif r.event_type == "candidate_scored":
+            elif r.event_type == _EVT_CANDIDATE_SCORED:
                 detail = f"Scored {payload.get('composite_score', '?')}"
-            elif r.event_type == "candidate_promoted":
+            elif r.event_type == _EVT_CANDIDATE_PROMOTED:
                 detail = f"Promoted with score {payload.get('score', '?')}"
-            elif r.event_type == "stop_adjusted":
+            elif r.event_type == _EVT_STOP_ADJUSTED:
                 old = payload.get("old_stop", "?")
                 new = payload.get("new_stop", "?")
                 detail = f"Stop adjusted: {old} → {new}"
-            elif r.event_type == "partial_taken":
+            elif r.event_type == _EVT_PARTIAL_TAKEN:
                 qty = payload.get("quantity", "?")
                 price = payload.get("price", "?")
                 detail = f"Partial take: {qty} @ {price}"
-            elif r.event_type == "time_stop_triggered":
+            elif r.event_type == _EVT_TIME_STOP_TRIGGERED:
                 detail = f"Time stop after {payload.get('days_held', '?')} days"
-            elif r.event_type == "fill_booked":
+            elif r.event_type == _EVT_FILL_BOOKED:
                 detail = "Fill booked"
             combined.append(
                 {
