@@ -136,6 +136,10 @@ Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamli
 | 0025 | SQLite Cache for SEC Connector | Per-connector SEC ticker cache |
 | 0026 | Content-Addressed Vault | Append-only zstd blob storage |
 | 0027 | Dependency Pruning | Remove polars, SQLAlchemy, 50-day prune |
+| 0028 | Clock Virtualization | SystemClock + VirtualClock for deterministic replay |
+| 0029 | Store Mixin Decomposition | 9 single-concern mixin files for CanonicalStore |
+| 0030 | Shadow Ablation Books | Parallel portfolios for mechanism evaluation |
+| 0031 | File-Based Halt Mechanism | Crash-safe .HALT file protocol |
 
 See [docs/adr/README.md](../adr/README.md) for full ADR index.
 
