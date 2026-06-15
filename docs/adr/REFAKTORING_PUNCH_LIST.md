@@ -31,64 +31,34 @@
 - **Rationale:** Zero imports in any source or test file. Dead weight in lockfile.
 
 ### P1.3: Pipeline — call `write_halt()` when validation HALT occurs
-- **Files:** `alpha_quant/app/pipeline.py`, `alpha_quant/app/scheduler.py`
-- **Change:** After `validate_bars` returns HALT severity, call `write_halt()` with reason. In scheduler, check and propagate.
-- **Effort:** 10 min, 2 files, ~5 lines
-- **Rationale:** Halt detection exists but never creates the halt file. The feature is incomplete.
+- **Status:** ✅ Already implemented (pipeline.py:202, scheduler.py:59)
 
 ### P1.4: Wire LLM adapter in factory
-- **Files:** `alpha_quant/app/factory.py`, `alpha_quant/app/config.py`
-- **Change:** Add `create_llm(config, vault)` that returns `OpenAILikeLLM` or `CannedLLM` based on `config.data.mode`
-- **Effort:** 10 min, 1 file, ~10 lines
-- **Rationale:** `OpenAILikeLLM` exists with config and retry logic but is never wired into the DI container.
+- **Status:** ✅ Already implemented (factory.py:116 `create_llm`)
 
 ### P1.5: Wire Store adapter in factory
-- **Files:** `alpha_quant/app/factory.py`
-- **Change:** Add `create_store(config)` that returns `CanonicalStore` or `FixtureStore`
-- **Effort:** 10 min, 1 file, ~8 lines
-- **Rationale:** `CanonicalStore` implements all 19 Store methods but is never created by factory.
+- **Status:** ✅ Already implemented (factory.py:110 `create_store`)
 
 ### P1.6: Wire EventSink adapter in factory
-- **Files:** `alpha_quant/app/factory.py`
-- **Change:** Add `create_event_sink(config)` that returns `SqliteEventSink` or `FakeEventSink`
-- **Effort:** 10 min, 1 file, ~8 lines
-- **Rationale:** `SqliteEventSink` fully implements the port but is never created by factory.
+- **Status:** ✅ Already implemented (factory.py:104 `create_event_sink`)
 
 ### P1.9: Implement missing event emissions
-- **Files:** `alpha_quant/app/pipeline.py`, `alpha_quant/domain/risk.py`, `alpha_quant/domain/validate.py`
-- **Change:** Wire emissions for: `StalenessHaltSet`, `BookMarked`, `IndicatorStateUpdated`, `ErrorOccurred`, `ConsistencyViolation`, `DataQuarantined`, `DrawdownLadderTripped`, `RegimeChanged`
-- **Effort:** Medium (3 files, ~40 lines)
-- **Rationale:** 8 event types defined in `events.py` but never emitted anywhere. The audit trail is incomplete.
+- **Status:** ✅ Done — StalenessHaltSet and DataIngested added (others already emitted)
 
 ### P1.10: Graduate insider signal from binary to continuous
-- **Files:** `alpha_quant/domain/insider_signal.py`
-- **Change:** Score proportional to `total_value / market_cap` or number of distinct insiders. Add negative signal for sell-side clusters.
-- **Effort:** Small (1 file, ~15 lines)
-- **Rationale:** A $200K cluster scores the same as a $10M cluster. No sell-side analysis at all.
+- **Status:** ✅ Already implemented — `insider_signal.py` uses proportional `total_value / market_cap` scoring with sell penalty
 
 ### P1.11: Add sector concentration check in ranking
-- **Files:** `alpha_quant/domain/ranking.py`
-- **Change:** Add `max_sector_exposure_pct` parameter. Cap candidates per sector proportionally to benchmark sector weight or use uniform allocation.
-- **Effort:** Small (1 file, ~15 lines)
-- **Rationale:** Top N candidates can all be from one sector. No diversification constraint.
+- **Status:** ✅ Already implemented — `ranking.py:42-53` enforces `max_sector_pct=0.25`
 
 ### P1.14: Fix RSI scoring — replace discrete ranges with continuous function
-- **Files:** `alpha_quant/domain/technical.py`
-- **Change:** Replace `if/elif` range-based RSI scoring with Gaussian centered at 50-55, penalizing both overbought (>80) and oversold (<30) extremes
-- **Effort:** Small (1 file, ~10 lines)
-- **Rationale:** RSI=80 scores 0.4 (same as RSI=40). Overlapping ranges create ambiguity. No penalization of extremes.
+- **Status:** ✅ Already implemented — `technical.py:90-95` uses Gaussian centered at 52, sigma 22
 
 ### P1.15: Add SPY benchmark to backtest metrics
-- **Files:** `alpha_quant/app/backtest.py`
-- **Change:** Use `compute_spy_buy_and_hold` from `ablation.py` to add `spy_return`, `spy_cagr`, `spy_max_dd` to `BacktestMetrics`
-- **Effort:** 10 min, 1 file, ~5 lines
-- **Rationale:** No benchmark comparison — can't tell if strategy beat SPY.
+- **Status:** ✅ Already implemented (backtest.py:62-64, 405-414)
 
 ### P1.17: Implement CLI stubs — journal, report, backtest
-- **Files:** `alpha_quant/cli.py`
-- **Change:** Wire `cmd_journal` → `journal.generate_journal()`, `cmd_report` → `reporting.generate_weekly()/generate_monthly()`, `cmd_backtest` → `backtest.run()`
-- **Effort:** Small (1 file, ~25 lines)
-- **Rationale:** Three CLI commands print "not yet implemented" despite functional domain and app modules existing.
+- **Status:** ✅ Already implemented (cli.py:175 cmd_backtest, 338 cmd_journal, 372 cmd_report)
 
 ### P1.18: Integration/E2E tests for critical paths
 
@@ -99,10 +69,7 @@
 - **Rationale:** Silent breakage if event types change in `events.py`. 8 unique strings duplicated 22 times.
 
 ### P1.20: Duplicate gate logic in pipeline and ranking
-- **Files:** `alpha_quant/app/pipeline.py:470-504`, `alpha_quant/domain/ranking.py:57-73`
-- **Change:** Remove inline gate checks from `pipeline.py`; let `rank()` be the sole gate evaluation point. `ranking.py:_passes_gates()` already checks `gate_results` and `block_reason`.
-- **Effort:** Small (2 files, ~15 lines)
-- **Rationale:** Gates evaluated twice per candidate. Different behavior possible.
+- **Status:** ✅ Not a bug — pipeline checks emit CandidateBlocked events and enforce composite threshold; ranking checks filter by gate_results. Different concerns, same data.
 
 ### P1.21: Canonical Parquet read function duplication (6 near-identical functions)
 - **Files:** `alpha_quant/app/store/canonical.py:121-320`
