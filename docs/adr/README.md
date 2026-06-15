@@ -33,6 +33,10 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0025](./0025-use-sec-connector-sqlite-cache.md) | Use SQLite Cache for SEC Connector | Accepted | 2026-06-12 |
 | [0026](./0026-use-content-addressed-vault.md) | Use Content-Addressed Vault for Raw Data Storage | Accepted | 2026-06-12 |
 | [0027](./0027-use-dependency-pruning.md) | Dependency Pruning — polars, SQLAlchemy, APScheduler CLI, 50-Day Prune | Accepted | 2026-06-13 |
+| [0028](./0028-use-clock-virtualization-for-determinism.md) | Clock Virtualization for Deterministic Replay | Accepted | 2026-06-15 |
+| [0029](./0029-use-store-mixin-decomposition.md) | Store Mixin Decomposition for Schema Organization | Accepted | 2026-06-15 |
+| [0030](./0030-use-shadow-ablation-books.md) | Shadow Ablation Books for Mechanism Evaluation | Accepted | 2026-06-15 |
+| [0031](./0031-use-file-based-halt-mechanism.md) | File-Based Halt Mechanism for System Safety | Accepted | 2026-06-15 |
 
 ## Status Meanings
 

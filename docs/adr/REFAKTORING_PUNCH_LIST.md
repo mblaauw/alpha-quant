@@ -241,20 +241,24 @@
 ### P3.9: Update ADR-0021 — stale `app/store.py` path
 
 ### P3.10: Create ADR for clock virtualization architecture
-- **Change:** New ADR documenting `ports/clock.py`, `adapters/real/clock.py` (SystemClock), `adapters/fake/virtual_clock.py` (VirtualClock). Invariant I9 (deterministic clock) central to golden replay.
+- **Change:** Created ADR-0028 documenting `ports/clock.py`, `SystemClock`, `VirtualClock`. Invariant I9 (deterministic clock) central to golden replay.
 - **Effort:** 30 min, 1 file
+- **Status:** ✅ Done
 
 ### P3.11: Create ADR for store port decomposition into mixins
-- **Change:** New ADR documenting the evolution from a single Store interface to 9 specialized mixin classes combined by `CanonicalStore`.
+- **Change:** Created ADR-0029 documenting the evolution from a single Store interface to 9 specialized mixin classes combined by `CanonicalStore`.
 - **Effort:** 20 min, 1 file
+- **Status:** ✅ Done
 
 ### P3.12: Create ADR for shadow ablation book architecture
-- **Change:** New ADR documenting the shadow book pattern in `domain/ablation.py` for mechanism evaluation.
+- **Change:** Created ADR-0030 documenting the shadow book pattern in `domain/ablation.py` for mechanism evaluation.
 - **Effort:** 20 min, 1 file
+- **Status:** ✅ Done
 
 ### P3.13: Create ADR for halt mechanism (file-based protocol)
-- **Change:** New ADR documenting `app/halt.py` — write_halt, read_halt, is_halted, clear_halt.
+- **Change:** Created ADR-0031 documenting `app/halt.py` — write_halt, read_halt, is_halted, clear_halt.
 - **Effort:** 15 min, 1 file
+- **Status:** ✅ Done
 - **Change:** ADR-0021 references `app/store.py` which no longer exists; update to `app/store/state.py`.
 - **Effort:** 5 min, 1 file
 
