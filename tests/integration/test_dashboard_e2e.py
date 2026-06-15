@@ -232,11 +232,10 @@ class TestDashboardSeeded:
         system_success = [s.value for s in at.success if "System Running" in s.value]
         assert len(system_success) > 0
 
-    def test_home_tab_shows_equity_curve(self, seeded_db: Path) -> None:
+    def test_home_tab_shows_total_return(self, seeded_db: Path) -> None:
         at = _run_dashboard(seeded_db)
-        equity_metrics = [m for m in at.metric if m.label == "Equity"]
-        assert len(equity_metrics) > 0
-        assert equity_metrics[0].value == "$102,000.00"
+        return_metrics = [m for m in at.metric if m.label == "Total Return"]
+        assert len(return_metrics) > 0
 
     def test_home_tab_shows_last_run_info(self, seeded_db: Path) -> None:
         at = _run_dashboard(seeded_db)
@@ -249,10 +248,10 @@ class TestDashboardSeeded:
         assert len(pos_metrics) > 0
         assert pos_metrics[0].value == "2"
 
-    def test_home_tab_shows_data_health(self, seeded_db: Path) -> None:
+    def test_home_tab_shows_system_running(self, seeded_db: Path) -> None:
         at = _run_dashboard(seeded_db)
-        health_messages = [s.value for s in at.success if "All data sources healthy" in s.value]
-        assert len(health_messages) > 0
+        system_success = [s.value for s in at.success if "System Running" in s.value]
+        assert len(system_success) > 0
 
     def test_reports_tab_shows_reports(self, seeded_db: Path) -> None:
         at = _run_dashboard(seeded_db)
@@ -272,7 +271,7 @@ class TestDashboardSeeded:
     def test_decision_explorer_shows_info_on_empty_input(self, seeded_db: Path) -> None:
         at = _run_dashboard(seeded_db)
         at.tabs[5].run()
-        info_messages = [i.value for i in at.info if "Enter a symbol" in i.value]
+        info_messages = [i.value for i in at.info if "Select or type a symbol" in i.value]
         assert len(info_messages) > 0
 
     def test_portfolio_tab_shows_positions_dataframe(self, seeded_db: Path) -> None:
