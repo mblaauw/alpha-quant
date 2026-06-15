@@ -17,6 +17,7 @@ class Bar(BaseModel):
     close: float
     volume: float
     adj_close: float | None = None
+    fetch_id: str | None = None
 
     @model_validator(mode="after")
     def _validate_bar_relationships(self) -> Self:
@@ -70,6 +71,7 @@ class FundamentalsSnapshot(BaseModel):
     revenue: float | None = None
     net_income: float | None = None
     accruals: float | None = None
+    fetch_id: str | None = None
 
 
 class EarningsEntry(BaseModel):
@@ -81,6 +83,7 @@ class EarningsEntry(BaseModel):
     eps_actual: float | None = None
     revenue_estimate: float | None = None
     revenue_actual: float | None = None
+    fetch_id: str | None = None
 
 
 class InsiderTransaction(BaseModel):
@@ -95,6 +98,7 @@ class InsiderTransaction(BaseModel):
     shares_traded: float
     price: float | None = None
     shares_held: float | None = None
+    fetch_id: str | None = None
 
 
 class InsiderCluster(BaseModel):
@@ -119,6 +123,7 @@ class MentionCount(BaseModel):
     mention_date: date
     source: str
     count: int
+    fetch_id: str | None = None
 
 
 class SentimentBaseline(BaseModel):
@@ -249,6 +254,7 @@ class CorporateAction(BaseModel):
     action_type: str
     ratio: float | None = None
     amount: float | None = None
+    fetch_id: str | None = None
 
 
 class IndicatorState(BaseModel):
