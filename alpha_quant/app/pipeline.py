@@ -29,13 +29,17 @@ from alpha_quant.domain.events import (
     CandidateScored,
     ConsistencyViolation,
     DataQuarantined,
+    DrawdownLadderTripped,
     ErrorOccurred,
+    FillBooked,
     IndicatorStateUpdated,
+    PartialTaken,
     PipelineRunCompleted,
     PipelineRunStarted,
     RegimeChanged,
     SourceDegraded,
     StopAdjusted,
+    TimeStopTriggered,
 )
 from alpha_quant.domain.fills import FillConfig, fill_stop_loss
 from alpha_quant.domain.invariants import InvariantViolation, check_invariants
@@ -310,6 +314,15 @@ def run(
                     }
                 )
                 store.save_position(updated)
+                events.append(
+                    PartialTaken(
+                        run_id=run_id,
+                        source="pipeline",
+                        symbol=sym,
+                        quantity=reduce_qty,
+                        price=action.price or bar.close,
+                    )
+                )
                 proceed = round(reduce_qty * (action.price or bar.close), 2)
                 cash_adjust += proceed
                 decisions.append(
@@ -355,6 +368,23 @@ def run(
             store.save_position(updated)
             store.save_fill(exit_fill)
             fills.append(exit_fill)
+            events.append(
+                FillBooked(
+                    run_id=run_id,
+                    source="pipeline",
+                    fill=exit_fill,
+                )
+            )
+            if action.action_type == "time_stop":
+                entry_date = pos.entry_date or run_date
+                events.append(
+                    TimeStopTriggered(
+                        run_id=run_id,
+                        source="pipeline",
+                        symbol=sym,
+                        days_held=(run_date - entry_date).days,
+                    )
+                )
             decisions.append(
                 Decision(
                     symbol=sym,
@@ -368,10 +398,20 @@ def run(
 
     # --- 5b. Portfolio-level risk (drawdown) ---
     equity_snapshots = store.load_portfolio_snapshots()
-    dd_verdict = evaluate_drawdown([s.equity for s in equity_snapshots], rc)
-    if dd_verdict.multiplier < 1.0:
-        for action in dd_verdict.actions:
-            events.append(action)
+    equity_values = [s.equity for s in equity_snapshots]
+    dd_verdict = evaluate_drawdown(equity_values, rc)
+    if dd_verdict.multiplier < 1.0 and equity_values:
+        peak = max(equity_values)
+        current = equity_values[-1]
+        dd_pct = (peak - current) / peak if peak > 0 else 0.0
+        events.append(
+            DrawdownLadderTripped(
+                run_id=run_id,
+                source="pipeline",
+                drawdown_pct=round(dd_pct * 100, 2),
+                action=f"multiplier reduced to {dd_verdict.multiplier}",
+            )
+        )
 
     # --- 6. Decide (score + rank + size) ---
     new_positions_count = len([p for p in store.load_positions() if p.quantity > 0])

@@ -289,8 +289,8 @@ class TestPipelineCore:
                 prev_equity=100_000.0,
             )
         assert isinstance(result, RunResult)
-        dd_events = [e for e in result.events if getattr(e, "action_type", None) == "drawdown_cut"]
-        assert len(dd_events) > 0, "drawdown_cut event should be emitted when equity drops 20%"
+        dd_events = [e for e in result.events if getattr(e, "event_type", None) == "drawdown_ladder_tripped"]
+        assert len(dd_events) > 0, "DrawdownLadderTripped event should be emitted when equity drops 20%"
 
     def test_daily_halt_on_equity_drop(self) -> None:
         spy_bars = _make_bars(400, 100.0)
