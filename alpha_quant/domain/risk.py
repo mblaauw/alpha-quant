@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from alpha_quant.domain.models import Bar, Position
 
@@ -26,6 +26,27 @@ class RiskConfig(BaseModel):
     dd_ladder: list[list[float]] = Field(default_factory=lambda: [[0.10, 0.5], [0.15, 0.0]])
     dd_window_days: int = 0
     daily_loss_halt_pct: float = 0.03
+
+    @field_validator("stop_atr_mult", "trail_after_r", "partial_take_at_r")
+    @classmethod
+    def _r_multiple_bounds(cls, v: float) -> float:
+        if not 0.1 <= v <= 10:
+            raise ValueError("R-multiple must be between 0.1 and 10")
+        return v
+
+    @field_validator("time_stop_days")
+    @classmethod
+    def _time_stop_days_bounds(cls, v: int) -> int:
+        if not 1 <= v <= 365:
+            raise ValueError("time_stop_days must be between 1 and 365")
+        return v
+
+    @field_validator("daily_loss_halt_pct")
+    @classmethod
+    def _daily_loss_halt_pct_bounds(cls, v: float) -> float:
+        if not 0.0 <= v <= 1.0:
+            raise ValueError("daily_loss_halt_pct must be between 0.0 and 1.0")
+        return v
 
 
 class RiskAction(BaseModel):

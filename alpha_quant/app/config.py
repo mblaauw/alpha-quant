@@ -6,6 +6,8 @@ from typing import Any
 from pydantic import BaseModel, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from alpha_quant.domain.risk import RiskConfig
+
 
 class BootstrapConfig(BaseModel):
     symbols: list[str]
@@ -100,37 +102,6 @@ class PaperConfig(BaseModel):
     def _slippage_bps_bounds(cls, v: int) -> int:
         if not 0 <= v <= 100:
             raise ValueError("slippage_bps must be between 0 and 100")
-        return v
-
-
-class RiskConfig(BaseModel):
-    stop_atr_mult: float = 2.0
-    trail_after_r: float = 1.0
-    partial_take_at_r: float = 2.0
-    time_stop_days: int = 30
-    dd_ladder: list[list[float]] = [[0.10, 0.5], [0.15, 0.0]]
-    dd_window_days: int = 0
-    daily_loss_halt_pct: float = 0.03
-
-    @field_validator("stop_atr_mult", "trail_after_r", "partial_take_at_r")
-    @classmethod
-    def _r_multiple_bounds(cls, v: float) -> float:
-        if not 0.1 <= v <= 10:
-            raise ValueError("R-multiple must be between 0.1 and 10")
-        return v
-
-    @field_validator("time_stop_days")
-    @classmethod
-    def _time_stop_days_bounds(cls, v: int) -> int:
-        if not 1 <= v <= 365:
-            raise ValueError("time_stop_days must be between 1 and 365")
-        return v
-
-    @field_validator("daily_loss_halt_pct")
-    @classmethod
-    def _daily_loss_halt_pct_bounds(cls, v: float) -> float:
-        if not 0.0 <= v <= 1.0:
-            raise ValueError("daily_loss_halt_pct must be between 0.0 and 1.0")
         return v
 
 
