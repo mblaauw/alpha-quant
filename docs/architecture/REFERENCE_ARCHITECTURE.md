@@ -15,7 +15,7 @@ The system operates across three execution realities — **backtest** (historica
 
 ### 1.2 Non-Goals (v1)
 
-- Live brokerage execution (a broker port is designed but unimplemented)
+- Live brokerage execution (a broker port exists with `FakeBroker` and `AlpacaBroker` adapters, but live execution is out of v1 scope)
 - Intraday trading, options/derivatives, shorting
 - ML models, multi-agent coordination
 - LLM-computed numbers anywhere
@@ -96,7 +96,7 @@ Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamli
 | Scheduling | APScheduler (cron fallback) | In-process, simple |
 | Configuration | pydantic-settings + TOML | Typed, env-overridable, SecretStr |
 | Logging | structlog (JSON) | Events + logs share shape |
-| Testing | pytest + hypothesis | Property-based invariants |
+| Testing | pytest | Golden replay, integration tests, unit tests |
 | LLM client | Direct httpx (no SDK) | Single adapter for OpenAI + OpenRouter |
 | Market data | alpaca-py (data module only) | Trading module never imported |
 | Dashboard | Streamlit | Read-only, zero pipeline coupling |
@@ -105,7 +105,7 @@ Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamli
 
 ## 5. Architecture Decision Records
 
-27 ADRs document every technology and architectural decision.
+31 ADRs document every technology and architectural decision.
 
 | ADR | Title | Key Decision |
 |-----|-------|-------------|
@@ -168,7 +168,7 @@ The primary CI strategy is a full-DAG replay against 6 months of fixture data. T
 
 ### 6.4 Three Execution Realities (P2)
 
-Backtest, replay, and paper share one domain core and one fill model. The only differences are:
+Backtest, replay, and paper share one domain core and one fill model. The primary differences are:
 - **Clock**: system clock (paper) vs. virtual clock (replay/backtest)
 - **Data source**: live feeds (paper) vs. fixture vault (replay) vs. historical archive (backtest)
 - **Speed**: wall-clock (paper) vs. as-fast-as-possible (replay/backtest)
@@ -177,7 +177,7 @@ Backtest, replay, and paper share one domain core and one fill model. The only d
 
 | Layer | Speed | What | Tooling |
 |-------|-------|------|---------|
-| Domain unit tests | ms | Pure function invariants (I1–I13) | pytest + hypothesis |
+| Domain unit tests | ms | Pure function invariants (I1–I13) | pytest |
 | Full-DAG golden replay | s–min | 6-month fixture replay, hash comparison | CLI replay |
 | Source degradation chaos | s | Fallback behavior verification | Synthetic overlays |
 | 10-year backtest | <60s | Historical walk-forward | CLI backtest |
@@ -217,13 +217,13 @@ At the next open: fill queued orders against T+1 bars.
 
 - DuckDB state store → PostgreSQL behind the `store` port
 - Local Parquet → S3/MinIO behind DuckDB path config
-- Paper engine → live broker via `broker.py` port (defined but unimplemented)
+- Paper engine → live broker via `broker.py` port (defined; adapters exist, live execution is out of v1 scope)
 
 ## 9. Related Documents
 
 - [DESIGN.md](../../DESIGN.md) — Detailed system design specification (v1.2)
 - [Model DSL](model.c4) — LikeC4 model definitions (all elements, relationships, deployment)
 - [Views DSL](views.c4) — LikeC4 view definitions (6 diagram layouts)
-- [ADR Index](../adr/README.md) — 27 Architecture Decision Records
+- [ADR Index](../adr/README.md) — 31 Architecture Decision Records
 - [ROADMAP.md](../planning/ROADMAP.md) — 6-phase implementation timeline
 - [BACKLOG.md](../planning/BACKLOG.md) — Full backlog with epics and stories

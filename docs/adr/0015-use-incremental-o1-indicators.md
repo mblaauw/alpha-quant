@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-The indicator engine (derive.py) must compute EMA(20/50/200), RSI(14), ATR(14), MACD, and 12-1 momentum for each symbol every day. The 50-day raw tail (DESIGN §3.5) means long-window indicators (EMA200) cannot be recomputed from available raw data. The indicator state must persist between runs and update incrementally.
+The indicator engine (derive.py) must compute EMA(20/50/200), RSI(14), ATR(14), MACD, and 12-1 momentum for each symbol every day. Long-window indicators (EMA200) cannot be recomputed from a short raw history, so the indicator state must persist between runs and update incrementally.
 
 This ADR documents the *how* at the architecture level, while ADR-0008 documents the *what* (choice of numpy recurrences).
 
@@ -20,29 +20,28 @@ This ADR documents the *how* at the architecture level, while ADR-0008 documents
 - Stateful: indicator state persists in DuckDB (state.db) between pipeline runs
 - Cold start: bootstrap does a one-time 250-day backfill to seed the state
 - Integrity verification: CI recomputes from full fixture history and compares to incremental state (1e-6 tolerance)
-- The 50-day tail pattern only works if indicators are maintained incrementally
+- The 50-day raw tail pattern (removed in P2.RO — storage was negligible) originally required incremental indicators to avoid full-history recomputation
 
 ## Considered Options
 
 - **Option A: Incremental O(1) state machine** — Store `{ema20, ema50, ema200, rsi_avg_gain, rsi_avg_loss, atr, last_close}` for each symbol; update via recurrence formulas
-- **Option B: Keep full raw history and recompute windows** — Defeats the purpose of the 50-day tail (would need to keep 200+ days of raw bars)
-- **Option C: Window-based with database window functions** — Compute indicators via SQL window functions (DuckDB or SQLite); requires keeping all raw data; slower for single-symbol updates
+- **Option B: Keep full raw history and recompute windows** — Would need to keep 200+ days of raw bars to compute EMA200
+- **Option C: Window-based with database window functions** — Compute indicators via SQL window functions; requires keeping all raw data; slower for single-symbol updates
 
 ## Decision Outcome
 
 Chosen option: **Option A — Incremental O(1) state machine**.
 
 Rationale:
-1. The 50-day tail is only achievable with incremental state — keeping 200+ days of raw data for 50 symbols just to compute EMA200 is wasteful
+1. Incremental state avoids scanning 200+ days of raw data to compute EMA200
 2. Performance: 50 symbols × 5 indicators = 250 O(1) updates per day, executed in < 1ms
-3. The indicator state is a single SQLite row (~200 bytes per symbol) — 50 symbols = 10 KB of state
+3. The indicator state is a single DuckDB row (~200 bytes per symbol) — 50 symbols = 10 KB of state
 4. Cold start is a one-time bootstrap operation (DESIGN §3.7) that runs on project initialization
 5. Integrity check in CI catches any drift from the brute-force computation
 
 ### Positive Consequences
 
-- Raw bars can be pruned to the 50-day tail immediately after indicator update
-- Indicator state is human-readable in SQLite (inspectable via `sqlite3`)
+- Indicator state is human-readable in DuckDB (inspectable via `duckdb`)
 - Adding a new indicator is a single recurrence formula + one more column in the indicator_state table
 - The derive engine is pure numpy — trivially testable
 
