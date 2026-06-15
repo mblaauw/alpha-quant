@@ -527,7 +527,7 @@ class TestDecideCandidates:
 
         with (
             patch("alpha_quant.app._loop.score_candidate") as mock_score,
-            patch("alpha_quant.app._loop.check_blackout") as mock_bo,
+            patch("alpha_quant.domain.loop_helpers.check_blackout") as mock_bo,
         ):
             mock_score.return_value = _FakeCandidate()
             mock_bo.return_value = "BLOCK"
@@ -556,8 +556,8 @@ class TestDecideCandidates:
 
         with (
             patch("alpha_quant.app._loop.score_candidate") as mock_score,
-            patch("alpha_quant.app._loop.evaluate_fundamental") as mock_fund,
-            patch("alpha_quant.app._loop.check_blackout") as mock_bo,
+            patch("alpha_quant.domain.loop_helpers.evaluate_fundamental") as mock_fund,
+            patch("alpha_quant.domain.loop_helpers.check_blackout") as mock_bo,
         ):
             mock_score.return_value = _FakeCandidate()
             mock_fund.return_value = QualityVerdict(passed=False, reason="low_quality")
@@ -589,9 +589,9 @@ class TestDecideCandidates:
 
         with (
             patch("alpha_quant.app._loop.score_candidate") as mock_score,
-            patch("alpha_quant.app._loop.evaluate_fundamental") as mock_fund,
-            patch("alpha_quant.app._loop.check_blackout") as mock_bo,
-            patch("alpha_quant.app._loop.evaluate_insider") as mock_insider,
+            patch("alpha_quant.domain.loop_helpers.evaluate_fundamental") as mock_fund,
+            patch("alpha_quant.domain.loop_helpers.check_blackout") as mock_bo,
+            patch("alpha_quant.domain.loop_helpers.evaluate_insider") as mock_insider,
         ):
             mock_score.return_value = _FakeCandidate()
             mock_fund.return_value = QualityVerdict(passed=True, reason=None)
@@ -627,8 +627,8 @@ class TestDecideCandidates:
 
         with (
             patch("alpha_quant.app._loop.score_candidate") as mock_score,
-            patch("alpha_quant.app._loop.check_blackout") as mock_bo,
-            patch("alpha_quant.app._loop.evaluate_crowding") as mock_crowd,
+            patch("alpha_quant.domain.loop_helpers.check_blackout") as mock_bo,
+            patch("alpha_quant.domain.loop_helpers.evaluate_crowding") as mock_crowd,
         ):
             mock_score.return_value = _FakeCandidate()
             mock_bo.return_value = None
@@ -664,10 +664,10 @@ class TestDecideCandidates:
 
         with (
             patch("alpha_quant.app._loop.score_candidate") as mock_score,
-            patch("alpha_quant.app._loop.evaluate_fundamental") as mock_fund,
-            patch("alpha_quant.app._loop.check_blackout") as mock_bo,
-            patch("alpha_quant.app._loop.evaluate_insider") as mock_insider,
-            patch("alpha_quant.app._loop.evaluate_crowding") as mock_crowd,
+            patch("alpha_quant.domain.loop_helpers.evaluate_fundamental") as mock_fund,
+            patch("alpha_quant.domain.loop_helpers.check_blackout") as mock_bo,
+            patch("alpha_quant.domain.loop_helpers.evaluate_insider") as mock_insider,
+            patch("alpha_quant.domain.loop_helpers.evaluate_crowding") as mock_crowd,
         ):
             mock_score.return_value = _FakeCandidate()
             mock_fund.return_value = QualityVerdict(passed=True, reason=None)
@@ -709,9 +709,9 @@ class TestShadowAblation:
 
         with (
             patch("alpha_quant.app._loop.score_candidate") as mock_score,
-            patch("alpha_quant.app._loop.evaluate_fundamental") as mock_fund,
-            patch("alpha_quant.app._loop.check_blackout") as mock_bo,
-            patch("alpha_quant.app._loop.evaluate_insider") as mock_insider,
+            patch("alpha_quant.domain.loop_helpers.evaluate_fundamental") as mock_fund,
+            patch("alpha_quant.domain.loop_helpers.check_blackout") as mock_bo,
+            patch("alpha_quant.domain.loop_helpers.evaluate_insider") as mock_insider,
         ):
             mock_score.return_value = _FakeCandidate()
             mock_fund.return_value = QualityVerdict(passed=True, reason=None)
@@ -755,8 +755,8 @@ class TestShadowAblation:
 
         with (
             patch("alpha_quant.app._loop.score_candidate") as mock_score,
-            patch("alpha_quant.app._loop.check_blackout") as mock_bo,
-            patch("alpha_quant.app._loop.evaluate_crowding") as mock_crowd,
+            patch("alpha_quant.domain.loop_helpers.check_blackout") as mock_bo,
+            patch("alpha_quant.domain.loop_helpers.evaluate_crowding") as mock_crowd,
         ):
             mock_score.return_value = _FakeCandidate()
             mock_bo.return_value = None
