@@ -1,9 +1,8 @@
 <div align="center">
 
 <div align="center">
-  <img src="docs/assets/architecture-hexagonal.svg" alt="Alpha-Quant hexagonal architecture" width="900">
+  <img src="docs/assets/logo.png" alt="Alpha-Quant Logo" width="200">
 </div>
-
 # Alpha-Quant
 
 Deterministic, daily-cadence, long-only equity paper-trading engine
@@ -66,54 +65,9 @@ uv run pytest
 
 Alpha-Quant follows a **ports-and-adapters (hexagonal) architecture** where the domain core has zero I/O and every external dependency is accessed through a port interface with both fake and real adapter implementations.
 
-```mermaid
-graph TB
-    subgraph Adapters["Adapters (outer ring)"]
-        direction TB
-        FA["Fake Adapters<br/>fixture_store, virtual_clock,<br/>canned_llm, fixture_market_data,<br/>fixture_fundamentals, fixture_insider,<br/>fixture_sentiment, fake_broker,<br/>fake_event_sink"]
-        RA["Real Adapters<br/>eodhd_connector, sec_connector,<br/>openinsider_connector, reddit_connector,<br/>alpaca_connector, llm_adapter,<br/>system_clock, real_event_sink"]
-    end
-
-    subgraph Ports["Port Interfaces"]
-        P1["Clock"]
-        P2["MarketData"]
-        P3["Fundamentals"]
-        P4["InsiderFeed"]
-        P5["SentimentFeed"]
-        P6["Store"]
-        P7["Broker"]
-        P8["EventSink"]
-        P9["LLM"]
-    end
-
-    subgraph Domain["Domain Core (zero I/O)"]
-        M["Models: Position, Candidate,<br/>Decision, Bar, Fill, Order"]
-        R["Risk: stops, trails, takes,<br/>drawdown, daily loss"]
-        S["Sizing: kelly-lite, risk parity"]
-        E["Events: domain event types,<br/>event logging"]
-        I["Invariants: I1–I11 checks"]
-        D["Derive: incremental indicators<br/>(numpy, O(1) recurrence)"]
-        DEC["Mechanisms: M1 universe, M2 regime,<br/>M3 technical, M4 quality,<br/>M5 insider, M6 crowding,<br/>M7 blackout, M8 ranking"]
-    end
-
-    subgraph App["Application Services"]
-        PL["Pipeline: daily orchestration"]
-        BT["Backtest: event-driven simulator"]
-        PP["PaperPortfolio: position mgmt"]
-        SH["ShadowBook: ablation books"]
-        RP["Replay: golden replay (stub)"]
-        LB["CLI: run, backtest, journal,<br/>ask, report, status, halt"]
-        ST["Store: canonical schema,<br/>DuckDB state persistence"]
-        DSH["Dashboard: Streamlit UI"]
-    end
-
-    Adapters -->|implement| Ports
-    Ports -->|used by| Domain
-    App -->|uses| Ports
-    App -->|imports| Domain
-    Ports -.->|no dependency| App
-    Domain -.->|no imports from outside| Ports
-```
+<div align="center">
+  <img src="docs/assets/architecture-hexagonal.svg" alt="Alpha-Quant hexagonal architecture" width="900">
+</div>
 
 ### Layer Rules
 
