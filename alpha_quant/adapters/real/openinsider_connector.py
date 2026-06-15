@@ -93,12 +93,14 @@ class OpenInsiderConnector(BaseConnector, InsiderFeed):
         }
         return f"{SCREENER_URL}?{urlencode(params)}"
 
-    def _fetch_html(self, days: int) -> str:
+    def _fetch_html_with_lineage(self, days: int) -> tuple[str, str | None]:
         url = self._build_screener_url(days)
-        response = self.fetch(url)
-        return response.text
+        fr = self.fetch_with_lineage(url)
+        return fr.response.text, fr.fetch_id
 
-    def _parse_transactions(self, html: str) -> list[InsiderTransaction]:
+    def _parse_transactions(
+        self, html: str, fetch_id: str | None = None
+    ) -> list[InsiderTransaction]:
         parser = HTMLParser(html)
         rows = parser.css("table.tinytable tbody tr")
         if not rows:
@@ -115,7 +117,7 @@ class OpenInsiderConnector(BaseConnector, InsiderFeed):
                 skip_count += 1
                 continue
             try:
-                tx = _row_to_transaction(cells)
+                tx = _row_to_transaction(cells, fetch_id=fetch_id)
                 if tx is not None:
                     transactions.append(tx)
                 else:
@@ -184,8 +186,8 @@ class OpenInsiderConnector(BaseConnector, InsiderFeed):
 
     @override
     def cluster_transactions(self, symbol: str) -> list[InsiderTransaction]:
-        html = self._fetch_html(30)
-        all_tx = self._parse_transactions(html)
+        html, fetch_id = self._fetch_html_with_lineage(30)
+        all_tx = self._parse_transactions(html, fetch_id=fetch_id)
         return [tx for tx in all_tx if tx.symbol.upper() == symbol.upper()]
 
     @override
@@ -193,6 +195,6 @@ class OpenInsiderConnector(BaseConnector, InsiderFeed):
         return [c for c in self._fetch_all_clusters() if c.symbol.upper() == symbol.upper()]
 
     def _fetch_all_clusters(self, days: int = 30) -> list[InsiderCluster]:
-        html = self._fetch_html(days)
-        transactions = self._parse_transactions(html)
+        html, fetch_id = self._fetch_html_with_lineage(days)
+        transactions = self._parse_transactions(html, fetch_id=fetch_id)
         return self._cluster_transactions(transactions)

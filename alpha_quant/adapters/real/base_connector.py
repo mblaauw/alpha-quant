@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -17,6 +18,13 @@ from alpha_quant.adapters.real.token_bucket import TokenBucket
 
 if TYPE_CHECKING:
     from alpha_quant.app.vault import Vault
+
+
+@dataclass
+class FetchResult:
+    response: httpx.Response
+    fetch_id: str | None = None
+
 
 logger = structlog.get_logger()
 
@@ -86,7 +94,7 @@ class BaseConnector:
                 return response
         raise RuntimeError("Unreachable")
 
-    def fetch(self, url: str, params: dict[str, str] | None = None) -> httpx.Response:
+    def fetch_with_lineage(self, url: str, params: dict[str, str] | None = None) -> FetchResult:
         while not self._bucket.consume():
             time.sleep(self._bucket.wait_time())
 
@@ -113,18 +121,23 @@ class BaseConnector:
             byte_size=len(response.content),
         )
 
+        fetch_id: str | None = None
         if self._vault is not None:
             query_params = {}
             if params:
                 query_params = dict(sorted(params.items()))
-            self._vault.store(
+            fetch_id = self._vault.store(
                 source=self._source_name,
                 endpoint=url,
                 params=query_params,
                 data=response.content,
             )
 
-        return response
+        return FetchResult(response=response, fetch_id=fetch_id)
+
+    def fetch(self, url: str, params: dict[str, str] | None = None) -> httpx.Response:
+        fr = self.fetch_with_lineage(url, params)
+        return fr.response
 
     def close(self) -> None:
         self._client.close()

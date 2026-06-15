@@ -81,7 +81,7 @@ def _parse_relationship(rel: str) -> str:
     return rel
 
 
-def _row_to_transaction(cells: list) -> InsiderTransaction | None:
+def _row_to_transaction(cells: list, fetch_id: str | None = None) -> InsiderTransaction | None:
     ticker = _cell_text(cells, 0).upper() or None
     owner = _cell_text(cells, 3) or ""
     title = _cell_text(cells, 4) or None
@@ -108,4 +108,5 @@ def _row_to_transaction(cells: list) -> InsiderTransaction | None:
         shares_traded=qty,
         price=price,
         shares_held=held,
+        fetch_id=fetch_id,
     )

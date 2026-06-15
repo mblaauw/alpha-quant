@@ -100,10 +100,7 @@ def model_to_pylist(models: list[Any], model_name: str) -> list[dict[str, Any]]:
                 for m in models
             ]
         case "fundamentals":
-            rows = [m.model_dump() for m in models] if models else []
-            for row in rows:
-                row["fetch_id"] = None
-            return rows
+            return [m.model_dump() for m in models] if models else []
         case "insider_transactions":
             return [
                 {
