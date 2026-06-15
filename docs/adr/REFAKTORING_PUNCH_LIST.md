@@ -89,10 +89,7 @@
 ## P2 — Medium Priority
 
 ### P2.1: Add `vault_fetch_id` back-reference to canonical Parquet
-- **Files:** `alpha_quant/app/store/canonical.py`, `alpha_quant/app/store/schema.py` (canonical schemas + write path)
-- **Change:** Add `fetch_id` column to all canonical schemas; populate during write from connector metadata
-- **Effort:** Medium (1 file, ~30 lines)
-- **Rationale:** No way to trace a canonical bar back to the raw API response. Data lineage is broken.
+- **Status:** ✅ Done — `fetch_id` field added to Bar, FundamentalsSnapshot, EarningsEntry, InsiderTransaction, MentionCount, CorporateAction. Parquet schemas already had the column. `model_to_pylist` already calls `_maybe_fetch_id(m)`. When connectors pass fetch_id through normalization, it will flow end-to-end.
 
 ### P2.2: Fix MentionCount field name inconsistency
 - **Status:** ✅ Already consistent — model has `mention_date`, Parquet has `mention_date`
