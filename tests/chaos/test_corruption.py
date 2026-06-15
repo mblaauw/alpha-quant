@@ -1,4 +1,4 @@
-"""Chaos test: SQLite corruption is detected and triggers consistency halt.
+"""Chaos test: DuckDB state corruption is detected and triggers consistency halt.
 
 Corrupts the state DB and verifies the system detects it.
 """

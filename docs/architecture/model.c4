@@ -77,8 +77,8 @@ model {
       }
 
       logicalComponent canonicalWriter 'Canonical Writer' {
-        description 'Writes parsed data: analytical data to date-partitioned Parquet, transactional state to SQLite.'
-        technology 'PyArrow, SQLAlchemy Core'
+        description 'Writes parsed data: analytical data to date-partitioned Parquet, transactional state to DuckDB.'
+        technology 'PyArrow, DuckDB'
       }
 
       logicalComponent deriveEngine 'Derive Engine' {
@@ -93,7 +93,7 @@ model {
 
       logicalComponent catalog 'Catalog' {
         description 'Dataset versioning and manifest tracking. Run metadata, fixture integrity verification, golden replay hash management.'
-        technology 'SQLAlchemy Core'
+        technology 'DuckDB'
       }
     }
 
@@ -173,8 +173,8 @@ model {
     }
 
     container paperPortfolio 'Paper Portfolio' {
-      description 'Authoritative internal portfolio. Cash, positions, orders, fills, equity curve in SQLite. Transactional integrity. No broker dependency.'
-      technology 'SQLAlchemy Core'
+      description 'Authoritative internal portfolio. Cash, positions, orders, fills, equity curve in DuckDB. Transactional integrity. No broker dependency.'
+      technology 'DuckDB'
 
       logicalComponent paperPortfolioInternal 'Paper Portfolio State' {
         description 'Authoritative portfolio: cash, positions, orders, fills, equity curve. All written transactionally with Decision lineage.'
@@ -187,7 +187,7 @@ model {
 
     container shadowBooks 'Shadow Books' {
       description '3 ablation books (RULES_ONLY, NO_INSIDER, NO_CROWDING_VETO) running parallel to PAPER with mechanism toggles. SPY buy-and-hold curve.'
-      technology 'SQLAlchemy Core'
+      technology 'DuckDB'
 
       logicalComponent shadowBookInternal 'Shadow Books (x3)' {
         description 'RULES_ONLY, NO_INSIDER, NO_CROWDING_VETO. Same fill model, toggled mechanisms. Live ablation by construction.'
@@ -204,18 +204,18 @@ model {
     }
 
     container dashboard 'Streamlit Dashboard' {
-      description 'Read-only monitoring dashboard. Tabs: Overview, Portfolio, Risk, Reports, Concepts. Reads from SQLite only — zero pipeline coupling.'
+      description 'Read-only monitoring dashboard. Tabs: Overview, Portfolio, Risk, Reports, Concepts. Reads from DuckDB only — zero pipeline coupling.'
       technology 'Streamlit, altair'
     }
 
     container eventLog 'Event Log' {
-      description 'Append-only typed events from every pipeline stage. Written to both SQLite (queries) and structlog JSON stream (debugging).'
-      technology 'SQLAlchemy Core, structlog'
+      description 'Append-only typed events from every pipeline stage. Written to DuckDB (queries) and structlog JSON stream (debugging).'
+      technology 'DuckDB, structlog'
     }
 
-    dataStore sqliteStore 'SQLite State Store' {
-      description 'Transactional state: decisions, orders, fills, positions, equity curve, events, concept_log, indicator_state, catalog. WAL mode for concurrent reads.'
-      technology 'SQLite WAL'
+    dataStore stateStore 'DuckDB State Store' {
+      description 'Transactional state: decisions, orders, fills, positions, equity curve, events, concept_log, indicator_state, catalog. Snapshot isolation for concurrent reads.'
+      technology 'DuckDB'
     }
 
     dataStore parquetArchive 'Parquet Archive' {
@@ -229,12 +229,12 @@ model {
 
     monitoredProcess schedulerProcess 'APScheduler Process' {
       description 'Daily pipeline scheduler. Runs at 17:30 ET on trading days. Single-threaded Python process.'
-      technology 'APScheduler 3.x, Python 3.12'
+      technology 'APScheduler 3.x, Python 3.14'
     }
 
     monitoredProcess cliProcess 'CLI Process' {
       description 'Ad-hoc operations. Invoked by user for replay, backtest, bootstrap, status, halt, ask.'
-      technology 'argparse, Python 3.12'
+      technology 'argparse, Python 3.14'
     }
 
     monitoredProcess dashboardProcess 'Streamlit Process' {
@@ -248,13 +248,13 @@ model {
     }
 
     dataStore canonicalDir 'Canonical Directory' {
-      description 'Date-partitioned Parquet files for analytical data. Pruned to 50-day tail.'
+      description 'Date-partitioned Parquet files for analytical data.'
       technology 'Parquet, file system'
     }
 
-    dataStore stateDb 'SQLite Database' {
-      description 'Single-file SQLite database in WAL mode. Contains all transactional state and indicator data.'
-      technology 'SQLite WAL'
+    dataStore stateDb 'DuckDB State Database' {
+      description 'Single-file DuckDB database. Contains all transactional state, indicator data, and event log.'
+      technology 'DuckDB'
     }
 
     dataStore configFile 'Config File' {
@@ -328,18 +328,18 @@ model {
     technology 'EventSink port'
   }
 
-  dataLayer -> sqliteStore 'Writes indicator_state, catalog; reads quarantines'
+  dataLayer -> stateStore 'Writes indicator_state, catalog; reads quarantines'
   dataLayer -> parquetArchive 'Writes bars, fundamentals, insider_tx, mentions'
 
-  paperPortfolio -> sqliteStore 'Reads/writes positions, orders, fills, equity'
-  shadowBooks -> sqliteStore 'Reads/writes shadow book state'
+  paperPortfolio -> stateStore 'Reads/writes positions, orders, fills, equity'
+  shadowBooks -> stateStore 'Reads/writes shadow book state'
   shadowBooks -> fillModel 'Uses same fill model as PAPER'
 
   narrator -> eventLog 'Reads events for context building'
-  narrator -> sqliteStore 'Reads positions, equity curve, concept_log'
+  narrator -> stateStore 'Reads positions, equity curve, concept_log'
   narrator -> llmProvider 'Sends context, receives prose'
 
-  dashboard -> sqliteStore 'Reads-only: positions, equity_curve, events, journals'
+  dashboard -> stateStore 'Reads-only: positions, equity_curve, events, journals'
   dashboard -> parquetArchive 'Reads analytical data for charts (via DuckDB)'
 
   m1 -> m3 'Universe members for scoring'

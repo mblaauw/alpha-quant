@@ -1,4 +1,4 @@
-.PHONY: check format type test test-dashboard test-e2e bootstrap golden bless-golden lint
+.PHONY: check format type test test-dashboard test-e2e bootstrap golden bless-golden lint check-docs
 
 check:
 	uv run ruff check alpha_quant/
@@ -32,6 +32,13 @@ golden:
 		--from-date 2024-01-01 \
 		--to-date 2024-01-31 \
 		--output fixtures/golden/golden_run.json
+
+check-docs:
+	@echo "Checking for stale documentation patterns..."
+	@! grep -rn 'pytest + hypothesis' docs/ --include='*.md' && echo "  ✅ No 'pytest + hypothesis' in docs" || (echo "  ❌ Found 'pytest + hypothesis' in docs (should be just 'pytest')" && false)
+	@! grep -rn 'SQLite scanner\|SQLite state\|SqliteEventSink' docs/ --include='*.md' && echo "  ✅ No stale SQLite references in docs" || (echo "  ❌ Found stale SQLite references in docs" && false)
+	@! grep -rn '"SQLite\|Sqlite' tests/ --include='*.py' | grep -v '# noqa\|# fmt: skip\|\.sqlite\|sqlite3' && echo "  ✅ No stale SQLite references in tests/" || (echo "  ❌ Found stale SQLite references in tests/" && false)
+	@echo "Documentation check passed."
 
 bless-golden: bootstrap golden
 	@echo "Golden file updated: fixtures/golden/golden_run.json"

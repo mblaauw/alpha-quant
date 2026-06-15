@@ -54,7 +54,7 @@ Rationale:
 
 - Invariants only check what is explicitly coded — gaps in invariant coverage mean silent corruption
 - I1 (cash + mark == equity) requires the caller to provide the equity value — if the caller provides wrong equity, the check passes but state is corrupt
-- No property-based testing for invariants yet (hypothesis is installed but unused)
+- No property-based testing for invariants (hypothesis was removed as an unused dependency — see ADR-0027)
 
 ## References
 

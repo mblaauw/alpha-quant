@@ -30,7 +30,7 @@ Alpha-Quant is a deterministic, daily-cadence, long-only equity paper-trading sy
 - Walk-forward validation infrastructure (shadow books that isolate each mechanism's contribution)
 - Deterministic replay for auditability
 
-> **⚠️ Beta status:** This is a research/paper-trading system. It is **not financial advice**. The decision engine is under active development — 6/8 mechanisms are wired (M1 universe uses static config list; M2 regime uses hardcoded VIX/breadth defaults). See [Beta Release milestone](https://github.com/mblaauw/alpha-quant/milestone/8) for open items.
+> **⚠️ Beta status:** This is a research/paper-trading system. It is **not financial advice**. The decision engine is fully wired (8/8 mechanisms; M1 uses a configured universe list in the pipeline; M2 SPY path is live, VIX/breadth use defaults). See [Beta Release milestone](https://github.com/mblaauw/alpha-quant/milestone/8) for open items.
 
 ### Key Principles
 
@@ -38,7 +38,7 @@ Alpha-Quant is a deterministic, daily-cadence, long-only equity paper-trading sy
 - **Degrade, never block** — source failures degrade gracefully; only price staleness halts
 - **One fill model** — backtest, replay, paper, and shadow books all share the same conservative fill semantics (`domain/fills.py`)
 - **LLM is explainer only** — never in the decision path; narration polishes recorded reasoning
-- **Walk-forward by design** — every mechanism has an ablation shadow book; if removal improves performance, the mechanism is flagged for review (infrastructure in place, runtime wiring in progress — see BETA-DA-4)
+- **Walk-forward by design** — every mechanism has an ablation shadow book; if removal improves performance, the mechanism is flagged for review. Live ablation runs on every pipeline execution
 
 ## Quick Start
 
@@ -82,8 +82,8 @@ Alpha-Quant follows a **ports-and-adapters (hexagonal) architecture** where the 
 
 | ID | Mechanism | Domain Logic | Runtime Wiring | Notes |
 |----|-----------|:------------:|:--------------:|-------|
-| **M1** | Universe | ✅ Implemented | ❌ Not wired | `universe.select` exists in `domain/`; pipeline uses static config list |
-| **M2** | Regime | ✅ Implemented | ⚠️ Partial | SPY EMA50/200 path live; VIX/breadth use hardcoded defaults |
+| **M1** | Universe | ✅ Implemented | ✅ Wired | `universe.select` is wired in the pipeline; bootstrap reads `[bootstrap].symbols` from config |
+| **M2** | Regime | ✅ Implemented | ✅ Wired | SPY EMA50/200 path live; VIX/breadth use hardcoded defaults unless overridden |
 | **M3** | Technical | ✅ Implemented | ✅ Wired | Trend, RSI (Gaussian 52±22), MACD, volume, ATR |
 | **—** | Momentum | ✅ Implemented | ✅ Wired | 63-day (~3-month) lookback, bucketed score |
 | **M4** | Quality | ✅ Implemented | ✅ Wired | Fundamental gate (operating cash flow, D/E, accruals) |
@@ -92,7 +92,7 @@ Alpha-Quant follows a **ports-and-adapters (hexagonal) architecture** where the 
 | **M7** | Blackout | ✅ Implemented | ✅ Wired | 3-day pre-earnings entry block |
 | **M8** | Composite | ✅ Implemented | ✅ Wired | 0.6·technical + 0.25·momentum + 0.15·insider; equal-weight sector cap (25% of slots) |
 
-> Each mechanism's runtime path is verified by pipeline behavioral tests (429 tests). See [BETA-DA-8](https://github.com/mblaauw/alpha-quant/issues/334).
+> Each mechanism's runtime path is verified by pipeline behavioral tests (467 tests). See [BETA-DA-8](https://github.com/mblaauw/alpha-quant/issues/334).
 
 ## CLI Commands
 
@@ -117,7 +117,7 @@ Alpha-Quant follows a **ports-and-adapters (hexagonal) architecture** where the 
 |----------|-------------|
 | [Design Specification](DESIGN.md) | Full system design (v1.2) |
 | [Architecture Diagrams](docs/architecture/README.md) | C4 model (LikeC4 DSL) |
-| [ADR Log](docs/adr/README.md) | 28 Architecture Decision Records |
+| [ADR Log](docs/adr/README.md) | 31 Architecture Decision Records |
 | [Concept Cards](alpha_quant/concepts/) | 22 mechanism descriptions (ablation, ATR, crowding, momentum, etc.) |
 | [GitHub Issues](https://github.com/mblaauw/alpha-quant/issues) | Active backlog — prioritised by P0–P3 |
 | [Roadmap](docs/planning/ROADMAP.md) | Beta release status and known limitations |
@@ -129,7 +129,7 @@ make check          # Ruff lint
 make format         # Ruff format
 make type           # Type check (ty)
 make bootstrap      # Generate fixtures
-uv run pytest       # Run tests (429 passing)
+uv run pytest       # Run tests (467 passing)
 make bless-golden   # Update golden replay fixture hash
 ```
 
@@ -155,7 +155,7 @@ See [config.local.toml.example](config.local.toml.example) for available options
 | Columnar storage | pyarrow (Parquet, zstd) |
 | HTTP | httpx + tenacity retry |
 | Logging | structlog (JSON) |
-| Testing | pytest + hypothesis |
+| Testing | pytest |
 | Linting | ruff (lint + format) |
 | Type checking | ty (astral) |
 

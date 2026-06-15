@@ -34,7 +34,7 @@ alpha_quant/
 ├── domain/                      # pure functions, no I/O (§1 rationale)
 │   ├── __init__.py              # re-exports models + events
 │   ├── models.py                # all pydantic data models (frozen)
-│   ├── events.py                # 21 discriminated domain event types
+│   ├── events.py                # 20 discriminated domain event types (plus BaseDomainEvent base)
 │   ├── normalize.py             # boundary parsing: bytes → pydantic models
 │   ├── validate.py              # quality gates → QUARANTINE/DATA_HALT
 │   ├── derive.py                # incremental O(1) indicator engine (numpy)
@@ -44,13 +44,13 @@ alpha_quant/
 │   ├── clock.py                 # nothing reads the OS clock directly
 │   ├── market_data.py  fundamentals.py  insider_feed.py  sentiment_feed.py
 │   ├── llm.py  store.py  event_sink.py
-│   └── broker.py                # designed, NOT implemented in v1 (§9.4)
+│   └── broker.py                # port interface; FakeBroker and AlpacaBroker adapters exist, live execution out of v1 scope (§9.4)
 ├── adapters/
 │   ├── real/                    # production implementations
 │   │   ├── clock.py             # SystemClock — wraps datetime.now(UTC)
 │   │   ├── base_connector.py    # shared HTTP: httpx, tenacity retry, token-bucket, vault
 │   │   ├── token_bucket.py      # thread-safe rate limiter
-│   │   ├── event_sink.py        # SqliteEventSink
+│   │   ├── event_sink.py        # SqliteEventSink (secondary; primary event persistence is through CanonicalStore/DuckDB)
 │   │   ├── eodhd_connector.py   # EODHD: bars, fundamentals, earnings
 │   │   ├── alpaca_connector.py  # Alpaca Data API: quotes, calendar, latest bar
 │   │   ├── sec_connector.py     # SEC EDGAR: ticker → CIK mapping
@@ -66,7 +66,7 @@ alpha_quant/
 │       ├── fixture_sentiment_feed.py # mention counts from fixture
 │       └── fixture_store.py         # in-memory store for test isolation
 ├── app/                         # application wiring + infrastructure
-│   ├── __init__.py              # CLI entry point (Typer)
+│   ├── __init__.py              # CLI entry point (argparse)
 │   ├── _loop.py                 # shared decision-loop helpers
 │   ├── alerts.py                # alert generation
 │   ├── backtest.py              # historical backtest engine
@@ -212,7 +212,7 @@ Failure policy: a source failing **degrades, never blocks** — pipeline runs wi
 Append-only directory tree of zstd-compressed raw payloads:
 
 ```
-vault/{source}/{yyyy}/{mm}/{dd}/{fetch_id}.zst     + vault/manifest.duckdb
+vault/{source}/{yyyy}/{mm}/{dd}/{fetch_id}.zst     + vault/manifest.db
 ```
 
 `fetch_id = sha256(source|endpoint|params|ingest_ts)[:16]`; manifest rows record source, endpoint, params, ingest_ts, content hash, byte size. **Nothing is ever deleted or rewritten.** Cost is trivial (daily JSON/HTML for ~1k symbols compresses to a few MB/day). Payoff: any parser bug, schema change, or new mechanism can be replayed against history you already own — this is what makes the immutability contract real rather than aspirational.
@@ -233,12 +233,12 @@ canonical/corp_actions/effective_date=.../
 
 Date partitioning makes as-of-date queries natural. DuckDB reads parquet globs directly with zero server footprint — and you already know this stack cold from the postgres-connector pipeline (PostgreSQL→DuckDB→Parquet); same pattern, new domain. (The 50-day tail prune was removed in P2.RO — storage cost was negligible and the prune created a real risk of insufficient history for indicator backfill after corporate actions.)
 
-**Transactional state → DuckDB (direct).** Decisions, orders, fills, positions, equity curves, events, concept_log, indicator_state, catalog. Single-writer, ACID via DuckDB's per-connection transactions. DuckDB's SQLite scanner bridges to `.db` files for state tables.
+**Transactional state → DuckDB (direct).** Decisions, orders, fills, positions, equity curves, events, concept_log, indicator_state, catalog. Single-writer, ACID via DuckDB's per-connection transactions.
 
 While splitting analytical and transactional stores is generally prudent, DuckDB is safe for both because:
 - The pipeline is single-writer (no concurrent write access)
 - DuckDB provides snapshot isolation per connection
-- State tables use DuckDB's SQLite scanner for ACID row-level operations
+- DuckDB state tables handle ACID row-level operations
 - The `Store` port abstracts storage — migrating to PostgreSQL later requires only a new adapter (per ADR-0021)
 
 Migration path: local Parquet → MinIO/S3 is behind DuckDB's path config; state → PostgreSQL requires a new `Store` adapter. Both are non-events.
@@ -281,7 +281,7 @@ Development speeds: domain unit tests (ms) → full-DAG replay over fixtures (se
 | Scheduling | **APScheduler** (cron fallback) | in-process, simple |
 | Config | **pydantic-settings** + TOML | typed, env-overridable |
 | Logging | **structlog** (JSON lines) | events + logs share shape |
-| Testing | **pytest + hypothesis** | property tests on cap/risk invariants |
+| Testing | **pytest** | golden replay, integration tests, unit tests |
 | LLM client | **httpx** against OpenAI-compatible API | one adapter: OpenAI + OpenRouter |
 | Market data SDK | **alpaca-py** (data module only) | no trading module imported — enforced by lint rule |
 | Dashboard | **Streamlit** | reads DuckDB state store via Store port, zero coupling |
@@ -290,7 +290,7 @@ Development speeds: domain unit tests (ms) → full-DAG replay over fixtures (se
 
 ## 4. Clock virtualization and replay
 
-The `Clock` port is fully wired — every app-layer consumer (pipeline, store, paper, alerts, halt, fixtures, vault) and every domain function (events, validate) receives a `Clock` instance. Nothing reads the OS clock; all time flows through `SystemClock` (live) or `VirtualClock` (replay/backtest). `alpha-quant replay --from 2023-01-01 --to 2025-12-31` drives the **entire DAG** against fixture adapters — ingest, validation, halts, decisions, paper fills, events, journals, reports — in minutes. CI runs a **golden replay** (6 fixture-months; decision log + paper equity curve must hash-match the committed golden output; intended changes re-bless the golden file in the same PR). The single highest-leverage testing investment in the project.
+The `Clock` port is wired for most app-layer consumers (pipeline, store, paper, alerts, halt, fixtures, vault) and key domain functions. `SystemClock` (live) or `VirtualClock` (replay/backtest) injects time. A small number of remaining direct clock reads (`datetime.now(UTC)` in events, vault, pipeline, and some adapters) are tracked as known issues. `alpha-quant replay --from 2023-01-01 --to 2025-12-31` drives the **entire DAG** against fixture adapters — ingest, validation, halts, decisions, paper fills, events, journals, reports — in minutes. CI runs a **golden replay** (6 fixture-months; decision log + paper equity curve must hash-match the committed golden output; intended changes re-bless the golden file in the same PR). The single highest-leverage testing investment in the project.
 
 ---
 
@@ -421,7 +421,7 @@ I5. Per-position risk-at-stop ≤ 2% equity at order time.
 I6. Gross exposure ≤ cap after every fill batch.
 I7. Identical inputs + config + git sha ⇒ identical decisions and fills (golden replay in CI).
 I8. Backtest, replay, paper, and shadows execute the same domain functions and the same fill model.
-I9. No module reads the OS clock; all time flows through the Clock port.
+I9. No domain module reads the OS clock; app-layer modules should use the Clock port (direct `datetime.now(UTC)` calls remain in a few locations — tracked issues).
 I10. Every number in user-facing text exists in the lineage/event data it cites.
 I11. All books update on every run, including halted ones.
 I12. The paper book passes self-consistency (§9.3) after every fill batch; violation ⇒ full halt.

@@ -32,7 +32,7 @@ Chosen option: **Option A — structlog with JSON processor**.
 Rationale:
 1. structlog's processor chain maps naturally to the pattern: enrich → format → output
 2. Context variables (run_id, date, source) are automatically bound to every log call in a pipeline run
-3. The same `event.model_dump_json()` output goes to both the SQLite event log and the structlog JSON stream — one write, two consumers
+3. The same `event.model_dump_json()` output goes to both the DuckDB event log and the structlog JSON stream — one write, two consumers
 4. CalVer versioning (26.1.0) ensures predictable release cadence
 5. Native async log methods (`alog()`, `ainfo()`) for future async paths
 
