@@ -40,7 +40,7 @@ Six diagrams model the system at Levels 1–4 of the C4 model, rendered via Like
 | Level | Diagram | Source | Description |
 |-------|---------|--------|-------------|
 | L1 | System Context | `views/systemContext.png` | System boundary, user, and all 6 external dependencies. |
-| L2 | Container | `views/container.png` | 12 containers, 2 data stores, external systems. |
+| L2 | Container | `views/container.png` | 10 containers, 2 data stores, external systems. |
 | L3 | Data Layer | `views/dataLayerComponents.png` | 7 components in the four-zone architecture. |
 | L3 | Decision Engine | `views/decisionEngineComponents.png` | 8 mechanisms (M1–M8), position sizer, risk evaluator. |
 | L3 | Fill Model & Portfolio | `views/fillModelPortfolioComponents.png` | 4 fill actions, portfolio, shadow books, consistency checker. |
@@ -52,7 +52,7 @@ The user (retail investor) interacts with Alpha-Quant via CLI and Streamlit dash
 
 ### 3.2 Container Diagram (L2)
 
-Alpha-Quant contains 13 containers and 2 internal data stores:
+Alpha-Quant contains 10 containers and 2 internal data stores:
 
 - **CLI** — argparse-based entry point for all operations
 - **Pipeline Engine** — APScheduler-driven daily orchestrator (17:30 ET)
@@ -87,7 +87,7 @@ Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamli
 | Package manager | uv | Rust-based, 10-100x faster resolution, deterministic lockfile |
 | HTTP client | httpx | Sync+async, HTTP/2, configurable timeouts |
 | Retry/backoff | tenacity | Declarative per-connector policies |
-| HTML parsing | selectolax | Fast, lenient; lxml fallback |
+| HTML parsing | selectolax | Fast, lenient |
 | Validation | pydantic v2 | Parse-don't-validate at zone boundaries |
 | Analytical SQL | DuckDB | Zero-ops parquet queries, embedded |
 | Columnar storage | PyArrow / Parquet (zstd) | Standard columnar format |
@@ -98,7 +98,7 @@ Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamli
 | Logging | structlog (JSON) | Events + logs share shape |
 | Testing | pytest | Golden replay, integration tests, unit tests |
 | LLM client | Direct httpx (no SDK) | Single adapter for OpenAI + OpenRouter |
-| Market data | alpaca-py (data module only) | Trading module never imported |
+| Market data | alpaca-py (data module only) | Trading module only imported in broker adapter |
 | Dashboard | Streamlit | Read-only, zero pipeline coupling |
 | CLI | argparse (stdlib) | Zero additional deps |
 | Diagramming | LikeC4 | DSL-driven C4 diagrams, PNG export |
@@ -164,7 +164,7 @@ Each source has a defined fallback when unavailable:
 
 ### 6.3 Golden Replay CI (ADR-0017)
 
-The primary CI strategy is a full-DAG replay against 6 months of fixture data. The SHA256 hash of the decision log + equity curve must match a committed golden file. Because of determinism (I7), the replay is never flaky. Changes that alter behavior intentionally update the golden hash in the same PR via `make bless-golden`.
+The primary CI strategy is a full-DAG replay against fixture data (January 2024). The SHA256 hash of the decision log + equity curve must match a committed golden file. Because of determinism (I7), the replay is never flaky. Changes that alter behavior intentionally update the golden hash in the same PR via `make bless-golden`.
 
 ### 6.4 Three Execution Realities (P2)
 
@@ -178,7 +178,7 @@ Backtest, replay, and paper share one domain core and one fill model. The primar
 | Layer | Speed | What | Tooling |
 |-------|-------|------|---------|
 | Domain unit tests | ms | Pure function invariants (I1–I13) | pytest |
-| Full-DAG golden replay | s–min | 6-month fixture replay, hash comparison | CLI replay |
+| Full-DAG golden replay | s–min | Fixture replay (January 2024), hash comparison | CLI replay |
 | Source degradation chaos | s | Fallback behavior verification | Synthetic overlays |
 | 10-year backtest | <60s | Historical walk-forward | CLI backtest |
 

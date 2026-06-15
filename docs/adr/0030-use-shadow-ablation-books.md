@@ -29,7 +29,7 @@ Additional ablations (M3 technical without quality, M8 weighted differently) are
 
 ## Considered Options
 
-- **Option A: ShadowBook class with toggles (current choice)** — `domain/ablation.py` defines `ShadowBook` that accepts `AblationConfig`. Each configured book runs as a separate portfolio with its own AdversarialBroker. The factory creates three shadow books: `RULES_ONLY`, `NO_INSIDER`, `NO_CROWING_VETO`
+- **Option A: ShadowBook class with toggles (current choice)** — `domain/ablation.py` defines `ShadowBook` that accepts `AblationConfig`. Each configured book runs as a separate portfolio with its own fill and portfolio logic. The factory creates three shadow books: `RULES_ONLY`, `NO_INSIDER`, `NO_CROWDING_VETO`
 - **Option B: Run separate backtests** — Run the pipeline N times with different configurations. No shadow books needed
 - **Option C: Post-hoc counterfactual** — Record all decisions and recompute outcomes without certain mechanisms
 

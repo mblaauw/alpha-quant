@@ -36,7 +36,7 @@ golden:
 check-docs:
 	@echo "Checking for stale documentation patterns..."
 	@failed=0; \
-	check() { label=$$1; shift; if grep -rni "$$@" 2>/dev/null | grep -qviE 'remove|removed|removal|ADR-0027|0007-use-sqlite|0008-use-custom|0010-use-custom|0014-use-streamlit|0017-use-golden'; then echo "  ❌ $$label"; grep -rni "$$@" 2>/dev/null | grep -viE 'remove|removed|removal|ADR-0027|0007-use-sqlite|0008-use-custom|0010-use-custom|0014-use-streamlit|0017-use-golden' | sed 's/^/      /'; failed=1; else echo "  ✅ $$label"; fi; }; \
+	check() { label=$$1; shift; if grep -rni "$$@" 2>/dev/null | grep -qviE 'remove|removed|removal|changed|chang|ADR-0027|0007-use-sqlite|0008-use-custom|0010-use-custom|0014-use-streamlit|0017-use-golden'; then echo "  ❌ $$label"; grep -rni "$$@" 2>/dev/null | grep -viE 'remove|removed|removal|changed|chang|ADR-0027|0007-use-sqlite|0008-use-custom|0010-use-custom|0014-use-streamlit|0017-use-golden' | sed 's/^/      /'; failed=1; else echo "  ✅ $$label"; fi; }; \
 	check 'pytest + hypothesis' 'pytest + hypothesis' docs/ README.md DESIGN.md --include='*.md'; \
 	check 'stale SQLite references in docs' 'SQLite scanner\|SQLite state\|SQLite State Store' docs/ README.md --include='*.md'; \
 	check 'stale SQLite references in tests/' '"SQLite\|Sqlite' tests/ --include='*.py'; \
@@ -44,6 +44,12 @@ check-docs:
 	check 'stale broker wording' 'designed but unimplemented' docs/ DESIGN.md --include='*.md'; \
 	check 'overstrong clock claims' 'fully wired -- every\|fully wired — every' docs/ --include='*.md'; \
 	check 'stale CLI count' 'CLI with 9 subcommands' docs/ --include='*.md'; \
+	check 'stale CLI count in ADR-0004' '9 subcommands' docs/adr/0004-use-argparse-for-cli.md --include='*.md'; \
+	check 'stale golden replay duration' '6 fixture-months' docs/ README.md DESIGN.md --include='*.md'; \
+	check 'stale fixture version example' 'fx-2026' docs/ DESIGN.md --include='*.md'; \
+	check 'stale replay flags' '--from 20.*--to 20\|--from 20.*--to ' docs/ DESIGN.md --include='*.md'; \
+	check 'lxml fallback claim' 'lxml fallback' docs/ DESIGN.md --include='*.md'; \
+	check 'stale RSI range claim' 'RSI 45.70' docs/ DESIGN.md --include='*.md'; \
 	if [ $$failed -eq 0 ]; then echo "Documentation check passed."; else echo "Documentation check FAILED."; false; fi
 
 bless-golden: bootstrap golden

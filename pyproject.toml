@@ -45,9 +45,8 @@ package = true
 target-version = "py314"
 line-length = 100
 
-# Check that no code outside clock adapters calls datetime.now()
-# Usage: uv run no-clock-datetime
-# Expect: returns 0 when only adapters/real/clock.py contains datetime.now()
+# Clock hygiene: domain functions should not read the OS clock.
+# See CI workflow and DESIGN.md I9 for the invariant and exceptions.
 
 
 [tool.ruff.lint]

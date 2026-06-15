@@ -60,7 +60,7 @@
     "ConnectorConfig": {
       "properties": {
         "user_agent": {
-          "default": "AlphaQuant/0.1.0 (research project; contact m@mblaauw.dev)",
+          "default": "AlphaQuant/0.2.0 (research project; contact m@mblaauw.dev)",
           "title": "User Agent",
           "type": "string"
         },

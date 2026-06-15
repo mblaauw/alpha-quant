@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import numpy as np
@@ -208,22 +207,6 @@ def validate_fundamentals(snapshot: FundamentalsSnapshot) -> list[ValidationResu
         )
 
     return results
-
-
-def validate_staleness(
-    last_update: datetime, threshold: timedelta, symbol: str = ""
-) -> list[ValidationResult]:
-    age = datetime.now(UTC) - last_update
-    if age > threshold:
-        return [
-            ValidationResult(
-                is_valid=False,
-                check="staleness",
-                issues=[f"{symbol} last updated {age.total_seconds() / 3600:.1f}h ago"],
-                severity="HALT",
-            )
-        ]
-    return []
 
 
 def validate_indicator_state(state: IndicatorState) -> list[ValidationResult]:

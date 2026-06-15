@@ -57,5 +57,5 @@ Rationale:
 
 - DESIGN.md §3.4 (Canonical store), §3.5 (Derived state), §3.8 (Library decisions)
 - RAD §5 (Container Architecture — Parquet Archive), §6.1 (Data Layer Components)
-- C4 Component diagram (Data Layer): `docs/architecture/views/data-layer-components.png`
+- C4 Component diagram (Data Layer): `docs/architecture/views/dataLayerComponents.png`
 - ADR-0007 (SQLite for transactional store)
