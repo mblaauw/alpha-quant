@@ -111,10 +111,10 @@
 - **Rationale:** High maintenance burden. Adding a new dataset requires copying the entire pattern.
 
 ### P1.22: Fix ADR-0027 — apscheduler not made optional despite ADR claim
-- **Files:** `docs/adr/0027-use-dependency-pruning.md`, `pyproject.toml`
-- **Change:** Either move `apscheduler` to `[scheduler]` optional extra per ADR-0027, or update the ADR to reflect it stayed as main dependency
-- **Effort:** Small (2 files, ~5 lines)
-- **Rationale:** ADR text says "moved to optional" but `pyproject.toml` has it as a main dependency
+- **Files:** `docs/adr/0027-use-dependency-pruning.md`
+- **Change:** Updated ADR-0027 to reflect apscheduler stayed as main dependency (scheduler is core feature)
+- **Effort:** Small (1 file, ~5 lines)
+- **Status:** ✅ Done
 - **Files:** `tests/integration/` (new files)
 - **Change:** Store round-trip tests (DuckDB read/write), pipeline with fixture data, paper portfolio lifecycle, backtest metrics correctness
 - **Effort:** Large (4-5 new files, ~300 lines)
