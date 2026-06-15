@@ -26,6 +26,7 @@ from alpha_quant.domain.models import (
     Position,
 )
 from alpha_quant.domain.risk import RiskAction, RiskConfig, evaluate_stops, evaluate_time_stop
+from alpha_quant.domain.scoring import compute_composite
 from alpha_quant.domain.sizing import PositionSize, SizingConfig, size_position
 from alpha_quant.domain.technical import momentum_score
 from alpha_quant.domain.technical import score as score_technical
@@ -128,12 +129,12 @@ def score_candidate(
     tech = score_technical(bars_to_date, state)
     momentum_scr = momentum_score(bars_to_date, bar.close)
     tech_scr = tech.score
-    composite = 0.70 * tech_scr + 0.30 * momentum_scr
+    composite = compute_composite({"technical": tech_scr, "momentum": momentum_scr})
     return Candidate(
         symbol=symbol,
         date=dt,
         scores={"technical": tech_scr, "momentum": momentum_scr},
-        composite_score=min(1.0, composite),
+        composite_score=composite,
         regime=regime,
         gate_results={"fundamental": True, "blackout": True},
     )

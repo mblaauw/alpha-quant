@@ -67,6 +67,7 @@ from alpha_quant.domain.models import (
 from alpha_quant.domain.narration import NarrationContext, PositionNarration, build
 from alpha_quant.domain.regime import CAUTION, REGIME_MULTIPLIERS, RISK_OFF, RISK_ON, Regime, detect
 from alpha_quant.domain.reporting import ReportEntry, generate_monthly, generate_weekly
+from alpha_quant.domain.scoring import compute_composite
 
 __all__ = [
     "Bar",
@@ -140,4 +141,5 @@ __all__ = [
     "ConsistencyViolation",
     "ErrorOccurred",
     "DomainEvent",
+    "compute_composite",
 ]

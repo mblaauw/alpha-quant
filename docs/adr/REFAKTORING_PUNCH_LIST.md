@@ -1,4 +1,4 @@
-# Refactoring Punch List — P5.7 Technical Refinement
+# Refactoring Punch List — P6.R Post-Dashboard UX/IA Refinement
 
 ## P0 — Must Fix Before Production
 
@@ -9,6 +9,26 @@
 - **Rationale:** Python 2 comma-separated syntax catches `ValueError` only; `TypeError` is bound to the variable name and **not caught**. Python 3.14 targets make this a real bug. (Note: original locations in `base_connector.py` and `store/state.py` were already fixed; these three remain.)
 
 ## P1 — High Priority
+
+### P0.2: Composite score formula inconsistency — 3 different weighting formulas
+- **Files:** `alpha_quant/domain/ranking.py:63-73`, `alpha_quant/domain/loop_helpers.py:131`, `alpha_quant/domain/technical.py:39-46`
+- **Change:** Consolidate to a single `compute_composite(scores, components)` in `domain/scoring.py`. `ranking.py:_compute_composite` uses `0.60/0.25/0.15`, `loop_helpers.py:score_candidate` uses `0.70/0.30`, `technical.py:score` uses `0.3125/0.25/0.1875/0.125/0.125`. `rank()` recomputes composite overwriting the value set during scoring — final score depends on ordering of function calls.
+- **Effort:** Medium (2 files, ~30 lines)
+- **Rationale:** Bug — can produce different final rankings depending on which pipeline path is taken
+
+## P1 — High Priority
+
+### P1.1: Fix adapter → app import violation in llm_adapter.py
+- **Files:** `alpha_quant/adapters/real/llm_adapter.py:9`
+- **Change:** Move `LLMConfig` to a shared domain/ports types module, or create a port-level config Protocol to avoid runtime import from `alpha_quant.app.config`
+- **Effort:** Small (2 files, ~10 lines)
+- **Rationale:** Only hard hexagonal architecture violation (runtime import). 5 other adapters have type-checking-only soft violations.
+
+### P1.2: Remove unused `hypothesis` dev dependency
+- **Files:** `pyproject.toml`
+- **Change:** Remove `hypothesis` from dev dependencies
+- **Effort:** 1 min
+- **Rationale:** Zero imports in any source or test file. Dead weight in lockfile.
 
 ### P1.3: Pipeline — call `write_halt()` when validation HALT occurs
 - **Files:** `alpha_quant/app/pipeline.py`, `alpha_quant/app/scheduler.py`
@@ -71,6 +91,30 @@
 - **Rationale:** Three CLI commands print "not yet implemented" despite functional domain and app modules existing.
 
 ### P1.18: Integration/E2E tests for critical paths
+
+### P1.19: Hardcoded event-type strings in dashboard (22 occurrences)
+- **Files:** `alpha_quant/app/dashboard.py` (lines 174, 256-259, 352, 396-399, 706-708)
+- **Change:** Import event classes from `alpha_quant.domain.events` and use their `event_type` defaults instead of hardcoded strings. Extract repeated event strings to module-level constants.
+- **Effort:** Small (1 file, ~15 lines)
+- **Rationale:** Silent breakage if event types change in `events.py`. 8 unique strings duplicated 22 times.
+
+### P1.20: Duplicate gate logic in pipeline and ranking
+- **Files:** `alpha_quant/app/pipeline.py:470-504`, `alpha_quant/domain/ranking.py:57-73`
+- **Change:** Remove inline gate checks from `pipeline.py`; let `rank()` be the sole gate evaluation point. `ranking.py:_passes_gates()` already checks `gate_results` and `block_reason`.
+- **Effort:** Small (2 files, ~15 lines)
+- **Rationale:** Gates evaluated twice per candidate. Different behavior possible.
+
+### P1.21: Canonical Parquet read function duplication (6 near-identical functions)
+- **Files:** `alpha_quant/app/store/canonical.py:121-320`
+- **Change:** Extract generic `_read_dataset(symbol, dataset, column_map, model_cls)` helper. 6 functions x ~33 lines = ~200 lines of near-identical code with same try/except/hive_spec/SELECT pattern.
+- **Effort:** Medium (1 file, ~40 lines)
+- **Rationale:** High maintenance burden. Adding a new dataset requires copying the entire pattern.
+
+### P1.22: Fix ADR-0027 — apscheduler not made optional despite ADR claim
+- **Files:** `docs/adr/0027-use-dependency-pruning.md`, `pyproject.toml`
+- **Change:** Either move `apscheduler` to `[scheduler]` optional extra per ADR-0027, or update the ADR to reflect it stayed as main dependency
+- **Effort:** Small (2 files, ~5 lines)
+- **Rationale:** ADR text says "moved to optional" but `pyproject.toml` has it as a main dependency
 - **Files:** `tests/integration/` (new files)
 - **Change:** Store round-trip tests (DuckDB read/write), pipeline with fixture data, paper portfolio lifecycle, backtest metrics correctness
 - **Effort:** Large (4-5 new files, ~300 lines)
@@ -139,6 +183,18 @@
 - **Rationale:** Available via Pydantic but never used. Would auto-generate config documentation.
 
 ### P2.13: Make drawdown ladder rolling window instead of all-time peak
+
+### P2.14: Duplicated column-name lists across all store mixins
+- **Files:** All files in `alpha_quant/app/store/` (position_store, order_store, decision_store, admin_store, journal_store)
+- **Change:** Extract shared column-name constants per table. Each column name appears 2-3 times (INSERT, SELECT, model constructor).
+- **Effort:** Small (5 files, ~30 lines)
+- **Rationale:** Reduces drift risk between read and write column lists.
+
+### P2.15: Re-export-only wrapper in `_loop.py`
+- **Files:** `alpha_quant/app/_loop.py:8-18`
+- **Change:** Remove pass-through re-exports of `score_candidate`, `compute_atr`, `evaluate_risk_actions`, `get_bar_for_date`, `get_date_bars`, `size_entry`, `bars_up_to` — import directly from `domain.loop_helpers` in consumers.
+- **Effort:** Small (2 files, ~10 lines)
+- **Rationale:** `_loop.py` adds no logic for these functions. Pure indirection.
 - **Files:** `alpha_quant/domain/risk.py`
 - **Change:** Add `dd_window_days` config option. When set, measure drawdown from rolling window peak instead of all-time.
 - **Effort:** Small (1 file, ~10 lines)
@@ -183,6 +239,22 @@
 - **Effort:** 5 min, 1 file
 
 ### P3.9: Update ADR-0021 — stale `app/store.py` path
+
+### P3.10: Create ADR for clock virtualization architecture
+- **Change:** New ADR documenting `ports/clock.py`, `adapters/real/clock.py` (SystemClock), `adapters/fake/virtual_clock.py` (VirtualClock). Invariant I9 (deterministic clock) central to golden replay.
+- **Effort:** 30 min, 1 file
+
+### P3.11: Create ADR for store port decomposition into mixins
+- **Change:** New ADR documenting the evolution from a single Store interface to 9 specialized mixin classes combined by `CanonicalStore`.
+- **Effort:** 20 min, 1 file
+
+### P3.12: Create ADR for shadow ablation book architecture
+- **Change:** New ADR documenting the shadow book pattern in `domain/ablation.py` for mechanism evaluation.
+- **Effort:** 20 min, 1 file
+
+### P3.13: Create ADR for halt mechanism (file-based protocol)
+- **Change:** New ADR documenting `app/halt.py` — write_halt, read_halt, is_halted, clear_halt.
+- **Effort:** 15 min, 1 file
 - **Change:** ADR-0021 references `app/store.py` which no longer exists; update to `app/store/state.py`.
 - **Effort:** 5 min, 1 file
 
