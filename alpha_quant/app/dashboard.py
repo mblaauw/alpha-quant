@@ -6,8 +6,11 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 import streamlit as st
+import structlog
 
 from alpha_quant.app.halt import is_halted, read_halt
+
+logger = structlog.get_logger()
 
 st.set_page_config(
     page_title="Alpha Quant Dashboard",
@@ -18,68 +21,93 @@ st.set_page_config(
 DATA_DIR = Path("data")
 
 
-@st.cache_resource
-def _connect() -> tuple[duckdb.DuckDBPyConnection, duckdb.DuckDBPyConnection]:
-    analytical = duckdb.connect()
+def _safe_query(
+    state: duckdb.DuckDBPyConnection, query: str, params: list | None = None
+) -> pd.DataFrame:
+    try:
+        if params:
+            return state.execute(query, params).fetchdf()
+        return state.execute(query).fetchdf()
+    except (duckdb.CatalogException, duckdb.BinderException) as e:
+        logger.warning("dashboard_query_failed", query=query[:80], error=str(e))
+        return pd.DataFrame()
+
+
+@st.cache_resource(ttl=300)
+def _connect() -> tuple[duckdb.DuckDBPyConnection, duckdb.DuckDBPyConnection] | None:
     state_path = DATA_DIR / "state.db"
-    state = duckdb.connect(str(state_path))
-    return analytical, state
+    if not state_path.exists():
+        return None
+    try:
+        analytical = duckdb.connect()
+        state = duckdb.connect(str(state_path))
+        return analytical, state
+    except duckdb.IOException as e:
+        st.error(f":warning: **Database connection error** — {e}")
+        return None
 
 
 def _load_equity_curve(state: duckdb.DuckDBPyConnection, book: str = "PAPER") -> pd.DataFrame:
-    return state.execute(
+    return _safe_query(
+        state,
         "SELECT equity_date, equity, cash FROM equity_curve WHERE book = ? ORDER BY equity_date",
         [book],
-    ).fetchdf()
+    )
 
 
 def _load_positions(state: duckdb.DuckDBPyConnection) -> pd.DataFrame:
-    return state.execute(
+    return _safe_query(
+        state,
         "SELECT symbol, quantity, entry_price, avg_cost, current_price,"
         " stop_price, trail_price, market_value, unrealized_pl,"
         " entry_date, high_since_entry, partial_taken"
-        " FROM positions WHERE quantity > 0"
-    ).fetchdf()
+        " FROM positions WHERE quantity > 0",
+    )
 
 
 def _load_journals(state: duckdb.DuckDBPyConnection) -> pd.DataFrame:
-    return state.execute(
-        "SELECT entry_date FROM journal_entries ORDER BY entry_date DESC LIMIT 30"
-    ).fetchdf()
+    return _safe_query(
+        state,
+        "SELECT entry_date FROM journal_entries ORDER BY entry_date DESC LIMIT 30",
+    )
 
 
 def _load_reports(state: duckdb.DuckDBPyConnection) -> pd.DataFrame:
-    return state.execute(
-        "SELECT report_date, report_type FROM reports ORDER BY report_date DESC LIMIT 20"
-    ).fetchdf()
+    return _safe_query(
+        state,
+        "SELECT report_date, report_type FROM reports ORDER BY report_date DESC LIMIT 20",
+    )
 
 
 def _load_latest_run(state: duckdb.DuckDBPyConnection) -> pd.DataFrame:
-    return state.execute(
+    return _safe_query(
+        state,
         "SELECT run_type, start_ts, end_ts, status, config_hash"
-        " FROM runs ORDER BY start_ts DESC LIMIT 1"
-    ).fetchdf()
+        " FROM runs ORDER BY start_ts DESC LIMIT 1",
+    )
 
 
 def _load_quarantine(state: duckdb.DuckDBPyConnection) -> pd.DataFrame:
-    return state.execute(
+    return _safe_query(
+        state,
         "SELECT symbol, reason, severity, quarantined_date"
-        " FROM quarantine WHERE cleared_date IS NULL"
-    ).fetchdf()
+        " FROM quarantine WHERE cleared_date IS NULL",
+    )
 
 
 def _load_staleness_events(state: duckdb.DuckDBPyConnection) -> pd.DataFrame:
-    return state.execute(
+    return _safe_query(
+        state,
         "SELECT payload FROM events WHERE event_type = 'staleness_halt_set'"
-        " ORDER BY timestamp DESC LIMIT 5"
-    ).fetchdf()
+        " ORDER BY timestamp DESC LIMIT 5",
+    )
 
 
 def _read_markdown(path: Path) -> str:
     try:
         return path.read_text()
-    except FileNotFoundError:
-        return f"File not found: {path}"
+    except (FileNotFoundError, PermissionError, IsADirectoryError) as e:
+        return f"Error reading {path}: {e}"
 
 
 def home_tab(state: duckdb.DuckDBPyConnection) -> None:
@@ -98,8 +126,8 @@ def home_tab(state: duckdb.DuckDBPyConnection) -> None:
     runs = _load_latest_run(state)
     if not runs.empty:
         last_run = runs.iloc[0]
-        col1.metric("Last Run Type", last_run.run_type.capitalize())
-        col2.metric("Run Status", last_run.status.capitalize())
+        col1.metric("Last Run Type", last_run.run_type.capitalize() if last_run.run_type else "—")
+        col2.metric("Run Status", last_run.status.capitalize() if last_run.status else "—")
         col3.metric("Run Date", str(last_run.start_ts)[:10] if last_run.start_ts else "—")
     else:
         col1.metric("Last Run", "No runs found")
@@ -227,12 +255,13 @@ def reports_tab(state: duckdb.DuckDBPyConnection) -> None:
         if selected:
             dt_str, rtype = selected.split(" (")
             rtype = rtype.rstrip(")")
-            row = state.execute(
+            row = _safe_query(
+                state,
                 "SELECT content FROM reports WHERE report_date = ? AND report_type = ?",
                 [dt_str, rtype],
-            ).fetchone()
-            if row:
-                st.markdown(row[0])
+            )
+            if not row.empty:
+                st.markdown(row.iloc[0]["content"])
     else:
         st.info("No reports available.")
 
@@ -273,17 +302,10 @@ def concepts_tab() -> None:
     st.header("Concept Cards")
 
     concepts_dir = Path(__file__).resolve().parent.parent / "concepts"
-    manifest_path = concepts_dir / "concepts.json"
-
-    if not manifest_path.exists():
-        cards = _build_concepts_manifest(concepts_dir)
-        if not cards:
-            st.info("No concept cards found.")
-            return
-        manifest_path.write_text(json.dumps(cards, indent=2) + "\n")
-    else:
-        with manifest_path.open() as f:
-            cards = json.load(f)
+    cards = _build_concepts_manifest(concepts_dir)
+    if not cards:
+        st.info("No concept cards found.")
+        return
 
     titles = {c["title"]: c["id"] for c in cards}
     difficulty_groups: dict[str, list[str]] = {}
@@ -319,21 +341,23 @@ def decision_tab(state: duckdb.DuckDBPyConnection) -> None:
         st.info("Enter a symbol to explore its decision history.")
         return
 
-    decisions = state.execute(
+    decisions = _safe_query(
+        state,
         "SELECT decision_id, run_id, symbol, decision_date, action, confidence, reasons,"
         " candidate_json, risk_results, mechanism_results"
         " FROM decisions WHERE symbol = ? ORDER BY decision_date DESC LIMIT 20",
         [symbol],
-    ).fetchdf()
+    )
 
-    events = state.execute(
+    events = _safe_query(
+        state,
         "SELECT event_type, timestamp, payload FROM events"
         " WHERE event_type IN ('candidate_blocked', 'candidate_scored', 'candidate_promoted',"
         "                      'stop_adjusted', 'partial_taken', 'time_stop_triggered')"
         " AND payload->>'symbol' = ?"
         " ORDER BY timestamp DESC LIMIT 50",
         [symbol],
-    ).fetchdf()
+    )
 
     st.subheader(f"Timeline for {symbol}")
 
@@ -349,7 +373,10 @@ def decision_tab(state: duckdb.DuckDBPyConnection) -> None:
                 }
             )
         for _, r in events.iterrows():
-            payload = json.loads(r["payload"])
+            try:
+                payload = json.loads(r["payload"])
+            except (json.JSONDecodeError, TypeError, ValueError):  # fmt: skip
+                payload = {}
             detail = ""
             if r.event_type == "candidate_blocked":
                 detail = f"Blocked at gate={payload.get('gate', '?')}: {payload.get('reason', '')}"
@@ -396,12 +423,13 @@ def journal_tab(state: duckdb.DuckDBPyConnection) -> None:
         selected_date = st.selectbox("Select journal date", dates, format_func=str)
 
         if selected_date:
-            row = state.execute(
+            row = _safe_query(
+                state,
                 "SELECT content FROM journal_entries WHERE entry_date = ?",
                 [str(selected_date)],
-            ).fetchone()
-            if row:
-                st.markdown(row[0])
+            )
+            if not row.empty:
+                st.markdown(row.iloc[0]["content"])
             else:
                 st.info("No journal entry for this date.")
     else:
@@ -424,7 +452,16 @@ def main() -> None:
         st.info("Run the pipeline at least once to generate data.")
         return
 
-    analytical, state = _connect()
+    if not (DATA_DIR / "state.db").exists():
+        st.warning(f"No state database found at {DATA_DIR / 'state.db'}")
+        st.info("Run the pipeline at least once to generate data.")
+        return
+
+    conn = _connect()
+    if conn is None:
+        return
+
+    analytical, state = conn
 
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
         ["Home", "Portfolio", "Reports", "Concepts", "Daily Journal", "Decision Explorer"]
