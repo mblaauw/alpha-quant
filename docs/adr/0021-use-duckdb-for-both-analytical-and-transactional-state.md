@@ -14,7 +14,7 @@ Alpha-Quant originally planned (in ADR-0007) to use SQLite WAL via SQLAlchemy Co
 
 During P0/P1 implementation, the following emerged:
 
-1. **SQLAlchemy Core was never used.** The `CanonicalStore` in `app/store.py` uses DuckDB for both analytical and transactional access — DuckDB's SQLite scanner and direct SQL handle the transactional tables.
+1. **SQLAlchemy Core was never used.** The `CanonicalStore` in `app/store/state.py` uses DuckDB for both analytical and transactional access — DuckDB's SQLite scanner and direct SQL handle the transactional tables.
 
 2. **DuckDB supports both access patterns naturally.** It reads Parquet files for analytical scans and executes SQL against in-memory state tables for CRUD operations — no SQLAlchemy layer needed.
 
