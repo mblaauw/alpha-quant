@@ -63,4 +63,4 @@ Rationale:
 - ADR-0006 (DuckDB + Parquet for analytical store) — still active
 - ADR-0007 (SQLite WAL + SQLAlchemy Core for transactional state) — superseded
 - DESIGN.md §3.4 (Canonical store split by access pattern)
-- `alpha_quant/app/store.py` — canonical implementation
+- `alpha_quant/app/store/state.py` — CanonicalStore implementation

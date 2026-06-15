@@ -17,8 +17,8 @@ DESIGN.md §3.8 specifies "numpy recurrences (own ~100 lines) — incremental O(
 ## Decision Drivers
 
 - O(1) per-symbol-per-day update: no window recomputation, no data dependency beyond the previous state
-- 50-day raw tail with 200-day EMAs: window-based libraries would require keeping 200+ days of raw data for each symbol
-- Cold start: one-time 250-day backfill seeds the state, then raw bars are pruned
+- Incremental updates avoid window recomputation: window-based libraries would require keeping 200+ days of raw data for each symbol
+- Cold start: one-time 250-day backfill seeds the indicator state
 - CI integrity check: recompute from full history, compare to incremental state to 1e-6
 - No license or attribution requirements
 
@@ -35,14 +35,14 @@ Chosen option: **Option A — Custom numpy recurrence formulas**.
 
 Rationale:
 1. Only 5 indicators are needed — building custom numpy recurrences is ~100 lines of code
-2. O(1) per update enables the 50-day raw tail pattern: EMA200 is computed from a single stored value, not 200 days of history
+2. O(1) per update avoids recomputing windows: EMA200 is computed from a single stored value, not 200 days of history
 3. Zero external dependency — no pandas-ta or TA-Lib installation issues
 4. The team already uses numpy — no new skills required
 5. CI integrity check detects any drift from the brute-force computation
 
 ### Positive Consequences
 
-- The 50-day tail pattern works (EMA200 = 0.5 kB of stored state, not 200 days of OHLCV)
+- Incremental state means EMA200 = 0.5 kB of stored state, not 200 days of OHLCV
 - Performance: 10,000 symbols × 1 update in < 10ms
 - Total code footprint: ~100 lines of pure numpy, no abstractions
 - Deterministic and auditable — the recurrence formula is visible in the source code

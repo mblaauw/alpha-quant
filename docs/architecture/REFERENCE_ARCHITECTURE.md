@@ -26,7 +26,7 @@ The system operates across three execution realities — **backtest** (historica
 |---|-----------|-------------|
 | P1 | **Ports-and-Adapters** | `domain/` imports nothing from `adapters/` or `data/`. Pure domain core with fixture-backed fake adapters for deterministic replay. |
 | P2 | **Three Realities, One Core** | Backtest, replay, and paper share the same domain functions and fill model. Comparability by construction. |
-| P3 | **Clock Virtualization** | Clock port is fully wired — every app-layer consumer and domain function receives a `Clock` instance. `SystemClock` (live), `VirtualClock` (replay/backtest). Enables deterministic replay and golden CI. |
+| P3 | **Clock Virtualization** | Clock port is wired for most app-layer consumers; `SystemClock` (live) and `VirtualClock` (replay/backtest) inject time. A small number of direct `datetime.now(UTC)` calls remain (tracked issues). Enables deterministic replay and golden CI. |
 | P4 | **LLM is Explainer Only** | Never in the decision path. Every number is injected; a post-render checker verifies figures match source data. |
 | P5 | **Degrade, Never Block** | Source failures degrade (not block) the pipeline. Only price staleness sets `DATA_HALT`. |
 | P6 | **Append-Only Immutability** | Raw vault is append-only, zstd-compressed. Nothing is ever deleted or rewritten. |

@@ -30,14 +30,14 @@ The system is in **Beta Release** with the following capabilities:
 - Deterministic golden replay for regression testing
 - LLM-powered daily journal narration
 - Streamlit dashboard (6 tabs): Home, Portfolio, Reports, Concepts, Daily Journal, Decision Explorer
-- CLI with 9 subcommands: bootstrap, replay, run, backtest, journal, ask, report, status, halt
+- CLI with 12 subcommands: bootstrap, replay, ingest, run, backtest, journal, ask, report, status, halt, schedule, backup
 - Data quality monitoring (quarantine, staleness halts)
 
 ### Known Limitations
-- M1 universe selection uses static config list (domain `universe.select()` exists but not wired)
-- M2 regime uses hardcoded VIX/breadth defaults
+- M1 universe uses a configured symbol list (domain `universe.select()` is wired in pipeline)
+- M2 regime SPY path is live; VIX/breadth use defaults unless overridden
 - Live broker integration is out of scope — paper trading only
-- Broker evaluation docs pending paper trading data
+- Broker decision documented in `docs/evaluation/BROKER_DECISION.md`; final go/no-go deferred until paper trading results
 
 ### Next Steps
 - QA hardening milestone — test coverage, fuzzing, reliability improvements

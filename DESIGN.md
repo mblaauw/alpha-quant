@@ -10,7 +10,7 @@ Deterministic, daily-cadence, long-only equity system with an **internal paper-t
 
 **In scope:** US liquid equities, end-of-day signals, weekly rebalance + daily risk checks, internal paper portfolio + shadow ablation books, full decision lineage, user education.
 
-**Non-goals (v1):** live brokerage execution (a `broker` port is designed but unimplemented — see §9.4), intraday trading, options/derivatives, shorting, ML models, multi-agent coordination, LLM-computed numbers anywhere.
+**Non-goals (v1):** live brokerage execution (the `broker` port and `FakeBroker`/`AlpacaBroker` adapters exist, but live execution is out of scope — see §9.4), intraday trading, options/derivatives, shorting, ML models, multi-agent coordination, LLM-computed numbers anywhere.
 
 ---
 
@@ -41,7 +41,7 @@ alpha_quant/
 │   ├── universe.py              # M1 universe selection
 │   └── exceptions.py            # AlphaQuantError, DataNormalizationError
 ├── ports/                       # ABC interfaces for all external dependencies
-│   ├── clock.py                 # nothing reads the OS clock directly
+│   ├── clock.py                 # injected clock abstraction; most consumers use it, a few direct reads remain (tracked)
 │   ├── market_data.py  fundamentals.py  insider_feed.py  sentiment_feed.py
 │   ├── llm.py  store.py  event_sink.py
 │   └── broker.py                # port interface; FakeBroker and AlpacaBroker adapters exist, live execution out of v1 scope (§9.4)

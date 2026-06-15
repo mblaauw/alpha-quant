@@ -10,14 +10,14 @@ Accepted
 
 ## Context
 
-Alpha-Quant needs to store and query analytical data: daily bars (OHLCV), fundamentals snapshots, insider transactions, and mention counts. Access patterns are columnar (scan a field across 50 symbols), date-partitioned (50-day tail), and append-mostly (new data daily).
+Alpha-Quant needs to store and query analytical data: daily bars (OHLCV), fundamentals snapshots, insider transactions, and mention counts. Access patterns are columnar (scan a field across 50 symbols), date-partitioned, and append-mostly (new data daily).
 
 DESIGN.md §3.4 specifies a split-store architecture: analytical data → Parquet/DuckDB, transactional state → DuckDB (per ADR-0021).
 
 ## Decision Drivers
 
 - Columnar queries: "give me the close price for all symbols on date X" — a columnar format is 50-100x faster than row-based
-- Date-partitioned pruning: dropping old data should be a directory delete, not a DELETE FROM table
+- Date-partitioned cleanup: dropping old partitions is a directory delete
 - Zero server operations: the system runs on a single machine with no database server
 - Append-only immutability: analytical data is written once, never modified
 - Migration path: local parquet → S3/MinIO should be a non-event
@@ -35,7 +35,7 @@ Chosen option: **Option A — DuckDB + Parquet (date-partitioned)**.
 
 Rationale:
 1. DuckDB's columnar execution engine matches the access pattern perfectly: scanning 50 symbols × 1 field is a metadata-only operation on date-partitioned parquet
-2. Date-partitioned pruning is a filesystem operation — `rm -rf canonical/bars/date=<old_date>/` is instant and safe
+2. Date-partitioned cleanup is a filesystem operation — `rm -rf canonical/bars/date=<old_date>/` is instant and safe
 3. Zero server: DuckDB is an embedded database (same process), no daemon to manage
 4. Parquet is the standard columnar format — the team already has PyArrow as a dependency
 5. Migration path: change the DuckDB `read_parquet` path from local to S3 glob — nothing else changes
@@ -43,7 +43,7 @@ Rationale:
 ### Positive Consequences
 
 - Columnar queries on 50 symbols × 3 years of daily bars execute in milliseconds
-- The 50-day tail prune is a directory glob + delete — no heavy DELETE operations
+- Parquet cleanup is a filesystem operation — no heavy DELETE operations
 - Parquet files are usable by any tool (Polars, pandas, Tableau) — no lock-in
 - DuckDB reads parquet directly with zero ETL
 

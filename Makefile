@@ -35,10 +35,16 @@ golden:
 
 check-docs:
 	@echo "Checking for stale documentation patterns..."
-	@! grep -rn 'pytest + hypothesis' docs/ --include='*.md' && echo "  ✅ No 'pytest + hypothesis' in docs" || (echo "  ❌ Found 'pytest + hypothesis' in docs (should be just 'pytest')" && false)
-	@! grep -rn 'SQLite scanner\|SQLite state\|SqliteEventSink' docs/ --include='*.md' && echo "  ✅ No stale SQLite references in docs" || (echo "  ❌ Found stale SQLite references in docs" && false)
-	@! grep -rn '"SQLite\|Sqlite' tests/ --include='*.py' | grep -v '# noqa\|# fmt: skip\|\.sqlite\|sqlite3' && echo "  ✅ No stale SQLite references in tests/" || (echo "  ❌ Found stale SQLite references in tests/" && false)
-	@echo "Documentation check passed."
+	@failed=0; \
+	check() { label=$$1; shift; if grep -rni "$$@" 2>/dev/null | grep -qviE 'remove|removed|removal|ADR-0027|0007-use-sqlite|0008-use-custom|0010-use-custom|0014-use-streamlit|0017-use-golden'; then echo "  ❌ $$label"; grep -rni "$$@" 2>/dev/null | grep -viE 'remove|removed|removal|ADR-0027|0007-use-sqlite|0008-use-custom|0010-use-custom|0014-use-streamlit|0017-use-golden' | sed 's/^/      /'; failed=1; else echo "  ✅ $$label"; fi; }; \
+	check 'pytest + hypothesis' 'pytest + hypothesis' docs/ README.md DESIGN.md --include='*.md'; \
+	check 'stale SQLite references in docs' 'SQLite scanner\|SQLite state\|SQLite State Store' docs/ README.md --include='*.md'; \
+	check 'stale SQLite references in tests/' '"SQLite\|Sqlite' tests/ --include='*.py'; \
+	check '50-day tail as active feature' '50-day raw tail\|50-day tail pattern\|50-day tail prune\|raw bars are pruned\|Pruned to 50-day' docs/ DESIGN.md --include='*.md'; \
+	check 'stale broker wording' 'designed but unimplemented' docs/ DESIGN.md --include='*.md'; \
+	check 'overstrong clock claims' 'fully wired -- every\|fully wired — every' docs/ --include='*.md'; \
+	check 'stale CLI count' 'CLI with 9 subcommands' docs/ --include='*.md'; \
+	if [ $$failed -eq 0 ]; then echo "Documentation check passed."; else echo "Documentation check FAILED."; false; fi
 
 bless-golden: bootstrap golden
 	@echo "Golden file updated: fixtures/golden/golden_run.json"
