@@ -1,4 +1,4 @@
-.PHONY: check format type test bootstrap golden bless-golden lint
+.PHONY: check format type test test-dashboard test-e2e bootstrap golden bless-golden lint
 
 check:
 	uv run ruff check alpha_quant/
@@ -11,6 +11,12 @@ type:
 
 test:
 	uv run pytest
+
+test-dashboard:
+	uv run pytest tests/unit/test_dashboard.py tests/integration/test_dashboard_e2e.py -v
+
+test-e2e:
+	uv run pytest tests/integration/ -v
 
 lint: check format type
 	@echo "All linting passed."

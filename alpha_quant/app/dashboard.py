@@ -33,7 +33,6 @@ def _safe_query(
         return pd.DataFrame()
 
 
-@st.cache_resource(ttl=300)
 def _connect() -> tuple[duckdb.DuckDBPyConnection, duckdb.DuckDBPyConnection] | None:
     state_path = DATA_DIR / "state.db"
     if not state_path.exists():

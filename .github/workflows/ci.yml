@@ -7,11 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  check:
+  lint-type-test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.14"]
 
     steps:
       - uses: actions/checkout@v4
@@ -19,46 +16,42 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          version: "latest"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: pyproject.toml
 
       - name: Install dependencies
-        run: uv sync --all-extras
+        run: uv sync --frozen --extra dev
 
-      - name: Ruff check
+      - name: Lint (ruff check)
         run: uv run ruff check alpha_quant/
 
-      - name: Ruff format
+      - name: Format (ruff format)
         run: uv run ruff format --check alpha_quant/
 
-      - name: Type check
+      - name: Type check (ty)
         run: uv run ty check alpha_quant/
 
-      - name: Run tests
-        run: uv run pytest
+      - name: Test
+        run: uv run pytest -q
 
-      - name: Bootstrap fixtures
+      - name: Golden replay (determinism)
         run: |
           export PYTHONHASHSEED=0
-          uv run alpha-quant bootstrap
+          make bootstrap
+          make golden
 
-      - name: Stub replay (no DAG yet — #97)
+      - name: Verify golden hash
         run: |
-          export PYTHONHASHSEED=0
-          uv run alpha-quant replay \
-            --from-date 2024-01-01 \
-            --to-date 2024-01-31 \
-            --output fixtures/golden/stub_golden_run.json
-
-      - name: Verify stub golden hash (placeholder — #97)
-        run: |
-          EXPECTED_HASH=$(sha256sum fixtures/golden/stub_golden_run.json | cut -d' ' -f1)
-          echo "Golden hash: ${EXPECTED_HASH}"
-          git diff --exit-code fixtures/golden/stub_golden_run.json || {
+          git diff --exit-code fixtures/golden/golden_run.json || {
             echo "::error::Golden file mismatch! Run 'make bless-golden' to update."
             exit 1
           }
 
-      - name: Verify no alpaca.trading import
+      - name: Verify no alpaca.trading import (I13)
         run: |
           RESULT=$(grep -rn "alpaca\.trading" alpha_quant/ --include="*.py" || true)
           if [ -n "$RESULT" ]; then
