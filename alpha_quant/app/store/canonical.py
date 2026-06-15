@@ -154,7 +154,7 @@ def read_bars(
         result = analytical.execute(
             f"""
             SELECT DISTINCT ON ({dedup_key})
-                   symbol, "{pcol}" AS date, open, high, low, close, volume, adj_close
+                   symbol, "{pcol}" AS date, open, high, low, close, volume, adj_close, fetch_id
             FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
             WHERE symbol = ? AND "{pcol}" >= ? AND "{pcol}" <= ?
             ORDER BY {dedup_key} DESC
@@ -174,6 +174,7 @@ def read_bars(
             close=r[5],
             volume=r[6],
             adj_close=r[7],
+            fetch_id=r[8],
         )
         for r in result
     ]
@@ -187,9 +188,14 @@ def load_corp_actions(
         base,
         "corp_actions",
         symbol,
-        'symbol, "{pcol}" AS effective_date, action_type, ratio, amount',
+        'symbol, "{pcol}" AS effective_date, action_type, ratio, amount, fetch_id',
         lambda *r: CorporateAction(
-            symbol=r[0], effective_date=r[1], action_type=r[2], ratio=r[3], amount=r[4]
+            symbol=r[0],
+            effective_date=r[1],
+            action_type=r[2],
+            ratio=r[3],
+            amount=r[4],
+            fetch_id=r[5],
         ),
         order="ASC",
     )
@@ -203,7 +209,8 @@ def load_earnings(
         base,
         "earnings",
         symbol,
-        'symbol, "{pcol}" AS date, eps_estimate, eps_actual, revenue_estimate, revenue_actual',
+        'symbol, "{pcol}" AS date,'
+        " eps_estimate, eps_actual, revenue_estimate, revenue_actual, fetch_id",
         lambda *r: EarningsEntry(
             symbol=r[0],
             date=r[1],
@@ -211,6 +218,7 @@ def load_earnings(
             eps_actual=r[3],
             revenue_estimate=r[4],
             revenue_actual=r[5],
+            fetch_id=r[6],
         ),
         order="ASC",
     )
@@ -226,7 +234,7 @@ def read_fundamentals(
         symbol,
         'symbol, "{pcol}" AS as_of_date, market_cap, pe_ratio, eps_ttm,'
         " dividend_yield, sector, industry, operating_cash_flow,"
-        " total_liabilities, total_debt, total_equity, revenue, net_income, accruals",
+        " total_liabilities, total_debt, total_equity, revenue, net_income, accruals, fetch_id",
         lambda *r: FundamentalsSnapshot(
             symbol=r[0],
             as_of_date=r[1],
@@ -243,6 +251,7 @@ def read_fundamentals(
             revenue=r[12],
             net_income=r[13],
             accruals=r[14],
+            fetch_id=r[15],
         ),
     )
 
@@ -256,7 +265,7 @@ def read_insider_transactions(
         "insider_transactions",
         symbol,
         'symbol, "{pcol}" AS filing_date, transaction_date, owner, title,'
-        " transaction_type, shares_traded, price, shares_held",
+        " transaction_type, shares_traded, price, shares_held, fetch_id",
         lambda *r: InsiderTransaction(
             symbol=r[0],
             filing_date=r[1],
@@ -267,6 +276,7 @@ def read_insider_transactions(
             shares_traded=r[6],
             price=r[7],
             shares_held=r[8],
+            fetch_id=r[9],
         ),
     )
 
@@ -279,6 +289,8 @@ def read_mentions(
         base,
         "mentions",
         symbol,
-        'symbol, "{pcol}" AS mention_date, source, count',
-        lambda *r: MentionCount(symbol=r[0], mention_date=r[1], source=r[2], count=r[3]),
+        'symbol, "{pcol}" AS mention_date, source, count, fetch_id',
+        lambda *r: MentionCount(
+            symbol=r[0], mention_date=r[1], source=r[2], count=r[3], fetch_id=r[4]
+        ),
     )
