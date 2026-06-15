@@ -34,13 +34,13 @@ The system is in **Beta Release** with the following capabilities:
 - Data quality monitoring (quarantine, staleness halts)
 
 ### Known Limitations
-- `replay` command is metadata-only — real DAG replay not wired (tracked in #97)
+- M1 universe selection uses static config list (domain `universe.select()` exists but not wired)
+- M2 regime uses hardcoded VIX/breadth defaults
 - Live broker integration is out of scope — paper trading only
 - Broker evaluation docs pending paper trading data
 
 ### Next Steps
-- [Beta Release Milestone](https://github.com/mblaauw/alpha-quant/milestone/8) — close remaining issues
-- Tag v0.2.0-beta1 after all P0/P1 issues resolved
-- Publish release notes
+- QA hardening milestone — test coverage, fuzzing, reliability improvements
+- Close remaining P0/P1 issues
 - Begin evaluation phase (≥3 months of paper trading data)
 - Broker go/no-go decision based on evaluation results

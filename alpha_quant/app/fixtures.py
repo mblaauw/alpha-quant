@@ -1,6 +1,5 @@
 import hashlib
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -57,7 +56,6 @@ def freeze_bundle(
 
     manifest: dict[str, Any] = {
         "version": version,
-        "created_at": datetime.now(UTC).isoformat(),
         "symbols": list(bars.keys()),
         "files": {},
     }

@@ -26,12 +26,12 @@ The system operates across three execution realities — **backtest** (historica
 |---|-----------|-------------|
 | P1 | **Ports-and-Adapters** | `domain/` imports nothing from `adapters/` or `data/`. Pure domain core with fixture-backed fake adapters for deterministic replay. |
 | P2 | **Three Realities, One Core** | Backtest, replay, and paper share the same domain functions and fill model. Comparability by construction. |
-| P3 | **Clock Virtualization** | Everything asks the `Clock` port (`SystemClock` live, `VirtualClock` replay/backtest). Enables deterministic replay and golden CI. |
+| P3 | **Clock Virtualization** | Clock port is fully wired — every app-layer consumer and domain function receives a `Clock` instance. `SystemClock` (live), `VirtualClock` (replay/backtest). Enables deterministic replay and golden CI. |
 | P4 | **LLM is Explainer Only** | Never in the decision path. Every number is injected; a post-render checker verifies figures match source data. |
 | P5 | **Degrade, Never Block** | Source failures degrade (not block) the pipeline. Only price staleness sets `DATA_HALT`. |
 | P6 | **Append-Only Immutability** | Raw vault is append-only, zstd-compressed. Nothing is ever deleted or rewritten. |
 | P7 | **Self-Consistency Over Reconciliation** | Nightly assertions over the DuckDB book. A violation is a software bug — full halt. |
-| P8 | **13 System Invariants (I1–I13)** | Assertion-enforced properties including determinism (I7), domain/adapter isolation (I2), LLM exclusion (I3), and post-fill self-consistency (I12). |
+| P8 | **13 System Invariants (I1–I13)** | Assertion-enforced properties. See DESIGN.md §16 for the authoritative invariant list with full descriptions. |
 
 ## 3. C4 Model
 
@@ -201,7 +201,6 @@ At the next open: fill queued orders against T+1 bars.
 - Raw vault: `vault/{source}/{yyyy}/{mm}/{dd}/{fetch_id}.zst`
 - Canonical data: `canonical/bars/date=*/` (Parquet, date-partitioned)
 - Transactional state: `data/state.db` (DuckDB)
-- 50-day raw bar tail with pruning
 
 ### 8.2 Operational Controls
 

@@ -66,15 +66,36 @@ alpha_quant/
 │       ├── fixture_sentiment_feed.py # mention counts from fixture
 │       └── fixture_store.py         # in-memory store for test isolation
 ├── app/                         # application wiring + infrastructure
-│   ├── config.py                # pydantic-settings + TOML loading
-│   ├── store.py                 # CanonicalStore: DuckDB (parquet + state)
-│   ├── vault.py                 # append-only zstd-compressed raw payload archive
+│   ├── __init__.py              # CLI entry point (Typer)
+│   ├── _loop.py                 # shared decision-loop helpers
+│   ├── alerts.py                # alert generation
+│   ├── backtest.py              # historical backtest engine
+│   ├── backup.py                # backup utilities
 │   ├── bootstrap.py             # fixture generation (deterministic)
-│   ├── fixtures.py              # freeze_bundle: parquet + manifest writer
 │   ├── catalog.py               # fixture integrity verification
-│   ├── calendar.py              # NYSE market calendar
-│   ├── replay.py                # golden replay harness (stub — #97)
-│   └── cli.py                   # run|replay|backtest|bootstrap|journal|ask|report|status|halt
+│   ├── config.py                # pydantic-settings + TOML loading
+│   ├── dashboard.py             # Streamlit dashboard
+│   ├── factory.py               # dependency injection factory
+│   ├── fixtures.py              # freeze_bundle: parquet + manifest writer
+│   ├── halt.py                  # halt file management
+│   ├── paper.py                 # paper trading engine
+│   ├── pipeline.py              # main daily pipeline
+│   ├── replay.py                # golden replay harness
+│   ├── scheduler.py             # APScheduler-based daily scheduling
+│   ├── vault.py                 # append-only zstd-compressed raw payload archive
+│   └── store/                   # DuckDB-backed state + analytical store
+│       ├── __init__.py          # re-exports
+│       ├── admin_store.py       # run metadata, config snapshots
+│       ├── bar_store.py         # bar data access
+│       ├── canonical.py         # parquet-backed canonical store
+│       ├── decision_store.py    # decision records
+│       ├── event_store.py       # event log access
+│       ├── indicator_store.py   # indicator state access
+│       ├── journal_store.py     # journal entries
+│       ├── order_store.py       # order persistence
+│       ├── position_store.py    # position persistence
+│       ├── schema.py            # SQL schema definitions
+│       └── state.py             # CanonicalStore composite (inherits all mixins)
 ├── tests/                       # test suite
 │   ├── unit/                    # unit tests (pure domain functions)
 │   └── integration/             # integration tests (adapter contracts)
@@ -255,7 +276,7 @@ Development speeds: domain unit tests (ms) → full-DAG replay over fixtures (se
 | Analytical SQL | **DuckDB** | zero-ops parquet queries; covers both analytical and transactional access |
 | Columnar files | **pyarrow** (parquet, zstd codec) | standard |
 | Compression | **zstandard** | vault blobs |
-| Transactional DB | **DuckDB** (direct, via `app/store.py`) | ACID, single-writer, no ORM; supersedes SQLite/SQLAlchemy (ADR-0021) |
+| Transactional DB | **DuckDB** (direct, via `app/store/state.py`) | ACID, single-writer, no ORM; supersedes SQLite/SQLAlchemy (ADR-0021) |
 | Indicators | **numpy** recurrences (own ~100 lines) | incremental O(1); window libs unnecessary |
 | Scheduling | **APScheduler** (cron fallback) | in-process, simple |
 | Config | **pydantic-settings** + TOML | typed, env-overridable |
@@ -269,7 +290,7 @@ Development speeds: domain unit tests (ms) → full-DAG replay over fixtures (se
 
 ## 4. Clock virtualization and replay
 
-Nothing reads the OS clock; everything asks the `Clock` port (`SystemClock` live, `VirtualClock` replay/backtest). `alpha-quant replay --from 2023-01-01 --to 2025-12-31` drives the **entire DAG** against fixture adapters — ingest, validation, halts, decisions, paper fills, events, journals, reports — in minutes. CI runs a **golden replay** (6 fixture-months; decision log + paper equity curve must hash-match the committed golden output; intended changes re-bless the golden file in the same PR). The single highest-leverage testing investment in the project.
+The `Clock` port is fully wired — every app-layer consumer (pipeline, store, paper, alerts, halt, fixtures, vault) and every domain function (events, validate) receives a `Clock` instance. Nothing reads the OS clock; all time flows through `SystemClock` (live) or `VirtualClock` (replay/backtest). `alpha-quant replay --from 2023-01-01 --to 2025-12-31` drives the **entire DAG** against fixture adapters — ingest, validation, halts, decisions, paper fills, events, journals, reports — in minutes. CI runs a **golden replay** (6 fixture-months; decision log + paper equity curve must hash-match the committed golden output; intended changes re-bless the golden file in the same PR). The single highest-leverage testing investment in the project.
 
 ---
 

@@ -30,7 +30,7 @@ Alpha-Quant is a deterministic, daily-cadence, long-only equity paper-trading sy
 - Walk-forward validation infrastructure (shadow books that isolate each mechanism's contribution)
 - Deterministic replay for auditability
 
-> **⚠️ Beta status:** This is a research/paper-trading system. It is **not financial advice**. The decision engine is under active development — several mechanisms are implemented as domain logic but not yet wired into the runtime path (see [Beta Release milestone](https://github.com/mblaauw/alpha-quant/milestone/8) for open items).
+> **⚠️ Beta status:** This is a research/paper-trading system. It is **not financial advice**. The decision engine is under active development — 6/8 mechanisms are wired (M1 universe uses static config list; M2 regime uses hardcoded VIX/breadth defaults). See [Beta Release milestone](https://github.com/mblaauw/alpha-quant/milestone/8) for open items.
 
 ### Key Principles
 
@@ -137,14 +137,14 @@ graph TB
 | **M7** | Blackout | ✅ Implemented | ✅ Wired | 3-day pre-earnings entry block |
 | **M8** | Composite | ✅ Implemented | ✅ Wired | 0.6·technical + 0.25·momentum + 0.15·insider; equal-weight sector cap (25% of slots) |
 
-> Each mechanism's runtime path is verified by pipeline behavioral tests (426 tests). See [BETA-DA-8](https://github.com/mblaauw/alpha-quant/issues/334).
+> Each mechanism's runtime path is verified by pipeline behavioral tests (429 tests). See [BETA-DA-8](https://github.com/mblaauw/alpha-quant/issues/334).
 
 ## CLI Commands
 
 | Command | Status | Description |
 |---------|--------|-------------|
 | `alpha-quant bootstrap` | ✅ Ready | Generate deterministic fixture data for development |
-| `alpha-quant replay` | 🔧 Partial | Golden replay — metadata only; DAG wiring tracked in BETA-DA-2 |
+| `alpha-quant replay` | ✅ Ready | Full-DAG golden replay over fixture data |
 | `alpha-quant ingest` | ✅ Ready | Fetch live data from APIs into canonical store (store-only source) |
 | `alpha-quant run` | ✅ Ready | Daily pipeline — reads canonical store (store-only; ingest separately) |
 | `alpha-quant backtest` | ✅ Ready | Event-driven backtester (single fill model) |
@@ -153,6 +153,8 @@ graph TB
 | `alpha-quant report` | ✅ Ready | Weekly/monthly reports (from DB or latest snapshot) |
 | `alpha-quant status` | ✅ Ready | Full system status (portfolio, equity, positions, risk) |
 | `alpha-quant halt` | ✅ Ready | Halt or resume pipeline |
+| `alpha-quant schedule` | ✅ Ready | Start/stop the APScheduler daily scheduler |
+| `alpha-quant backup` | ✅ Ready | Backup DuckDB state store and vault |
 
 ## Documentation
 
@@ -172,7 +174,7 @@ make check          # Ruff lint
 make format         # Ruff format
 make type           # Type check (ty)
 make bootstrap      # Generate fixtures
-uv run pytest       # Run tests (419 passing)
+uv run pytest       # Run tests (429 passing)
 make bless-golden   # Update golden replay fixture hash
 ```
 

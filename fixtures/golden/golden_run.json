@@ -9,7 +9,7 @@
     },
     {
       "action": "enter",
-      "confidence": 0.66,
+      "confidence": 0.6601,
       "date": "2024-01-01",
       "decision_id": "e72bf4096682a47d",
       "symbol": "TSLA"
@@ -37,7 +37,7 @@
     },
     {
       "action": "enter",
-      "confidence": 0.5768,
+      "confidence": 0.5767,
       "date": "2024-01-01",
       "decision_id": "a491b553f1854e9c",
       "symbol": "SCHW"
@@ -74,102 +74,102 @@
   "equity_curve": [
     {
       "day": 0,
-      "equity": 100525.28
+      "equity": 100525.59
     },
     {
       "day": 1,
-      "equity": 100373.43
+      "equity": 100372.65
     },
     {
       "day": 2,
-      "equity": 100445.86
+      "equity": 100444.89
     },
     {
       "day": 3,
-      "equity": 99885.34
+      "equity": 99883.98
     },
     {
       "day": 4,
-      "equity": 86796.77
+      "equity": 86774.75
     },
     {
       "day": 5,
-      "equity": 87380.28
+      "equity": 87357.77
     },
     {
       "day": 6,
-      "equity": 87708.85
+      "equity": 87687.83
     },
     {
       "day": 7,
-      "equity": 88228.97
+      "equity": 88209.7
     },
     {
       "day": 8,
-      "equity": 87940.43
+      "equity": 87920.93
     },
     {
       "day": 9,
-      "equity": 88157.93
+      "equity": 88138.52
     },
     {
       "day": 10,
-      "equity": 87188.41
+      "equity": 87168.6
     },
     {
       "day": 11,
-      "equity": 87318.72
+      "equity": 87298.03
     },
     {
       "day": 12,
-      "equity": 86774.02
+      "equity": 86753.64
     },
     {
       "day": 13,
-      "equity": 86554.86
+      "equity": 86535.12
     },
     {
       "day": 14,
-      "equity": 86390.62
+      "equity": 86371.95
     },
     {
       "day": 15,
-      "equity": 86096.86
+      "equity": 86079.94
     },
     {
       "day": 16,
-      "equity": 86240.19
+      "equity": 86226.16
     },
     {
       "day": 17,
-      "equity": 86287.65
+      "equity": 86273.06
     },
     {
       "day": 18,
-      "equity": 86426.21
+      "equity": 86411.34
     },
     {
       "day": 19,
-      "equity": 87032.92
+      "equity": 87019.61
     },
     {
       "day": 20,
-      "equity": 87716.16
+      "equity": 87702.56
     },
     {
       "day": 21,
-      "equity": 86988.08
+      "equity": 86973.13
     },
     {
       "day": 22,
-      "equity": 86495.06
+      "equity": 86480.02
     }
   ],
   "fills": [
     {
       "fill_id": "0e2e9e182b38fe0a9e8ac9dc4b2c786f31911e1112c8151128d2569854ef8dd1",
-      "price": 109.82,
-      "quantity": 117.0,
+      "price": 110.93,
+      "quantity": 116.0,
       "symbol": "SPY"
     },
     {
@@ -180,49 +180,49 @@
     },
     {
       "fill_id": "75d84b2c19f2cb84325f03cd572e11540257c3086f1cce3df24384ccfdfc3ea1",
-      "price": 91.27,
-      "quantity": 147.0,
+      "price": 92.0,
+      "quantity": 146.0,
       "symbol": "^VIX"
     },
     {
       "fill_id": "7577883a602781f75f4a2bb8237c027bcdd672c7945992245ee9fa7eeb15ef1d",
-      "price": 111.11,
-      "quantity": 119.0,
+      "price": 108.93,
+      "quantity": 122.0,
       "symbol": "COP"
     },
     {
       "fill_id": "034c8e41481b0d851fdc95fd1da52df68b37724790fa613075caf741002264e0",
-      "price": 103.69,
-      "quantity": 128.0,
+      "price": 102.46,
+      "quantity": 129.0,
       "symbol": "ABBV"
     },
     {
       "fill_id": "731944299a26db95e13f1fb2168cf3138cffaf107aa3af098cc3d95f4f9d8d80",
-      "price": 112.09,
+      "price": 112.54,
       "quantity": 113.0,
       "symbol": "SCHW"
     },
     {
       "fill_id": "fd940e375d601eb486a70edb343f982783745bcfa4c876d1f25001b45b7f161b",
-      "price": 91.48,
-      "quantity": 139.0,
+      "price": 89.69,
+      "quantity": 142.0,
       "symbol": "PG"
     },
     {
       "fill_id": "0e06c6eda7370e3f77bda6f6619b61d6ea81201fd32be36af5979665427ffc02",
-      "price": 84.33,
-      "quantity": -147.0,
+      "price": 85.0,
+      "quantity": -146.0,
       "symbol": "^VIX"
     },
     {
       "fill_id": "114cc5af4342be0ad188f2baca01263739f2e227098d6b4a879630159fe28c07",
-      "price": 109.58,
-      "quantity": 115.0,
+      "price": 110.69,
+      "quantity": 114.0,
       "symbol": "SPY"
     },
     {
       "fill_id": "eddcb85edd039624d889716a6b0c1b37de3102fc3a1ef099deaca26cbd9e16f8",
-      "price": 135.76,
+      "price": 135.48,
       "quantity": 41.0,
       "symbol": "TGT"
     }
@@ -230,17 +230,17 @@
   "meta": {
     "command": "replay",
     "config_hash": "f8e43fbdf811d9fd",
-    "fixture_hash": "c159034fce97abe9f140dcd4d51890732cf8ff3c4dc4c61b669382bdca58df73",
+    "fixture_hash": "f6913918b7a1e7284ec6a2fa6e533f94a8e5772c7cbf8e9dbbd846696105379f",
     "fixture_path": "fixtures/v1",
     "from_date": "2024-01-01",
     "to_date": "2024-01-31"
   },
   "metrics": {
-    "cagr_pct": -79.6,
-    "max_drawdown_pct": -14.35,
+    "cagr_pct": -79.64,
+    "max_drawdown_pct": -14.37,
     "num_fills": 10,
     "num_trades": 10,
-    "total_return_pct": -13.5
+    "total_return_pct": -13.52
   },
   "symbols": {
     "total": 52
