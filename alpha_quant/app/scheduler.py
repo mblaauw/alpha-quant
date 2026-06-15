@@ -13,7 +13,7 @@ import structlog
 from alpha_quant.app.alerts import alert
 from alpha_quant.app.config import load_config, redact_config
 from alpha_quant.app.halt import is_halted
-from alpha_quant.app.pipeline import PipelineConfig
+from alpha_quant.app.pipeline import PipelineConfig, persist_run_result
 from alpha_quant.app.pipeline import run as run_pipeline
 from alpha_quant.app.store import CanonicalStore
 from alpha_quant.domain.ablation import SHADOW_CONFIGS, ShadowBook
@@ -127,6 +127,8 @@ def run_daily_pipeline(
             prev_regime=prev_regime,
             shadow_books=_SHADOW_BOOKS,
         )
+
+        persist_run_result(store, result)
 
         status = "completed"
         if result.halted:

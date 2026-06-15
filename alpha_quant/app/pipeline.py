@@ -30,6 +30,7 @@ from alpha_quant.domain.events import (
     ConsistencyViolation,
     DataIngested,
     DataQuarantined,
+    DomainEvent,
     DrawdownLadderTripped,
     ErrorOccurred,
     FillBooked,
@@ -85,7 +86,7 @@ class RunResult:
     date: date
     decisions: list[Decision]
     fills: list[Fill]
-    events: list[object]
+    events: list[DomainEvent]
     violations: list[InvariantViolation]
     current_regime: str | None = None
     halted: bool = False
@@ -114,7 +115,7 @@ def run(
     deg = degradation or DegradationStatus()
 
     run_id = cfg.run_id or uuid.uuid4().hex[:16]
-    events: list[object] = []
+    events: list[DomainEvent] = []
     decisions: list[Decision] = []
     fills: list[Fill] = []
 
@@ -643,7 +644,7 @@ def run(
         today_pnl = today_equity - prev_snap.equity
         daily_halt_actions = evaluate_daily_loss(today_pnl, today_equity, rc)
         for action in daily_halt_actions:
-            events.append(action)
+            events.append(action)  # type: ignore
 
     main_snap = PortfolioSnapshot(
         date=run_date,
@@ -808,3 +809,21 @@ def run(
         prev_equity=prev_equity,
         new_equity=pop_equity_final,
     )
+
+
+def persist_run_result(store: Store, result: RunResult) -> None:
+    for event in result.events:
+        try:
+            store.save_event(event)
+        except Exception:
+            logger.exception("persist_event_failed", run_id=result.run_id)
+    for decision in result.decisions:
+        try:
+            store.save_decision(decision)
+        except Exception:
+            logger.exception("persist_decision_failed", run_id=result.run_id)
+    for fill in result.fills:
+        try:
+            store.save_fill(fill)
+        except Exception:
+            logger.exception("persist_fill_failed", run_id=result.run_id)

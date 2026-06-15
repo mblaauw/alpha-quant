@@ -56,7 +56,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         create_sentiment_feed,
     )
     from alpha_quant.app.halt import is_halted
-    from alpha_quant.app.pipeline import PipelineConfig
+    from alpha_quant.app.pipeline import PipelineConfig, persist_run_result
     from alpha_quant.app.pipeline import run as run_pipeline
     from alpha_quant.app.store import CanonicalStore
     from alpha_quant.app.vault import Vault
@@ -140,6 +140,7 @@ def cmd_run(args: argparse.Namespace) -> None:
     elif result.violations:
         status = "violations"
 
+    persist_run_result(store, result)
     store.complete_run(run_id, status=status)
 
     print(
