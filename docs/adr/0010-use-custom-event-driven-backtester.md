@@ -57,5 +57,5 @@ Rationale:
 
 - DESIGN.md §14 (Backtesting and evaluation), §16 (Invariant I8)
 - RAD §5 (Container Architecture), §7 (Dynamic Views — daily run sequence)
-- C4 Dynamic diagram: `docs/architecture/views/daily-run-sequence.png`
+- C4 Container diagram: `docs/architecture/views/container.png`
 - ADR-0009 (Fill model)

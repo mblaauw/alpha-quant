@@ -126,7 +126,7 @@ include_benchmarks = ["SPY", "^VIX"]
 [data]
 indicator_state = true
 staleness_halt_hours = 30
-fixture_version = "fx-2026-06-v1"
+fixture_version = "v1"
 
 [universe]
 min_price = 5.0
@@ -270,7 +270,7 @@ Development speeds: domain unit tests (ms) → full-DAG replay over fixtures (se
 | HTTP | **httpx** | sync+async, HTTP/2, timeouts as first-class config |
 | Retry/backoff | **tenacity** | declarative, per-connector policies |
 | Rate limiting | small token-bucket util (~30 lines) | not worth a dependency |
-| HTML parsing (OpenInsider) | **selectolax** | fast, lenient; lxml fallback |
+| HTML parsing (OpenInsider) | **selectolax** | fast, lenient |
 | Validation/models | **pydantic v2** | parse-don't-validate at zone boundaries |
 | DataFrames | — (use DuckDB SQL + pyarrow) | polars removed from dependencies (was evaluated but unused) |
 | Analytical SQL | **DuckDB** | zero-ops parquet queries; covers both analytical and transactional access |
@@ -283,20 +283,20 @@ Development speeds: domain unit tests (ms) → full-DAG replay over fixtures (se
 | Logging | **structlog** (JSON lines) | events + logs share shape |
 | Testing | **pytest** | golden replay, integration tests, unit tests |
 | LLM client | **httpx** against OpenAI-compatible API | one adapter: OpenAI + OpenRouter |
-| Market data SDK | **alpaca-py** (data module only) | no trading module imported — enforced by lint rule |
+| Market data SDK | **alpaca-py** (data module only) | no trading module imported outside broker adapter — enforced by lint rule |
 | Dashboard | **Streamlit** | reads DuckDB state store via Store port, zero coupling |
 
 ---
 
 ## 4. Clock virtualization and replay
 
-The `Clock` port is wired for most app-layer consumers (pipeline, store, paper, alerts, halt, fixtures, vault) and key domain functions. `SystemClock` (live) or `VirtualClock` (replay/backtest) injects time. A small number of remaining direct clock reads (`datetime.now(UTC)` in events, vault, pipeline, and some adapters) are tracked as known issues. `alpha-quant replay --from 2023-01-01 --to 2025-12-31` drives the **entire DAG** against fixture adapters — ingest, validation, halts, decisions, paper fills, events, journals, reports — in minutes. CI runs a **golden replay** (6 fixture-months; decision log + paper equity curve must hash-match the committed golden output; intended changes re-bless the golden file in the same PR). The single highest-leverage testing investment in the project.
+The `Clock` port is wired for most app-layer consumers (pipeline, store, paper, alerts, halt, fixtures, vault) and key domain functions. `SystemClock` (live) or `VirtualClock` (replay/backtest) injects time. A small number of remaining direct clock reads (`datetime.now(UTC)` in Pydantic event defaults, vault, pipeline, and some adapters) are tracked as known issues. `alpha-quant replay --from-date 2023-01-01 --to-date 2025-12-31` drives the **entire DAG** against fixture adapters — ingest, validation, halts, decisions, paper fills, events, journals, reports — in minutes. CI runs a **golden replay** (January 2024 fixture month; decision log + paper equity curve must hash-match the committed golden output; intended changes re-bless the golden file in the same PR). The single highest-leverage testing investment in the project.
 
 ---
 
 ## 5. Decision engine — 8 mechanisms
 
-(Unchanged from v1.1; summary.) **M1** universe (S&P500+MidCap400, $5+, $5M ADV, SEC-map validated) · **M2** regime gate (SPY EMA50/200, breadth, VIX → RISK_ON/CAUTION/RISK_OFF) · **M3** technical score (trend, RSI 45–70, MACD histogram, 12-1 momentum, volume confirmation, ATR% sanity) · **M4** fundamental quality gate, binary (positive OCF, sector-relative D/E, no recent negative surprise, accruals sane) · **M5** insider cluster signal (≥2 officers/directors, ≥$200k net, 30d → boost; Cohen/Malloy/Pomorski 2012) · **M6** crowding veto (Reddit mention z>3 → 10-day entry block; count arithmetic, never LLM sentiment) · **M7** earnings blackout (no entries ≤3 days before earnings) · **M8** composite ranking (0.6·technical + 0.25·momentum + 0.15·insider; gates first; liquidity tiebreak). Degradation per §3.2 when a source is down. Rejected: ML, LLM scoring, pairs, analyst revisions.
+(Unchanged from v1.1; summary.) **M1** universe (S&P500+MidCap400, $5+, $5M ADV, SEC-map validated) · **M2** regime gate (SPY EMA50/200, breadth, VIX → RISK_ON/CAUTION/RISK_OFF) · **M3** technical score (trend, Gaussian RSI 52±22, MACD histogram, 12-1 momentum, volume confirmation, ATR% sanity) · **M4** fundamental quality gate, binary (positive OCF, sector-relative D/E, no recent negative surprise, accruals sane) · **M5** insider cluster signal (≥2 officers/directors, ≥$200k net, 30d → boost; Cohen/Malloy/Pomorski 2012) · **M6** crowding veto (Reddit mention z>3 → 14-calendar-day entry block ≈ 10 trading days; count arithmetic, never LLM sentiment) · **M7** earnings blackout (no entries ≤3 days before earnings) · **M8** composite ranking (0.6·technical + 0.25·momentum + 0.15·insider; gates first; liquidity tiebreak). Degradation per §3.2 when a source is down. Rejected: ML, LLM scoring, pairs, analyst revisions.
 
 ---
 
@@ -322,7 +322,7 @@ The paper book (§9) is the FULL system. Alongside it, shadow books — RULES_ON
 
 ### 9.1 The paper book is the portfolio
 
-There is no external broker. `app/paper.py` maintains the authoritative portfolio in DuckDB (via the Store port): cash, positions, orders, fills, equity curve — all written transactionally with their Decision lineage. Alpaca contributes *information only* (latest quotes for marking and fill realism; trading calendar); the `alpaca-py` trading module is never imported (lint-enforced).
+There is no external broker. `app/paper.py` maintains the authoritative portfolio in DuckDB (via the Store port): cash, positions, orders, fills, equity curve — all written transactionally with their Decision lineage. Alpaca contributes *information only* (latest quotes for marking and fill realism; trading calendar); the `alpaca-py` trading module is only imported by the broker adapter (`alpaca_broker.py`) which is inactive in v1.
 
 What this removes: broker reconciliation, order-rejection handling, partial-fill plumbing, API-key risk on the execution path. What it forfeits (stated honestly, also to the user via a concept card): real fill competition, real spreads at size, exchange halts, borrow/locate realities. Paper results are therefore an **upper bound** on live performance — the monthly report says so explicitly.
 
@@ -421,11 +421,11 @@ I5. Per-position risk-at-stop ≤ 2% equity at order time.
 I6. Gross exposure ≤ cap after every fill batch.
 I7. Identical inputs + config + git sha ⇒ identical decisions and fills (golden replay in CI).
 I8. Backtest, replay, paper, and shadows execute the same domain functions and the same fill model.
-I9. No domain module reads the OS clock; app-layer modules should use the Clock port (direct `datetime.now(UTC)` calls remain in a few locations — tracked issues).
+I9. Domain functions do not read the OS clock; app-layer modules should use the Clock port (the `events.py` model default is the only domain exception; remaining app-layer clock reads are tracked issues).
 I10. Every number in user-facing text exists in the lineage/event data it cites.
 I11. All books update on every run, including halted ones.
 I12. The paper book passes self-consistency (§9.3) after every fill batch; violation ⇒ full halt.
-I13. `alpaca-py` trading module is never imported (lint rule); Alpaca is data-only.
+I13. `alpaca-py` trading module is only imported in the broker adapter (`alpaca_broker.py`); Alpaca is data-only outside the inactive broker path.
 
 ## 17. Retained red flags
 

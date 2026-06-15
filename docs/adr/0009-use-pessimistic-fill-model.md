@@ -57,4 +57,4 @@ Rationale:
 
 - DESIGN.md §9 (Internal paper-trading engine), §9.2 (Fill model semantics), §16 (Invariant I8)
 - RAD §6.3 (Fill Model & Portfolio Components)
-- C4 Component diagram (Fill Model): `docs/architecture/views/fill-model-portfolio.png`
+- C4 Component diagram (Fill Model): `docs/architecture/views/fillModelPortfolioComponents.png`

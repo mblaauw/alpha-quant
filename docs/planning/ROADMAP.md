@@ -40,7 +40,6 @@ The system is in **Beta Release** with the following capabilities:
 - Broker decision documented in `docs/evaluation/BROKER_DECISION.md`; final go/no-go deferred until paper trading results
 
 ### Next Steps
-- QA hardening milestone — test coverage, fuzzing, reliability improvements
-- Close remaining P0/P1 issues
+- Release hardening — documentation, CI invariant, and config cleanup
 - Begin evaluation phase (≥3 months of paper trading data)
-- Broker go/no-go decision based on evaluation results
+- Broker go/no-go decision based on evaluation results (see `docs/evaluation/BROKER_DECISION.md`)

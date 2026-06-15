@@ -12,7 +12,7 @@ Accepted
 
 Alpha-Quant is a deterministic system (I7: identical inputs + config + git sha ⇒ identical decisions and fills). This property should be the foundation of the QA strategy. The highest-leverage testing investment is the golden replay: running the entire pipeline against a fixed fixture dataset and comparing outputs to a committed golden file.
 
-DESIGN.md §4 states: "CI runs a golden replay (6 fixture-months; decision log + paper equity curve must hash-match the committed golden output)."
+DESIGN.md §4 states: "CI runs a golden replay (January 2024 fixture month; decision log + paper equity curve must hash-match the committed golden output)."
 
 ## Decision Drivers
 
@@ -35,7 +35,7 @@ Chosen option: **Option A — Golden replay with hash comparison**.
 Rationale:
 1. The golden replay exercises the entire DAG — from data ingestion through fill booking — in a single CI job
 2. Determinism (I7) means the golden test NEVER fails due to environmental factors — every failure is a real regression
-3. 6 fixture-months of data provides high confidence that the change is correct
+3. The fixture replay provides high confidence that the change is correct
 4. `make bless-golden` makes updating the golden file an explicit, reviewable action (it changes the golden hash in the PR)
 5. Unit tests remain important for edge cases, but the golden replay catches integration-level regressions that unit tests miss
 
@@ -44,7 +44,7 @@ Rationale:
 - Any regression in data parsing, indicator computation, decision logic, fill execution, or P&L calculation is caught in CI
 - The golden file serves as living documentation of expected system behavior
 - New contributors can verify their changes pass the golden replay before submitting PRs
-- The golden replay completes in < 3 minutes for 6 fixture-months (fits comfortably in CI time budget)
+- The golden replay completes in < 30 seconds for 1 fixture-month (fits comfortably in CI time budget)
 
 ### Negative Consequences
 
@@ -55,5 +55,5 @@ Rationale:
 ## References
 
 - DESIGN.md §4 (Clock virtualization and replay), §16 (Invariant I7)
-- RAD §10 (Cross-Cutting Concerns — Testing Strategy)
+- RAD §7 (Testing Strategy)
 - STORY-0.8 (Golden replay CI), BACKLOG.md

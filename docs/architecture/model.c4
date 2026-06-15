@@ -48,7 +48,7 @@ model {
     description 'Deterministic, daily-cadence, long-only equity trading system. Internal paper engine. LLM-powered narration and education.'
 
     container cli 'CLI' {
-      description 'Command-line interface. Entry point for all operations: run, replay, backtest, bootstrap, journal, ask, report, status, halt.'
+      description 'Command-line interface. Entry point for all operations: run, replay, backtest, bootstrap, ingest, journal, ask, report, status, halt, schedule, backup.'
       technology 'argparse'
     }
 
@@ -204,8 +204,8 @@ model {
     }
 
     container dashboard 'Streamlit Dashboard' {
-      description 'Read-only monitoring dashboard. Tabs: Overview, Portfolio, Risk, Reports, Concepts. Reads from DuckDB only — zero pipeline coupling.'
-      technology 'Streamlit, altair'
+      description 'Read-only monitoring dashboard. Tabs: Home, Portfolio Risk, Reports, Concept Cards, Journal, Decision Explorer. Reads from DuckDB only — zero pipeline coupling.'
+      technology 'Streamlit'
     }
 
     container eventLog 'Event Log' {
@@ -233,7 +233,7 @@ model {
     }
 
     monitoredProcess cliProcess 'CLI Process' {
-      description 'Ad-hoc operations. Invoked by user for replay, backtest, bootstrap, status, halt, ask.'
+      description 'Ad-hoc operations. Invoked by user for run, replay, backtest, bootstrap, ingest, journal, ask, report, status, halt, schedule, backup.'
       technology 'argparse, Python 3.14'
     }
 

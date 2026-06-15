@@ -55,5 +55,5 @@ Rationale:
 
 - DESIGN.md §3.2 (Connectors — Failure policy), §16 (Invariants)
 - RAD §4 (System Context), §10 (Cross-Cutting Concerns — Security)
-- C4 System Context diagram: `docs/architecture/views/system-context.png`
+- C4 System Context diagram: `docs/architecture/views/systemContext.png`
 - Chaos tests: STORY-5.6, BACKLOG.md

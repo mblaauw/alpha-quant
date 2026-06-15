@@ -57,5 +57,5 @@ Rationale:
 
 - DESIGN.md §3.2 (Connectors — EODHD), §3.8 (Library decisions)
 - RAD §4 (System Context — EODHD)
-- C4 System Context diagram: `docs/architecture/views/system-context.png`
+- C4 System Context diagram: `docs/architecture/views/systemContext.png`
 - EODHD API documentation: https://eodhd.com/api

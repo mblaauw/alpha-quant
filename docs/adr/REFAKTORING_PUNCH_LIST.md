@@ -3,10 +3,7 @@
 ## P0 — Must Fix Before Production
 
 ### P0.1: Fix `except ValueError, TypeError:` syntax bug (3 locations)
-- **Files:** `alpha_quant/domain/_normalize_helpers.py:15,40,68`
-- **Change:** `except ValueError, TypeError:` → `except (ValueError, TypeError):`
-- **Effort:** 5 min, 1 file, 3 lines
-- **Rationale:** Python 2 comma-separated syntax catches `ValueError` only; `TypeError` is bound to the variable name and **not caught**. Python 3.14 targets make this a real bug. (Note: original locations in `base_connector.py` and `store/state.py` were already fixed; these three remain.)
+- **Status:** ✅ Already fixed — code uses `except (ValueError, TypeError):  # fmt: skip`
 
 ## P1 — High Priority
 
@@ -25,10 +22,7 @@
 - **Rationale:** Only hard hexagonal architecture violation (runtime import). 5 other adapters have type-checking-only soft violations.
 
 ### P1.2: Remove unused `hypothesis` dev dependency
-- **Files:** `pyproject.toml`
-- **Change:** Remove `hypothesis` from dev dependencies
-- **Effort:** 1 min
-- **Rationale:** Zero imports in any source or test file. Dead weight in lockfile.
+- **Status:** ✅ Already done — `hypothesis` removed (see ADR-0027)
 
 ### P1.3: Pipeline — call `write_halt()` when validation HALT occurs
 - **Status:** ✅ Already implemented (pipeline.py:202, scheduler.py:59)

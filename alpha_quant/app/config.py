@@ -148,7 +148,7 @@ class AlpacaConfig(BaseModel):
 
 
 class ConnectorConfig(BaseModel):
-    user_agent: str = "AlphaQuant/0.1.0 (research project; contact m@mblaauw.dev)"
+    user_agent: str = "AlphaQuant/0.2.0 (research project; contact m@mblaauw.dev)"
     tokens_per_second: float = 10.0
     max_burst: float = 20.0
     default_timeout_s: float = 30.0

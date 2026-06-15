@@ -16,7 +16,7 @@ Specific candidates for removal:
 
 1. **Polars** — Added in P1.8 as a potential faster alternative to DuckDB for analytical queries. All analytical reads go through DuckDB's `read_parquet`; Polars is never imported in any source file (`git grep polars` returns zero results outside `pyproject.toml`).
 2. **SQLAlchemy** — Originally used for SQLite transactional state (ADR-0007). Superseded by DuckDB for transactional state (ADR-0021) and removed from imports but lingered in `pyproject.toml`.
-3. **APScheduler CLI** — The `schedule` subcommand was originally designed to run as a daemon. In practice, system cron (via `CRON_FALLBACK.md`) is more reliable and simpler to monitor. The APScheduler library remains as a dependency for the scheduler module, but the CLI entry point is pruned.
+3. **APScheduler CLI** — The `schedule` subcommand was originally designed to run as a daemon. The CLI entry point was retained as a core ops command; the APScheduler library remains the primary scheduler.
 4. **50-day tail prune** — The `CanonicalStore` had a 50-day tail prune that automatically deleted old partitions. The P2.RO spike found this was never triggered (fixtures never exceed 50 days; live runs keep data for backtesting). Removed entirely.
 
 ## Decision Drivers

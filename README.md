@@ -3,6 +3,7 @@
 <div align="center">
   <img src="docs/assets/logo.png" alt="Alpha-Quant Logo" width="200">
 </div>
+
 # Alpha-Quant
 
 Deterministic, daily-cadence, long-only equity paper-trading engine
@@ -68,6 +69,9 @@ Alpha-Quant follows a **ports-and-adapters (hexagonal) architecture** where the 
 <div align="center">
   <img src="docs/assets/architecture-hexagonal.svg" alt="Alpha-Quant hexagonal architecture" width="900">
 </div>
+<div align="center">
+  <img src="docs/assets/architecture-hexagonal-02.png" alt="Alpha-Quant hexagonal architecture" width="900">
+</div>
 
 ### Layer Rules
 
@@ -118,7 +122,7 @@ Alpha-Quant follows a **ports-and-adapters (hexagonal) architecture** where the 
 | [Design Specification](DESIGN.md) | Full system design (v1.2) |
 | [Architecture Diagrams](docs/architecture/README.md) | C4 model (LikeC4 DSL) |
 | [ADR Log](docs/adr/README.md) | 31 Architecture Decision Records |
-| [Concept Cards](alpha_quant/concepts/) | 22 mechanism descriptions (ablation, ATR, crowding, momentum, etc.) |
+| [Concept Cards](alpha_quant/concepts/) | 20 mechanism descriptions (ablation, ATR, crowding, momentum, etc.) |
 | [GitHub Issues](https://github.com/mblaauw/alpha-quant/issues) | Active backlog — prioritised by P0–P3 |
 | [Roadmap](docs/planning/ROADMAP.md) | Beta release status and known limitations |
 

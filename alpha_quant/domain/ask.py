@@ -144,6 +144,7 @@ def ask(
     store: Store,
     concepts_dir: Path | None = None,
     days: int = 30,
+    ref_date: date | None = None,
 ) -> str:
     if is_concept_query(query) and concepts_dir and concepts_dir.exists():
         for word in query.lower().split():
@@ -156,7 +157,7 @@ def ask(
         return "I couldn't identify a symbol or concept in your query."
 
     cutoff_dt = datetime.combine(
-        date.today() - timedelta(days=days),
+        (ref_date or date.today()) - timedelta(days=days),
         datetime.min.time(),
         tzinfo=UTC,
     )

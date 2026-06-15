@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-Alpha-Quant has 9 CLI subcommands: `run`, `replay`, `backtest`, `bootstrap`, `journal`, `ask`, `report`, `status`, `halt`. Each needs argument parsing, help text, and subcommand dispatch. The CLI is the primary interface for users and for cron-based scheduling.
+Alpha-Quant has 12 CLI subcommands: `run`, `replay`, `backtest`, `bootstrap`, `ingest`, `journal`, `ask`, `report`, `status`, `halt`, `schedule`, `backup`. Each needs argument parsing, help text, and subcommand dispatch. The CLI is the primary interface for users and for cron-based scheduling.
 
 ## Decision Drivers
 
@@ -21,7 +21,7 @@ Alpha-Quant has 9 CLI subcommands: `run`, `replay`, `backtest`, `bootstrap`, `jo
 
 ## Considered Options
 
-- **Option A: argparse (stdlib)** — Built into Python, sufficient for 9 subcommands, `add_subparsers()` for hierarchy
+- **Option A: argparse (stdlib)** — Built into Python, sufficient for 12 subcommands, `add_subparsers()` for hierarchy
 - **Option B: Click** — Decorator-based, more ergonomic for complex CLI trees, requires external dependency
 - **Option C: Typer** — Modern, type-hint-driven, generates help from type annotations, requires `click` + `typer` dependencies
 
@@ -30,7 +30,7 @@ Alpha-Quant has 9 CLI subcommands: `run`, `replay`, `backtest`, `bootstrap`, `jo
 Chosen option: **Option A — argparse (stdlib)**.
 
 Rationale:
-1. 9 subcommands with simple arguments (mostly flags and paths) do not justify an additional dependency
+1. 12 subcommands with simple arguments (mostly flags and paths) do not justify an additional dependency
 2. argparse is universally understood by Python developers — zero learning curve
 3. The CLI is thin: each subcommand dispatches to an `app/` module — the complexity is in the modules, not the CLI
 4. No need for Click's plugin system or Typer's auto-conversion features
@@ -44,7 +44,7 @@ Rationale:
 
 ### Negative Consequences
 
-- More boilerplate than Click's decorators (but trivial for 9 subcommands)
+- More boilerplate than Click's decorators (but trivial for 12 subcommands)
 - Help text formatting is less polished than Click/Typer
 - No auto-completion (can be added separately with `argcomplete` if needed)
 

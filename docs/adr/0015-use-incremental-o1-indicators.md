@@ -55,5 +55,5 @@ Rationale:
 
 - DESIGN.md §3.5 (Derived state / incremental engine), §3.7 (Bootstrap)
 - RAD §6.1 (Data Layer Components — Derive Engine)
-- C4 Component diagram (Data Layer): `docs/architecture/views/data-layer-components.png`
+- C4 Component diagram (Data Layer): `docs/architecture/views/dataLayerComponents.png`
 - ADR-0008 (Custom numpy indicators)
