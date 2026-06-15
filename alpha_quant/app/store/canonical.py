@@ -5,6 +5,7 @@ Split from app/store.py — no behavior change.
 
 import shutil
 import uuid
+from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -118,6 +119,30 @@ def write_dataset(
     )
 
 
+def _read_dataset(
+    analytical: duckdb.DuckDBPyConnection,
+    base: Path,
+    dataset: str,
+    symbol: str,
+    select_cols: str,
+    model_factory: Callable[..., Any],
+    order: str = "DESC",
+) -> list[Any]:
+    data_path = str(base / "canonical" / dataset / "**" / "*.parquet")
+    pcol = partition_col(dataset)
+    hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
+    select = select_cols.replace("{pcol}", pcol)
+    try:
+        result = analytical.execute(
+            f"SELECT {select} FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})"
+            f' WHERE symbol = ? ORDER BY "{pcol}" {order}',
+            [symbol],
+        ).fetchall()
+    except (duckdb.CatalogException, duckdb.IOException):  # fmt: skip
+        return []
+    return [model_factory(*r) for r in result]
+
+
 def read_bars(
     analytical: duckdb.DuckDBPyConnection, base: Path, symbol: str, start: date, end: date
 ) -> list[Bar]:
@@ -154,88 +179,52 @@ def read_bars(
 def load_corp_actions(
     analytical: duckdb.DuckDBPyConnection, base: Path, symbol: str
 ) -> list[CorporateAction]:
-    data_path = str(base / "canonical" / "corp_actions" / "**" / "*.parquet")
-    pcol = partition_col("corp_actions")
-    hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
-    try:
-        result = analytical.execute(
-            f"""
-            SELECT symbol, "{pcol}" AS effective_date, action_type, ratio, amount
-            FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
-            WHERE symbol = ?
-            ORDER BY "{pcol}"
-            """,
-            [symbol],
-        ).fetchall()
-    except (duckdb.CatalogException, duckdb.IOException):  # fmt: skip
-        return []
-    return [
-        CorporateAction(
-            symbol=r[0],
-            effective_date=r[1],
-            action_type=r[2],
-            ratio=r[3],
-            amount=r[4],
-        )
-        for r in result
-    ]
+    return _read_dataset(
+        analytical,
+        base,
+        "corp_actions",
+        symbol,
+        'symbol, "{pcol}" AS effective_date, action_type, ratio, amount',
+        lambda *r: CorporateAction(
+            symbol=r[0], effective_date=r[1], action_type=r[2], ratio=r[3], amount=r[4]
+        ),
+        order="ASC",
+    )
 
 
 def load_earnings(
     analytical: duckdb.DuckDBPyConnection, base: Path, symbol: str
 ) -> list[EarningsEntry]:
-    data_path = str(base / "canonical" / "earnings" / "**" / "*.parquet")
-    pcol = partition_col("earnings")
-    hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
-    try:
-        result = analytical.execute(
-            f"""
-            SELECT symbol, "{pcol}" AS date, eps_estimate, eps_actual,
-                   revenue_estimate, revenue_actual
-            FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
-            WHERE symbol = ?
-            ORDER BY "{pcol}"
-            """,
-            [symbol],
-        ).fetchall()
-    except (duckdb.CatalogException, duckdb.IOException):  # fmt: skip
-        return []
-    return [
-        EarningsEntry(
+    return _read_dataset(
+        analytical,
+        base,
+        "earnings",
+        symbol,
+        'symbol, "{pcol}" AS date, eps_estimate, eps_actual, revenue_estimate, revenue_actual',
+        lambda *r: EarningsEntry(
             symbol=r[0],
             date=r[1],
             eps_estimate=r[2],
             eps_actual=r[3],
             revenue_estimate=r[4],
             revenue_actual=r[5],
-        )
-        for r in result
-    ]
+        ),
+        order="ASC",
+    )
 
 
 def read_fundamentals(
     analytical: duckdb.DuckDBPyConnection, base: Path, symbol: str
 ) -> list[FundamentalsSnapshot]:
-    data_path = str(base / "canonical" / "fundamentals" / "**" / "*.parquet")
-    pcol = partition_col("fundamentals")
-    hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
-    try:
-        result = analytical.execute(
-            f"""
-            SELECT symbol, "{pcol}" AS as_of_date, market_cap, pe_ratio, eps_ttm,
-                   dividend_yield, sector, industry, operating_cash_flow,
-                   total_liabilities, total_debt, total_equity, revenue,
-                   net_income, accruals
-            FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
-            WHERE symbol = ?
-            ORDER BY "{pcol}" DESC
-            """,
-            [symbol],
-        ).fetchall()
-    except (duckdb.CatalogException, duckdb.IOException):  # fmt: skip
-        return []
-    return [
-        FundamentalsSnapshot(
+    return _read_dataset(
+        analytical,
+        base,
+        "fundamentals",
+        symbol,
+        'symbol, "{pcol}" AS as_of_date, market_cap, pe_ratio, eps_ttm,'
+        " dividend_yield, sector, industry, operating_cash_flow,"
+        " total_liabilities, total_debt, total_equity, revenue, net_income, accruals",
+        lambda *r: FundamentalsSnapshot(
             symbol=r[0],
             as_of_date=r[1],
             market_cap=r[2],
@@ -251,32 +240,21 @@ def read_fundamentals(
             revenue=r[12],
             net_income=r[13],
             accruals=r[14],
-        )
-        for r in result
-    ]
+        ),
+    )
 
 
 def read_insider_transactions(
     analytical: duckdb.DuckDBPyConnection, base: Path, symbol: str
 ) -> list[InsiderTransaction]:
-    data_path = str(base / "canonical" / "insider_transactions" / "**" / "*.parquet")
-    pcol = partition_col("insider_transactions")
-    hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
-    try:
-        result = analytical.execute(
-            f"""
-            SELECT symbol, "{pcol}" AS filing_date, transaction_date, owner, title,
-                   transaction_type, shares_traded, price, shares_held
-            FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
-            WHERE symbol = ?
-            ORDER BY "{pcol}" DESC
-            """,
-            [symbol],
-        ).fetchall()
-    except (duckdb.CatalogException, duckdb.IOException):  # fmt: skip
-        return []
-    return [
-        InsiderTransaction(
+    return _read_dataset(
+        analytical,
+        base,
+        "insider_transactions",
+        symbol,
+        'symbol, "{pcol}" AS filing_date, transaction_date, owner, title,'
+        " transaction_type, shares_traded, price, shares_held",
+        lambda *r: InsiderTransaction(
             symbol=r[0],
             filing_date=r[1],
             transaction_date=r[2],
@@ -286,35 +264,18 @@ def read_insider_transactions(
             shares_traded=r[6],
             price=r[7],
             shares_held=r[8],
-        )
-        for r in result
-    ]
+        ),
+    )
 
 
 def read_mentions(
     analytical: duckdb.DuckDBPyConnection, base: Path, symbol: str
 ) -> list[MentionCount]:
-    data_path = str(base / "canonical" / "mentions" / "**" / "*.parquet")
-    pcol = partition_col("mentions")
-    hive_spec = f"hive_types={{'{pcol}': 'DATE'}}"
-    try:
-        result = analytical.execute(
-            f"""
-            SELECT symbol, "{pcol}" AS mention_date, source, count
-            FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
-            WHERE symbol = ?
-            ORDER BY "{pcol}" DESC
-            """,
-            [symbol],
-        ).fetchall()
-    except (duckdb.CatalogException, duckdb.IOException):  # fmt: skip
-        return []
-    return [
-        MentionCount(
-            symbol=r[0],
-            mention_date=r[1],
-            source=r[2],
-            count=r[3],
-        )
-        for r in result
-    ]
+    return _read_dataset(
+        analytical,
+        base,
+        "mentions",
+        symbol,
+        'symbol, "{pcol}" AS mention_date, source, count',
+        lambda *r: MentionCount(symbol=r[0], mention_date=r[1], source=r[2], count=r[3]),
+    )
