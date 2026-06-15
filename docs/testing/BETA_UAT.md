@@ -3,7 +3,7 @@
 **Release Tag**: v0.2.0-beta1
 **Test Date**: 2026-06-15
 **Tester(s)**: Automated (opencode)
-**Git Commit**: `548db5c`
+**Git Commit**: `9ebf928`
 **Environment**: macOS 15 (arm64) / Python 3.14 / uv
 
 ## Results
@@ -26,7 +26,7 @@
 $ make check     → All checks passed
 $ make format    → 95 files already formatted
 $ make type      → All checks passed
-$ make test      → 429 passed in 15.47s
+$ make test      → 444 passed in 16.59s
 $ make golden    → sha256=8b85231f5e619754 (deterministic across 3 runs)
 ```
 
