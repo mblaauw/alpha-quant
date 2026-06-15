@@ -19,3 +19,4 @@ fixtures/*/
 !fixtures/golden/
 logs/
 seed-ship-*
+data.bak/
