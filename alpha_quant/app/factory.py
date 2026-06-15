@@ -30,6 +30,7 @@ from alpha_quant.ports.event_sink import EventSink
 from alpha_quant.ports.fundamentals import Fundamentals
 from alpha_quant.ports.insider_feed import InsiderFeed
 from alpha_quant.ports.llm import LLM
+from alpha_quant.ports.llm import LLMConfig as PortLLMConfig
 from alpha_quant.ports.market_data import MarketData
 from alpha_quant.ports.sentiment_feed import SentimentFeed
 from alpha_quant.ports.store import Store
@@ -114,7 +115,16 @@ def create_store(config: AppConfig) -> Store:
 
 def create_llm(config: AppConfig) -> LLM:
     if config.data.mode == "live":
-        return OpenAILikeLLM(config=config.llm)
+        llm_cfg = config.llm
+        return OpenAILikeLLM(
+            config=PortLLMConfig(
+                provider=llm_cfg.provider,
+                model=llm_cfg.model,
+                base_url=llm_cfg.base_url,
+                api_key=llm_cfg.api_key.get_secret_value(),
+                timeout_s=llm_cfg.timeout_s,
+            )
+        )
     return CannedLLM()
 
 

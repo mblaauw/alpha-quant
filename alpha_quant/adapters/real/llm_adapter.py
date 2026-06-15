@@ -6,8 +6,7 @@ from typing import Any, override
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from alpha_quant.app.config import LLMConfig
-from alpha_quant.ports.llm import LLM
+from alpha_quant.ports.llm import LLM, LLMConfig
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +27,7 @@ class OpenAILikeLLM(LLM):
         self._provider = config.provider
         self._model = config.model
         self._base_url = (config.base_url or "https://openrouter.ai/api").rstrip("/")
-        self._api_key = config.api_key.get_secret_value()
+        self._api_key = config.api_key
         self._timeout = config.timeout_s
         self._client = client
 
