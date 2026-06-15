@@ -41,7 +41,7 @@ from alpha_quant.domain.events import (
     StopAdjusted,
     TimeStopTriggered,
 )
-from alpha_quant.domain.fills import FillConfig, fill_stop_loss
+from alpha_quant.domain.fills import FillConfig, fill_entry_order, fill_stop_loss
 from alpha_quant.domain.invariants import InvariantViolation, check_invariants
 from alpha_quant.domain.models import (
     Bar,
@@ -523,7 +523,47 @@ def run(
             if sized is None:
                 continue
             final_shares = sized.shares
-            cost = round(final_shares * bar.close, 2)
+
+            prev_close = bar.open
+            bars_for_symbol = all_bars.get(cand.symbol, [])
+            if bars_for_symbol:
+                bars_to_date = [b for b in bars_for_symbol if b.date < run_date]
+                if bars_to_date:
+                    prev_close = bars_to_date[-1].close
+            order = Order(
+                order_id=f"{cand.symbol}_{uuid.uuid4().hex[:8]}",
+                symbol=cand.symbol,
+                action="buy",
+                quantity=float(final_shares),
+                order_type="MARKET",
+                status="submitted",
+                submitted_at=run_date,
+            )
+            fill = fill_entry_order(order, bar, prev_close, config=fc)
+            if fill is None:
+                events.append(
+                    CandidateBlocked(
+                        run_id=run_id,
+                        source="pipeline",
+                        symbol=cand.symbol,
+                        gate="fill",
+                        reason=(
+                            f"Entry blocked: gap-through or fill failure"
+                            f" (gap > {fc.max_gap_pct:.1%})"
+                        ),
+                    )
+                )
+                events.append(
+                    ErrorOccurred(
+                        run_id=run_id,
+                        source="pipeline",
+                        error=f"fill_entry_order returned None for {cand.symbol}",
+                        context={"symbol": cand.symbol, "operation": "fill_entry_order"},
+                    )
+                )
+                continue
+
+            cost = round(fill.quantity * fill.price, 2)
             entry_cost += cost
 
             decision_id = uuid.uuid4().hex[:16]
@@ -531,10 +571,10 @@ def run(
 
             pos = Position(
                 symbol=cand.symbol,
-                quantity=float(final_shares),
-                entry_price=bar.close,
-                avg_cost=bar.close,
-                current_price=bar.close,
+                quantity=float(fill.quantity),
+                entry_price=fill.price,
+                avg_cost=fill.price,
+                current_price=fill.price,
                 stop_price=stop_price,
                 market_value=cost,
                 decision_id=decision_id,

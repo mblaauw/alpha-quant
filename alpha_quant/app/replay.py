@@ -20,7 +20,7 @@ from alpha_quant.app._loop import (
 from alpha_quant.app.catalog import compute_manifest_hash
 from alpha_quant.app.config import AppConfig, redact_config
 from alpha_quant.domain.derive import backfill_indicator_state, update_indicator_state
-from alpha_quant.domain.fills import FillConfig, fill_entry_order, fill_stop_loss
+from alpha_quant.domain.fills import FillConfig, fill_entry_order, fill_partial_take, fill_stop_loss
 from alpha_quant.domain.models import (
     Bar,
     Decision,
@@ -313,14 +313,18 @@ def run_replay(
                 elif action.action_type == "partial_take":
                     if pos.quantity <= 0:
                         continue
-                    sell_qty = min(abs(action.shares), pos.quantity)
-                    proceeds = round(sell_qty * (action.price or bar.close), 2)
+                    oid = _make_id(f"partial_{sym}_{trade_date}")
+                    fill = fill_partial_take(pos, bar, oid, config=fill_config)
+                    if fill is None:
+                        continue
+                    sell_qty = int(abs(fill.quantity))
+                    proceeds = round(sell_qty * fill.price, 2)
                     cash += proceeds
                     remaining = pos.quantity - sell_qty
                     updated = pos.model_copy(
                         update={
                             "quantity": remaining,
-                            "market_value": remaining * (action.price or bar.close),
+                            "market_value": remaining * fill.price,
                             "partial_taken": True,
                         }
                     )

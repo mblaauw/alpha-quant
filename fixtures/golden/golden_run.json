@@ -229,7 +229,7 @@
   ],
   "meta": {
     "command": "replay",
-    "config_hash": "f8e43fbdf811d9fd",
+    "config_hash": "0ba58e0425476076",
     "fixture_hash": "f6913918b7a1e7284ec6a2fa6e533f94a8e5772c7cbf8e9dbbd846696105379f",
     "fixture_path": "fixtures/v1",
     "from_date": "2024-01-01",
