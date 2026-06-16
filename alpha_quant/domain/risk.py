@@ -23,7 +23,7 @@ class RiskConfig(BaseModel):
     trail_after_r: float = 1.0
     partial_take_at_r: float = 2.0
     time_stop_days: int = 30
-    dd_ladder: list[list[float]] = Field(default_factory=lambda: [[0.10, 0.5], [0.15, 0.0]])
+    dd_ladder: list[tuple[float, float]] = Field(default_factory=lambda: [(0.10, 0.5), (0.15, 0.0)])
     dd_window_days: int = 0
     daily_loss_halt_pct: float = 0.03
 
