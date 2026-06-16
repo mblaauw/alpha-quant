@@ -6,6 +6,7 @@
   {"id": "macd", "title": "Understanding MACD", "difficulty": "intermediate"},
   {"id": "drawdown", "title": "What is Drawdown?", "difficulty": "beginner"},
   {"id": "sharpe", "title": "Sharpe Ratio Explained", "difficulty": "intermediate"},
+  {"id": "sortino", "title": "Sortino Ratio Explained", "difficulty": "intermediate"},
   {"id": "moving-averages", "title": "Moving Averages (SMA and EMA)", "difficulty": "beginner"},
   {"id": "position-sizing", "title": "Position Sizing Fundamentals", "difficulty": "intermediate"},
   {"id": "risk-management", "title": "Risk Management in Trading", "difficulty": "intermediate"},
