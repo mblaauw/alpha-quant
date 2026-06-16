@@ -1,4 +1,4 @@
-.PHONY: check format type test test-dashboard test-e2e bootstrap golden bless-golden lint check-docs
+.PHONY: check format type test test-dashboard test-e2e lint bootstrap golden bless-golden clean check-docs
 
 check:
 	uv run ruff check alpha_quant/
@@ -30,6 +30,11 @@ golden:
 		--from-date 2024-01-01 \
 		--to-date 2024-01-31 \
 		--output fixtures/golden/golden_run.json
+
+clean:
+	rm -rf .pytest_cache .ruff_cache .mypy_cache
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name '*.pyc' -delete
 
 check-docs:
 	@echo "Checking for stale documentation patterns..."
