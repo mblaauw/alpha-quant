@@ -17,7 +17,7 @@ from alpha_quant.adapters.real.alpaca_broker import AlpacaBroker
 from alpha_quant.adapters.real.alpaca_connector import AlpacaConnector
 from alpha_quant.adapters.real.clock import SystemClock
 from alpha_quant.adapters.real.eodhd_connector import EODHDConnector
-from alpha_quant.adapters.real.event_sink import SqliteEventSink
+from alpha_quant.adapters.real.event_sink import DuckDBEventSink
 from alpha_quant.adapters.real.llm_adapter import OpenAILikeLLM
 from alpha_quant.adapters.real.openinsider_connector import OpenInsiderConnector
 from alpha_quant.adapters.real.reddit_sentiment_connector import RedditSentimentConnector
@@ -103,7 +103,7 @@ def create_sec_connector(
 
 def create_event_sink(config: AppConfig) -> EventSink:
     if config.data.mode == "live":
-        return SqliteEventSink(db_path=Path("data") / "state.db")
+        return DuckDBEventSink(db_path=Path("data") / "state.db")
     return FakeEventSink()
 
 
