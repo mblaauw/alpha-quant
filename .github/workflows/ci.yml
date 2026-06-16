@@ -80,3 +80,13 @@ jobs:
             echo "$RESULT"
             exit 1
           fi
+
+      - name: Verify no API keys or secrets in source
+        run: |
+          RESULT=$(git grep -nE 'sk-[A-Za-z0-9]{20,}|pk-[A-Za-z0-9]{16,}' \
+            -- '*.py' '*.toml' ':^config.local.toml' ':^*.example' ':^*.md' || true)
+          if [ -n "$RESULT" ]; then
+            echo "::error::API key pattern detected in source files. Never commit secrets."
+            echo "$RESULT"
+            exit 1
+          fi
