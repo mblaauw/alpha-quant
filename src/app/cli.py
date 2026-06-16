@@ -1,4 +1,3 @@
-import contextlib
 import hashlib
 import json
 import os
@@ -568,6 +567,17 @@ def ingest(
         console=console,
     )
 
+    totals = {
+        "bars": 0,
+        "fundamentals": 0,
+        "insider": 0,
+        "mentions": 0,
+        "bars_fail": 0,
+        "fundamentals_fail": 0,
+        "insider_fail": 0,
+        "mentions_fail": 0,
+    }
+
     with progress:
         ingest_task = progress.add_task(
             f"[cyan]Ingesting {len(universe)} symbols...",
@@ -581,58 +591,92 @@ def ingest(
                 bars = market_data.daily_bars(symbol, lookback, today)
                 if bars:
                     store.save_bars(symbol, bars)
+                    totals["bars"] += len(bars)
                     sym_results.append(f"bars={len(bars)}")
-            except Exception as e:
-                sym_results.append(f"bars=[red]FAIL({e})[/red]")
+                else:
+                    totals["bars_fail"] += 1
+                    sym_results.append("bars=[red]0[/red]")
+            except Exception:
+                totals["bars_fail"] += 1
+                sym_results.append("bars=[red]FAIL[/red]")
 
             try:
                 snap = fundamentals.snapshot(symbol)
                 if snap is not None:
                     store.save_fundamentals(symbol, [snap])
+                    totals["fundamentals"] += 1
                     sym_results.append("fundamentals=[green]OK[/green]")
-            except Exception as e:
-                sym_results.append(f"fundamentals=[red]FAIL({e})[/red]")
+                else:
+                    totals["fundamentals_fail"] += 1
+                    sym_results.append("fundamentals=[yellow]-[/yellow]")
+            except Exception:
+                totals["fundamentals_fail"] += 1
+                sym_results.append("fundamentals=[red]FAIL[/red]")
 
             try:
                 txns = insider.cluster_transactions(symbol)
                 if txns:
                     store.save_insider_transactions(symbol, txns)
+                    totals["insider"] += len(txns)
                     sym_results.append(f"insider={len(txns)}")
-            except Exception as e:
-                sym_results.append(f"insider=[red]FAIL({e})[/red]")
+                else:
+                    totals["insider_fail"] += 1
+                    sym_results.append("insider=[yellow]0[/yellow]")
+            except Exception:
+                totals["insider_fail"] += 1
+                sym_results.append("insider=[red]FAIL[/red]")
 
             try:
                 mentions = sentiment.mention_counts(symbol)
                 if mentions:
                     store.save_mentions(symbol, mentions)
+                    totals["mentions"] += len(mentions)
                     sym_results.append(f"mentions={len(mentions)}")
-            except Exception as e:
-                sym_results.append(f"mentions=[red]FAIL({e})[/red]")
+                else:
+                    totals["mentions_fail"] += 1
+                    sym_results.append("mentions=[yellow]0[/yellow]")
+            except Exception:
+                totals["mentions_fail"] += 1
+                sym_results.append("mentions=[red]FAIL[/red]")
 
             results[symbol] = sym_results
+            progress.console.print(f"  [cyan]{symbol}[/cyan]  {'  '.join(sym_results)}")
             progress.advance(ingest_task)
 
-    total_bars = 0
-    for rr in results.values():
-        for r in rr:
-            if r.startswith("bars="):
-                value = r.split("=", 1)[1]
-                with contextlib.suppress(ValueError):
-                    total_bars += int(value)
-    ok = sum(1 for rr in results.values() for r in rr if "FAIL" not in r)
-    fail = sum(1 for rr in results.values() for r in rr if "FAIL" in r)
+    source_table = Table(title="Ingest Summary", border_style="cyan")
+    source_table.add_column("Source", style="bold")
+    source_table.add_column("OK", style="green")
+    source_table.add_column("Failed")
+    source_table.add_column("Records")
 
-    border = "green" if fail == 0 else "yellow"
-    _print_panel(
-        "Ingest Complete",
-        [
-            ("Symbols", str(len(universe))),
-            ("Bars", f"{total_bars:,}"),
-            ("OK", f"[green]{ok}[/green]"),
-            ("Failed", f"[red]{fail}[/red]" if fail else "[green]0[/green]"),
-        ],
-        border_style=border,
+    def fmt(n: int) -> str:
+        return f"[red]{n}[/red]" if n > 0 else f"[green]{n}[/green]"
+
+    source_table.add_row(
+        "Bars",
+        fmt(len(universe) - totals["bars_fail"]),
+        fmt(totals["bars_fail"]),
+        str(totals["bars"]),
     )
+    source_table.add_row(
+        "Fundamentals",
+        fmt(len(universe) - totals["fundamentals_fail"]),
+        fmt(totals["fundamentals_fail"]),
+        str(totals["fundamentals"]),
+    )
+    source_table.add_row(
+        "Insider",
+        fmt(len(universe) - totals["insider_fail"]),
+        fmt(totals["insider_fail"]),
+        str(totals["insider"]),
+    )
+    source_table.add_row(
+        "Sentiment",
+        fmt(len(universe) - totals["mentions_fail"]),
+        fmt(totals["mentions_fail"]),
+        str(totals["mentions"]),
+    )
+    console.print(source_table)
 
 
 # ── Journal ─────────────────────────────────────────────────────────────────────────────
