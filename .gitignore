@@ -22,3 +22,4 @@ fixtures/*/
 logs/
 seed-ship-*
 data.bak/
+:memory:
