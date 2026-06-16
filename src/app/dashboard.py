@@ -759,7 +759,7 @@ def reports_tab(state: duckdb.DuckDBPyConnection) -> None:
 def concepts_tab() -> None:
     _section_header("Concept Cards", "Educational content on trading mechanisms")
 
-    concepts_dir = Path(__file__).resolve().parent.parent / "concepts"
+    concepts_dir = Path(__file__).resolve().parent / "concepts"
     cards = _build_concepts_manifest(concepts_dir)
     if not cards:
         _empty_state("No concept cards found", ":books:")

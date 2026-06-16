@@ -92,4 +92,4 @@ make bless-golden  # re-bless golden replay hash
 
 ## Concept Cards
 
-Reference the concept cards in `src/concepts/` for detailed explanations of each mechanism, indicator, and risk model. Use these to answer questions about the trading logic.
+Reference the concept cards in `src/app/concepts/` for detailed explanations of each mechanism, indicator, and risk model. Use these to answer questions about the trading logic.

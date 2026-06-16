@@ -371,7 +371,7 @@ def cmd_ask(args: argparse.Namespace) -> None:
 
     concept_card: str | None = None
     if is_concept_query(query):
-        concepts_dir = Path(__file__).resolve().parent.parent.parent / "concepts"
+        concepts_dir = Path(__file__).resolve().parent / "concepts"
         concept_card = _load_concept_card(query, concepts_dir)
 
     result = ask(query, store, concept_card=concept_card, ref_date=date.today())

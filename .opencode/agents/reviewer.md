@@ -34,7 +34,7 @@ You are a strict code reviewer for Alpha-Quant. You enforce the conventions in `
 - `try: ... except (A, B):` must have `# fmt: skip` (ruff format bug)
 
 ### Trading Logic
-- Verify formulas against domain concepts (`src/concepts/`)
+- Verify formulas against domain concepts (`src/app/concepts/`)
 - Check edge cases: gaps, partial fills, negative equity, zero ATR
 - Verify unit consistency (shares, prices, percentages)
 
