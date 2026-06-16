@@ -72,8 +72,6 @@ from alpha_quant.ports.store import Store
 
 logger = structlog.get_logger()
 
-_LOOKBACK_DAYS = 400
-
 
 @dataclass
 class PipelineConfig:

@@ -18,6 +18,7 @@ from alpha_quant.app._loop import (
     size_entry,
 )
 from alpha_quant.domain.ablation import AblationConfig, compute_spy_buy_and_hold
+from alpha_quant.domain.constants import LOOKBACK_DAYS
 from alpha_quant.domain.derive import backfill_indicator_state, update_indicator_state
 from alpha_quant.domain.fills import FillConfig, fill_entry_order, fill_stop_loss
 from alpha_quant.domain.models import (
@@ -35,8 +36,6 @@ from alpha_quant.domain.risk import (
 )
 from alpha_quant.domain.sizing import SizingConfig
 from alpha_quant.ports.store import Store
-
-_LOOKBACK_DAYS = 400
 
 
 @dataclass
@@ -176,7 +175,7 @@ def run_backtest(
     rc = risk_config or RiskConfig()
     sc = sizing_config or SizingConfig()
 
-    lookback_start = date.fromordinal(config.start_date.toordinal() - _LOOKBACK_DAYS)
+    lookback_start = date.fromordinal(config.start_date.toordinal() - LOOKBACK_DAYS)
     symbols = ensure_spy(config.symbols)
     all_bars = load_all_bars(store, symbols, lookback_start, config.end_date)
 
