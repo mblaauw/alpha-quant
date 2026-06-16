@@ -96,7 +96,7 @@ Alpha-Quant follows a **ports-and-adapters (hexagonal) architecture** where the 
 | **M7** | Blackout | ✅ Implemented | ✅ Wired | 3-day pre-earnings entry block |
 | **M8** | Composite | ✅ Implemented | ✅ Wired | 0.6·technical + 0.25·momentum + 0.15·insider; equal-weight sector cap (25% of slots) |
 
-> Each mechanism's runtime path is verified by pipeline behavioral tests (467 tests). See [BETA-DA-8](https://github.com/mblaauw/alpha-quant/issues/334).
+> Each mechanism's runtime path is verified by pipeline behavioral tests (519 tests). See [BETA-DA-8](https://github.com/mblaauw/alpha-quant/issues/334).
 
 ## CLI Commands
 
@@ -131,9 +131,9 @@ Alpha-Quant follows a **ports-and-adapters (hexagonal) architecture** where the 
 ```bash
 make check          # Ruff lint
 make format         # Ruff format
-make type           # Type check (ty)
+make type           # Type check alpha_quant/ (CI-equivalent)
 make bootstrap      # Generate fixtures
-uv run pytest       # Run tests (467 passing)
+uv run pytest       # Run tests (519 passing)
 make bless-golden   # Update golden replay fixture hash
 ```
 
