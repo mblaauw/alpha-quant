@@ -122,7 +122,7 @@ Alpha-Quant follows a **ports-and-adapters (hexagonal) architecture** where the 
 | [Design Specification](DESIGN.md) | Full system design (v1.2) |
 | [Architecture Diagrams](docs/architecture/README.md) | C4 model (LikeC4 DSL) |
 | [ADR Log](docs/adr/README.md) | 31 Architecture Decision Records |
-| [Concept Cards](alpha_quant/concepts/) | 21 mechanism descriptions (ablation, ATR, crowding, momentum, etc.) |
+| [Concept Cards](src/concepts/) | 21 mechanism descriptions (ablation, ATR, crowding, momentum, etc.) |
 | [GitHub Issues](https://github.com/mblaauw/alpha-quant/issues) | Active backlog — prioritised by P0–P3 |
 | [Roadmap](docs/planning/ROADMAP.md) | Beta release status and known limitations |
 
@@ -131,7 +131,7 @@ Alpha-Quant follows a **ports-and-adapters (hexagonal) architecture** where the 
 ```bash
 make check          # Ruff lint
 make format         # Ruff format
-make type           # Type check alpha_quant/ (CI-equivalent)
+make type           # Type check src/ (CI-equivalent)
 make bootstrap      # Generate fixtures
 uv run pytest       # Run tests (519 passing)
 make bless-golden   # Update golden replay fixture hash

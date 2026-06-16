@@ -38,7 +38,7 @@ Chosen option: **Option A — Mixin classes**.
 Rationale:
 1. Each mixin is a focused 20-60 line file with a single concern
 2. Mixins share the database connections from `CanonicalStore.__init__()` — no connection overhead
-3. External import paths are clean: `from alpha_quant.app.store import CanonicalStore`
+3. External import paths are clean: `from app.store import CanonicalStore`
 4. Composition (Option C) would require each sub-store to manage its own connection or accept one — extra wiring
 5. Module-level functions (Option D) would lose the natural grouping of state mutations under a single lifecycle
 
@@ -57,6 +57,6 @@ Rationale:
 
 ## References
 
-- `alpha_quant/app/store/__init__.py` — re-exports `CanonicalStore`
-- `alpha_quant/app/store/state.py` — schema initialization
-- `alpha_quant/app/store/position_store.py`, `event_store.py`, `decision_store.py`, `order_store.py`, `bar_store.py`, `admin_store.py`, `journal_store.py`, `indicator_store.py`, `canonical.py`
+- `src/app/store/__init__.py` — re-exports `CanonicalStore`
+- `src/app/store/state.py` — schema initialization
+- `src/app/store/position_store.py`, `event_store.py`, `decision_store.py`, `order_store.py`, `bar_store.py`, `admin_store.py`, `journal_store.py`, `indicator_store.py`, `canonical.py`

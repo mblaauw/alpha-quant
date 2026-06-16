@@ -55,5 +55,5 @@ Rationale:
 ## References
 
 - ADR-0006: DuckDB + Parquet for the Analytical Store
-- vault.py: `alpha_quant/app/vault.py`
+- vault.py: `src/app/vault.py`
 - P1.7: Raw vault implementation

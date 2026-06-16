@@ -8,7 +8,7 @@
 ## P1 — High Priority
 
 ### P0.2: Composite score formula inconsistency — 3 different weighting formulas
-- **Files:** `alpha_quant/domain/ranking.py:63-73`, `alpha_quant/domain/loop_helpers.py:131`, `alpha_quant/domain/technical.py:39-46`
+- **Files:** `src/domain/ranking.py:63-73`, `src/domain/loop_helpers.py:131`, `src/domain/technical.py:39-46`
 - **Change:** Consolidate to a single `compute_composite(scores, components)` in `domain/scoring.py`. `ranking.py:_compute_composite` uses `0.60/0.25/0.15`, `loop_helpers.py:score_candidate` uses `0.70/0.30`, `technical.py:score` uses `0.3125/0.25/0.1875/0.125/0.125`. `rank()` recomputes composite overwriting the value set during scoring — final score depends on ordering of function calls.
 - **Effort:** Medium (2 files, ~30 lines)
 - **Rationale:** Bug — can produce different final rankings depending on which pipeline path is taken
@@ -16,8 +16,8 @@
 ## P1 — High Priority
 
 ### P1.1: Fix adapter → app import violation in llm_adapter.py
-- **Files:** `alpha_quant/adapters/real/llm_adapter.py:9`
-- **Change:** Move `LLMConfig` to a shared domain/ports types module, or create a port-level config Protocol to avoid runtime import from `alpha_quant.app.config`
+- **Files:** `src/adapters/real/llm_adapter.py:9`
+- **Change:** Move `LLMConfig` to a shared domain/ports types module, or create a port-level config Protocol to avoid runtime import from \`app.config\`
 - **Effort:** Small (2 files, ~10 lines)
 - **Rationale:** Only hard hexagonal architecture violation (runtime import). 5 other adapters have type-checking-only soft violations.
 
@@ -58,8 +58,8 @@
 - **Status:** ✅ Done — 5 backtest integration tests added (PR #406)
 
 ### P1.19: Hardcoded event-type strings in dashboard (22 occurrences)
-- **Files:** `alpha_quant/app/dashboard.py` (lines 174, 256-259, 352, 396-399, 706-708)
-- **Change:** Import event classes from `alpha_quant.domain.events` and use their `event_type` defaults instead of hardcoded strings. Extract repeated event strings to module-level constants.
+- **Files:** `src/app/dashboard.py` (lines 174, 256-259, 352, 396-399, 706-708)
+- **Change:** Import event classes from \`domain.events\` and use their `event_type` defaults instead of hardcoded strings. Extract repeated event strings to module-level constants.
 - **Effort:** Small (1 file, ~15 lines)
 - **Rationale:** Silent breakage if event types change in `events.py`. 8 unique strings duplicated 22 times.
 
@@ -92,7 +92,7 @@
 - **Status:** ✅ Already implemented (state.py:157-158)
 
 ### P2.4: Implement atomic Parquet partition swap
-- **Files:** `alpha_quant/app/store/canonical.py`
+- **Files:** `src/app/store/canonical.py`
 - **Change:** Currently uses tempdir → rename pattern. Atomicity is adequate for single-machine. Acceptable.
 - **Status:** ✅ Already implemented (temp directory + atomic rename)
 
@@ -117,7 +117,7 @@
 ### P2.13: Make drawdown ladder rolling window instead of all-time peak
 
 ### P2.14: Duplicated column-name lists across all store mixins
-- **Files:** All files in `alpha_quant/app/store/` (position_store, order_store, decision_store, admin_store, journal_store)
+- **Files:** All files in `src/app/store/` (position_store, order_store, decision_store, admin_store, journal_store)
 - **Change:** Extract shared column-name constants per table. Each column name appears 2-3 times (INSERT, SELECT, model constructor).
 - **Effort:** Small (5 files, ~30 lines)
 - **Rationale:** Reduces drift risk between read and write column lists.

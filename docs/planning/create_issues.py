@@ -12,7 +12,7 @@ ISSUES = [
         "title": "P0.1: Project scaffold + CLI entrypoint",
         "body": """## Description
 
-Create the `alpha_quant` Python package with full directory structure, `pyproject.toml` with all dependencies, and a `cli.py` entrypoint with 9 subcommand stubs: `run`, `replay`, `backtest`, `bootstrap`, `journal`, `ask`, `report`, `status`, `halt`.
+Create the `src/` layout with hexagon packages (`domain/`, `app/`, `adapters/`, `ports/`), `pyproject.toml` with all dependencies, and a `cli.py` entrypoint with 9 subcommand stubs: `run`, `replay`, `backtest`, `bootstrap`, `journal`, `ask`, `report`, `status`, `halt`.
 
 ## Acceptance Criteria
 
@@ -20,12 +20,12 @@ Create the `alpha_quant` Python package with full directory structure, `pyprojec
 - [ ] `alpha-quant --help` shows all 9 subcommands
 - [ ] Each subcommand prints a stub message and exits 0
 - [ ] `ruff check .` passes with zero warnings
-- [ ] `mypy --strict alpha_quant` passes
-- [ ] Directory structure matches DESIGN §1 exactly: `alpha_quant/domain/`, `ports/`, `data/connectors/`, `adapters/real/`, `adapters/fake/`, `app/`, `fixtures/`
+- [ ] `ty check src/` passes
+- [ ] Directory structure matches DESIGN §1 exactly: `src/domain/`, `src/ports/`, `data/connectors/`, `src/adapters/real/`, `src/adapters/fake/`, `src/app/`, `fixtures/`
 
 ## Technical Details
 
-- Use `pyproject.toml` with `[project.scripts]` entry point: `alpha-quant = "alpha_quant.cli:main"`
+- Use `pyproject.toml` with `[project.scripts]` entry point: `alpha-quant = "app.cli:main"`
 - CLI: `argparse` (stdlib) — no Click/Typer for v1
 - Dependencies: httpx, pydantic, pydantic-settings, structlog, sqlalchemy, duckdb, pyarrow, polars, numpy, tenacity, apscheduler, zstandard, selectolax
 - Dev deps: pytest, pytest-cov, hypothesis, mypy, ruff""",
@@ -35,7 +35,7 @@ Create the `alpha_quant` Python package with full directory structure, `pyprojec
         "title": "P0.2: Port interfaces — Clock, Store, EventSink, LLM, MarketData, Fundamentals, InsiderFeed, SentimentFeed, Broker",
         "body": """## Description
 
-Define all port interfaces (abstract base classes) in `alpha_quant/ports/`. These are the contracts that adapters implement and domain code depends on. The Broker port is defined but raises `NotImplementedError`.
+Define all port interfaces (abstract base classes) in `src/ports/`. These are the contracts that adapters implement and domain code depends on. The Broker port is defined but raises `NotImplementedError`.
 
 ## Acceptance Criteria
 
@@ -250,7 +250,7 @@ Implement Alpaca connector using `alpaca-py` data module only. Provides latest q
 
 - Import: `from alpaca.data.historical import StockHistoricalDataClient`
 - Spread estimate: `(ask - bid) / mid` or default 0.001
-- Lint rule: CI grep `! grep -r "alpaca\\.trading" alpha_quant/`""",
+- Lint rule: CI grep `! grep -r "alpaca\\.trading" src/`""",
         "labels": ["story", "priority/p0", "size/s:2", "domain/backend", "P1"],
     },
     {
@@ -902,7 +902,7 @@ Write 20 hand-crafted concept cards (Markdown): ATR, stop-loss, regime, RSI, MAC
 
 ## Acceptance Criteria
 
-- [ ] 20 concept cards in `alpha_quant/concepts/` as `.md` files
+- [ ] 20 concept cards in `concepts/` as `.md` files
 - [ ] Each: title, difficulty, 2-3 paragraph explanation, key takeaway
 - [ ] Registry manifest: `concepts.json` with metadata
 

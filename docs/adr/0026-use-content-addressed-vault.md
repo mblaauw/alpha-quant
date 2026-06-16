@@ -115,5 +115,5 @@ CREATE TABLE manifest (
 - ADR-0006: Use DuckDB + Parquet for Analytical Store
 - ADR-0020: Use DuckDB for Vault Manifest
 - ADR-0021: Use DuckDB for Both Analytical and Transactional State
-- `alpha_quant/app/vault.py`
-- `alpha_quant/app/bootstrap.py`
+- `src/app/vault.py`
+- `src/app/bootstrap.py`

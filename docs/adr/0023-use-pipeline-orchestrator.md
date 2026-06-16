@@ -59,6 +59,6 @@ Rationale:
 
 - DESIGN.md §13: Daily run sequence
 - ADR-0016: Degrade-don't-block failure model
-- `alpha_quant/app/pipeline.py`
-- `alpha_quant/app/backtest.py`
+- `src/app/pipeline.py`
+- `src/app/backtest.py`
 - Refinement backlog P1.5, P1.6, P2.2
