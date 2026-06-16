@@ -23,3 +23,4 @@ logs/
 seed-ship-*
 data.bak/
 :memory:
+**/.coverage
