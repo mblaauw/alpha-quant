@@ -488,25 +488,25 @@ def run(
             if fund:
                 mech_data.fundamentals[symbol] = fund[0]
         except Exception:
-            pass
+            logger.warning("Failed to load fundamentals", symbol=symbol)
         try:
             txns = store.load_insider_transactions(symbol)
             if txns:
                 mech_data.insider_txns[symbol] = txns
         except Exception:
-            pass
+            logger.warning("Failed to load insider_txns", symbol=symbol)
         try:
             earnings = store.load_earnings(symbol)
             if earnings:
                 mech_data.earnings[symbol] = earnings
         except Exception:
-            pass
+            logger.warning("Failed to load earnings", symbol=symbol)
         try:
             mentions = store.load_mentions(symbol)
             if mentions:
                 mech_data.mentions[symbol] = mentions
         except Exception:
-            pass
+            logger.warning("Failed to load mentions", symbol=symbol)
 
     gate_threshold = 0.5 * m3_threshold_multiplier(deg)
 

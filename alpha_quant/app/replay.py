@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pyarrow.parquet as pq
+import structlog
 
 from alpha_quant.adapters.fake.fixture_store import FixtureStore
 from alpha_quant.app._loop import (
@@ -36,6 +37,8 @@ from alpha_quant.domain.models import (
 from alpha_quant.domain.ranking import rank as rank_candidates
 from alpha_quant.domain.risk import RiskConfig
 from alpha_quant.domain.sizing import SizingConfig
+
+logger = structlog.get_logger()
 
 
 def _make_id(seed: str) -> str:
@@ -216,7 +219,7 @@ def run_replay(
             if fund:
                 mech_fundamentals[sym] = fund[0]
         except Exception:
-            pass
+            logger.warning("Failed to load fundamentals", symbol=sym)
 
     mech_insider: dict[str, list[InsiderTransaction]] = {}
     for sym in symbols:
@@ -225,7 +228,7 @@ def run_replay(
             if txns:
                 mech_insider[sym] = list(txns)
         except Exception:
-            pass
+            logger.warning("Failed to load insider_txns", symbol=sym)
 
     mech_mentions: dict[str, list[MentionCount]] = {}
     for sym in symbols:
@@ -234,7 +237,7 @@ def run_replay(
             if mentions:
                 mech_mentions[sym] = list(mentions)
         except Exception:
-            pass
+            logger.warning("Failed to load mentions", symbol=sym)
 
     from alpha_quant.app._loop import MechanismData
 
