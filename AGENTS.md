@@ -95,11 +95,10 @@ Branch naming: `<scope>-<description>` (e.g. `port-interfaces-p0.2`, `fake-adapt
 - Follow existing code conventions (type hints, imports, patterns)
 - Use `typing.Protocol` for ports or `abc.ABC` + `@abstractmethod` as specified
 - All data models use `pydantic.BaseModel` with `frozen=True`
-- Verify the code at every step (or use `make check`, `make format`, `make type`, `make test` as aliases):
+- Verify the code at every step (or use `make check`, `make type`, `make test` as aliases):
 
 ```bash
 make check       # ruff check
-make format      # ruff format
 make format-check # ruff format --check (CI-equivalent)
 make type        # ty check src/ (CI-equivalent)
 make type-all    # ty check src/ tests/ (full)
@@ -433,4 +432,4 @@ except (SomeException, AnotherException):
 except (SomeException, AnotherException):  # fmt: skip
 ```
 
-Check `git diff` after `make format` to ensure no `except` lines were corrupted.
+Check `git diff` after edits to ensure the auto-formatter didn't corrupt `except` lines.
