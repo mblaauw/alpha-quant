@@ -110,6 +110,14 @@ def _jump_to_symbol(symbol: str) -> None:
     _status_badge("success", f"Symbol {symbol} selected — switch to Decision Explorer tab")
 
 
+def _safe_json_loads(payload: str) -> dict | None:
+    """Parse JSON safely, returning None on failure."""
+    try:
+        return json.loads(payload)
+    except json.JSONDecodeError, TypeError, ValueError:
+        return None
+
+
 def _safe_query(
     state: duckdb.DuckDBPyConnection, query: str, params: list | None = None
 ) -> pd.DataFrame:
@@ -527,9 +535,8 @@ def _decision_funnel(state: duckdb.DuckDBPyConnection) -> None:
     if not blocked.empty:
         reasons: dict[str, int] = {}
         for _, row in blocked.iterrows():
-            try:
-                payload = json.loads(row["payload"])
-            except (json.JSONDecodeError, TypeError, ValueError):  # fmt: skip
+            payload = _safe_json_loads(row["payload"])
+            if not payload:
                 continue
             gate = payload.get("gate", "unknown")
             reasons[gate] = reasons.get(gate, 0) + 1
@@ -548,9 +555,8 @@ def _decision_funnel(state: duckdb.DuckDBPyConnection) -> None:
         promo_rows: list[dict] = []
         promo_symbols: list[str] = []
         for _, row in promoted.iterrows():
-            try:
-                payload = json.loads(row["payload"])
-            except (json.JSONDecodeError, TypeError, ValueError):  # fmt: skip
+            payload = _safe_json_loads(row["payload"])
+            if not payload:
                 continue
             promo_rows.append(
                 {
@@ -576,9 +582,8 @@ def _decision_funnel(state: duckdb.DuckDBPyConnection) -> None:
             block_rows: list[dict] = []
             block_symbols: list[str] = []
             for _, row in blocked.iterrows():
-                try:
-                    payload = json.loads(row["payload"])
-                except (json.JSONDecodeError, TypeError, ValueError):  # fmt: skip
+                payload = _safe_json_loads(row["payload"])
+                if not payload:
                     continue
                 block_rows.append(
                     {
@@ -861,10 +866,7 @@ def decision_tab(state: duckdb.DuckDBPyConnection) -> None:
                 }
             )
         for _, r in events.iterrows():
-            try:
-                payload = json.loads(r["payload"])
-            except (json.JSONDecodeError, TypeError, ValueError):  # fmt: skip
-                payload = {}
+            payload = _safe_json_loads(r["payload"]) or {}
             detail = ""
             if r.event_type == _EVT_CANDIDATE_BLOCKED:
                 detail = f"Blocked at gate={payload.get('gate', '?')}: {payload.get('reason', '')}"
@@ -973,7 +975,7 @@ def main() -> None:
     st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-        ["Home", "Portfolio Risk", "Reports", "Concept Cards", "Journal", "Decision Explorer"]
+        ["Home", "Portfolio", "Reports", "Concepts", "Journal", "Explorer"]
     )
 
     with st.spinner("Refreshing..."):

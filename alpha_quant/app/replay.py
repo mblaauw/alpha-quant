@@ -19,6 +19,7 @@ from alpha_quant.app._loop import (
 )
 from alpha_quant.app.catalog import compute_manifest_hash
 from alpha_quant.app.config import AppConfig, redact_config
+from alpha_quant.domain.constants import LOOKBACK_DAYS
 from alpha_quant.domain.derive import backfill_indicator_state, update_indicator_state
 from alpha_quant.domain.fills import FillConfig, fill_entry_order, fill_partial_take, fill_stop_loss
 from alpha_quant.domain.models import (
@@ -35,8 +36,6 @@ from alpha_quant.domain.models import (
 from alpha_quant.domain.ranking import rank as rank_candidates
 from alpha_quant.domain.risk import RiskConfig
 from alpha_quant.domain.sizing import SizingConfig
-
-_LOOKBACK_DAYS = 400
 
 
 def _make_id(seed: str) -> str:
@@ -201,7 +200,7 @@ def run_replay(
     fstore = FixtureStore()
     _populate_store(fstore, fixture_data)
 
-    lookback_start = date.fromordinal(f_start.toordinal() - _LOOKBACK_DAYS)
+    lookback_start = date.fromordinal(f_start.toordinal() - LOOKBACK_DAYS)
     fb_keys = list(fixture_data["bars"].keys())
     all_bars = load_all_bars(fstore, ensure_spy(fb_keys), lookback_start, f_end)
 
