@@ -203,6 +203,6 @@ def setup_scheduler(
         mode=mode,
         config=config_path,
     )
-    print(f"[alpha-quant] scheduler: started (17:30 ET daily, mode={mode})")
+    logger.info("scheduler_started", mode=mode)
 
     return scheduler

@@ -2,6 +2,7 @@
 
 import json
 import time
+from datetime import datetime
 from pathlib import Path
 
 import duckdb
@@ -81,8 +82,12 @@ def _section_header(title: str, description: str = "") -> None:
         st.caption(description)
 
 
-def _empty_state(message: str, icon: str = ":information_source:") -> None:
-    st.info(f"{icon} {message}")
+def _empty_state(message: str, icon: str = ":information_source:", help_text: str = "") -> None:
+    _, col, _ = st.columns([1, 2, 1], gap="medium")
+    with col:
+        st.info(f"{icon} **{message}**")
+        if help_text:
+            st.caption(help_text)
 
 
 def _data_table(df: pd.DataFrame, height: int = 400) -> None:
@@ -114,6 +119,7 @@ def _safe_query(
         return state.execute(query).fetchdf()
     except (duckdb.CatalogException, duckdb.BinderException) as e:
         logger.warning("dashboard_query_failed", query=query[:80], error=str(e))
+        st.warning(f"Query failed: {e}")
         return pd.DataFrame()
 
 
@@ -358,8 +364,8 @@ def _daily_briefing(state: duckdb.DuckDBPyConnection, run_id: str | None) -> Non
     run_type = str(last_run.run_type).capitalize() if last_run.run_type else "—"
     status = str(last_run.status).capitalize() if last_run.status else "—"
     run_date = str(last_run.start_ts)[:10] if last_run.start_ts else "—"
+    col1, col2, col3 = st.columns(3, gap="medium")
 
-    col1, col2, col3 = st.columns(3)
     col1.metric("Last Run Type", run_type, help=_help_text("Last Run Type"))
     col2.metric("Run Status", status, help=_help_text("Run Status"))
     col3.metric("Run Date", run_date, help=_help_text("Run Date"))
@@ -375,7 +381,7 @@ def _daily_briefing(state: duckdb.DuckDBPyConnection, run_id: str | None) -> Non
             _metric_card("Promoted", str(promoted))
 
             with st.expander("Candidate Funnel"):
-                fc1, fc2, fc3, fc4 = st.columns(4)
+                fc1, fc2, fc3, fc4 = st.columns(4, gap="medium")
                 fc1.metric("Scored", scored, help=_help_text("Scored"))
                 fc2.metric("Blocked", blocked, help=_help_text("Blocked"))
                 fc3.metric("Promoted", promoted, help=_help_text("Promoted"))
@@ -512,7 +518,7 @@ def _decision_funnel(state: duckdb.DuckDBPyConnection) -> None:
     promoted = events_df[events_df["event_type"] == _EVT_CANDIDATE_PROMOTED]
     filled = events_df[events_df["event_type"] == _EVT_FILL_BOOKED]
 
-    fc1, fc2, fc3, fc4 = st.columns(4)
+    fc1, fc2, fc3, fc4 = st.columns(4, gap="medium")
     fc1.metric("Scored", len(scored), help=_help_text("Scored"))
     fc2.metric("Blocked", len(blocked), help=_help_text("Blocked"))
     fc3.metric("Promoted", len(promoted), help=_help_text("Promoted"))
@@ -560,7 +566,7 @@ def _decision_funnel(state: duckdb.DuckDBPyConnection) -> None:
             _data_table(pd.DataFrame(promo_rows), height=len(promo_rows) * 35 + 10)
         if promo_symbols:
             st.markdown("**Investigate promoted:**")
-            promo_cols = st.columns(min(len(promo_symbols), 6))
+            promo_cols = st.columns(min(len(promo_symbols), 6), gap="medium")
             for i, sym in enumerate(promo_symbols[:6]):
                 if promo_cols[i].button(f"🔍 {sym}", key=f"inv_promo_{sym}"):
                     _jump_to_symbol(sym)
@@ -588,7 +594,7 @@ def _decision_funnel(state: duckdb.DuckDBPyConnection) -> None:
                 _data_table(pd.DataFrame(block_rows), height=min(len(block_rows) * 35 + 10, 400))
             if block_symbols:
                 st.markdown("**Investigate blocked:**")
-                block_cols = st.columns(min(len(block_symbols), 6))
+                block_cols = st.columns(min(len(block_symbols), 6), gap="medium")
                 for i, sym in enumerate(block_symbols[:6]):
                     if block_cols[i].button(f"🔍 {sym}", key=f"inv_block_{sym}"):
                         _jump_to_symbol(sym)
@@ -650,7 +656,7 @@ def home_tab(state: duckdb.DuckDBPyConnection) -> None:
         latest_equity_val: float = float(equity_df.iloc[-1].equity) if not equity_df.empty else 1.0
         exposure_pct = (total_value / latest_equity_val * 100) if latest_equity_val > 0 else 0.0
 
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4 = st.columns(4, gap="medium")
         col1.metric("Open Positions", len(positions), help=_help_text("Open Positions"))
         col2.metric("Total Exposure", f"${total_value:,.2f}", help=_help_text("Total Exposure"))
         col3.metric("Exposure %", f"{exposure_pct:.1f}%", help=_help_text("Exposure %"))
@@ -673,7 +679,7 @@ def portfolio_tab(state: duckdb.DuckDBPyConnection) -> None:
     total_value = float(positions["market_value"].sum())
     total_pl = float(positions["unrealized_pl"].sum())
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4 = st.columns(4, gap="medium")
     col1.metric("Total Market Value", f"${total_value:,.2f}", help=_help_text("Total Market Value"))
     col2.metric("Unrealized P&L", f"${total_pl:+,.2f}", help=_help_text("Unrealized P&L"))
     col3.metric("Open Positions", len(positions), help=_help_text("Open Positions"))
@@ -714,7 +720,7 @@ def portfolio_tab(state: duckdb.DuckDBPyConnection) -> None:
     st.markdown("**Quick investigate:**")
     sym_list = [str(p.get("symbol", "")) for _, p in positions.iterrows() if p.get("symbol")]
     for row_start in range(0, len(sym_list), 6):
-        cols = st.columns(6)
+        cols = st.columns(6, gap="medium")
         for i, sym in enumerate(sym_list[row_start : row_start + 6]):
             if cols[i].button(f"🔍 {sym}", key=f"inv_pos_{sym}"):
                 _jump_to_symbol(sym)
@@ -954,6 +960,8 @@ def main() -> None:
         return
 
     analytical, state = conn
+
+    st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
         ["Home", "Portfolio Risk", "Reports", "Concept Cards", "Journal", "Decision Explorer"]
