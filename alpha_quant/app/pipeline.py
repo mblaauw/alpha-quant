@@ -545,12 +545,9 @@ def run(
                 continue
             final_shares = sized.shares
 
-            prev_close = bar.open
             bars_for_symbol = all_bars.get(cand.symbol, [])
-            if bars_for_symbol:
-                bars_to_date = [b for b in bars_for_symbol if b.date < run_date]
-                if bars_to_date:
-                    prev_close = bars_to_date[-1].close
+            bars_to_date = [b for b in bars_for_symbol if b.date < run_date]
+            prev_close = bars_to_date[-1].close if bars_to_date else 0.0
             order = Order(
                 order_id=f"{cand.symbol}_{uuid.uuid4().hex[:8]}",
                 symbol=cand.symbol,
@@ -700,7 +697,7 @@ def run(
                     if bar is None or state is None:
                         continue
                     atr_val = compute_atr(state, bar.close)
-                    sized = size_entry(pop_equity, bar.close, atr_val, regime_mult, sc)
+                    sized = size_entry(pop_equity, bar.close, atr_val, effective_mult, sc)
                     if sized is None:
                         continue
                     sh_orders.append(
