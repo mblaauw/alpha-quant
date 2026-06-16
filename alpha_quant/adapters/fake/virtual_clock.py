@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime, timedelta
 from typing import override
 
-from alpha_quant.domain.calendar import is_market_day
+from alpha_quant.domain.calendar import is_market_day, prev_market_day
 from alpha_quant.ports.clock import Clock
 
 
@@ -19,7 +19,7 @@ class VirtualClock(Clock):
 
     @override
     def market_date(self) -> date:
-        return self._current.date()
+        return prev_market_day(self._current.date())
 
     def advance(self) -> None:
         self._current += timedelta(days=1)

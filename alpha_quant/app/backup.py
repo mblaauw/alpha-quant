@@ -78,6 +78,7 @@ def run_backup(config_path: str | None = None) -> Path:
         logger.info("backup_complete", path=str(archive_path), sha=sha[:16])
         return archive_path
     finally:
+        store.close()
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 

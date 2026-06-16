@@ -52,6 +52,7 @@ class SqliteEventSink(EventSink):
                 event.source,
             ),
         )
+        self._conn.commit()
         logger.info("domain_event", event_type=event.event_type, run_id=event.run_id)
 
     def flush(self) -> None:

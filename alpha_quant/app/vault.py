@@ -99,7 +99,7 @@ class Vault:
             self._conn.commit()
 
             tmp_path.rename(path)
-        except BaseException:
+        except Exception:
             tmp_path.unlink(missing_ok=True)
             raise
 
