@@ -24,3 +24,4 @@ seed-ship-*
 data.bak/
 :memory:
 **/.coverage
+htmlcov/
