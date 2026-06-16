@@ -23,6 +23,12 @@ for i in range(60):
     cash = equity * (0.2 + 0.1 * (i % 3))
     store.save_portfolio_snapshot(PortfolioSnapshot(date=d, cash=cash, equity=equity))
 
+store._state_conn.execute(
+    "INSERT OR REPLACE INTO runs (run_id, run_type, config_hash, start_ts, status)"
+    " VALUES (?, ?, ?, ?, ?)",
+    ["demo-run", "fixture", "demo", datetime(2026, 6, 11, 12, 0, 0), "completed"],
+)
+
 positions = [
     Position(
         symbol="AAPL",

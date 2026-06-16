@@ -30,7 +30,6 @@ def _seed_state_db(db_path: Path, with_data: bool = True) -> None:
         "  equity_date DATE NOT NULL,"
         "  equity DOUBLE NOT NULL,"
         "  cash DOUBLE NOT NULL DEFAULT 0,"
-        "  nav DOUBLE NOT NULL DEFAULT 0,"
         "  regime VARCHAR NOT NULL DEFAULT 'CAUTION',"
         "  book VARCHAR NOT NULL DEFAULT 'PAPER',"
         "  PRIMARY KEY (equity_date, book)"
@@ -112,16 +111,18 @@ def _seed_state_db(db_path: Path, with_data: bool = True) -> None:
         "  candidate_json JSON,"
         "  risk_results JSON,"
         "  mechanism_results JSON,"
+        "  position_json JSON,"
+        "  order_json JSON,"
         "  PRIMARY KEY (symbol, decision_date)"
         ")"
     )
 
     if with_data:
         conn.execute(
-            "INSERT INTO equity_curve VALUES"
-            " ('2026-06-10', 100000.0, 80000.0, 100000.0, 'RISK_ON', 'PAPER'),"
-            " ('2026-06-11', 101500.0, 79000.0, 101500.0, 'RISK_ON', 'PAPER'),"
-            " ('2026-06-12', 102000.0, 78500.0, 102000.0, 'RISK_ON', 'PAPER')"
+            "INSERT INTO equity_curve (equity_date, equity, cash, regime, book) VALUES"
+            " ('2026-06-10', 100000.0, 80000.0, 'RISK_ON', 'PAPER'),"
+            " ('2026-06-11', 101500.0, 79000.0, 'RISK_ON', 'PAPER'),"
+            " ('2026-06-12', 102000.0, 78500.0, 'RISK_ON', 'PAPER')"
         )
         conn.execute(
             "INSERT INTO positions (symbol, quantity, entry_price, avg_cost,"
