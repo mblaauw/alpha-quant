@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from alpha_quant.domain.models import Bar
-from alpha_quant.domain.universe import select
+from domain.models import Bar
+from domain.universe import select
 
 
 def _make_bars(

@@ -5,7 +5,7 @@ from datetime import date
 import numpy as np
 import pytest
 
-from alpha_quant.domain.derive import (
+from domain.derive import (
     _empty_state,
     _REF_INPUT,
     _REF_EXPECTED,
@@ -18,7 +18,7 @@ from alpha_quant.domain.derive import (
     verify_indicator_external,
     verify_indicator_integrity,
 )
-from alpha_quant.domain.models import Bar, IndicatorState
+from domain.models import Bar, IndicatorState
 
 
 def _bar(
@@ -301,18 +301,18 @@ class TestVerifyIntegrity:
 
 
 def _build_ema_series(bars: list[Bar]) -> list[float | None]:
-    from alpha_quant.domain.derive import _build_incremental_series
+    from domain.derive import _build_incremental_series
     series = _build_incremental_series(bars)
     return [float(v) if not np.isnan(v) else None for v in series["ema20"]]
 
 
 def _build_rsi_series(bars: list[Bar]) -> list[float | None]:
-    from alpha_quant.domain.derive import _build_incremental_series
+    from domain.derive import _build_incremental_series
     series = _build_incremental_series(bars)
     return [float(v) if not np.isnan(v) else None for v in series["rsi"]]
 
 
 def _build_atr_series(bars: list[Bar]) -> list[float | None]:
-    from alpha_quant.domain.derive import _build_incremental_series
+    from domain.derive import _build_incremental_series
     series = _build_incremental_series(bars)
     return [float(v) if not np.isnan(v) else None for v in series["atr"]]

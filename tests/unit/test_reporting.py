@@ -1,9 +1,9 @@
-"""Unit tests for report generators (alpha_quant.domain.reporting)."""
+"""Unit tests for report generators (domain.reporting)."""
 
 from datetime import date
 
-from alpha_quant.domain.narration import NarrationContext
-from alpha_quant.domain.reporting import ReportEntry, generate_monthly, generate_weekly
+from domain.narration import NarrationContext
+from domain.reporting import ReportEntry, generate_monthly, generate_weekly
 
 
 def _ctx(

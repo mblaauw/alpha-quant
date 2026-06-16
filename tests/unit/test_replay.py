@@ -4,8 +4,8 @@ import hashlib
 import json
 from pathlib import Path
 
-from alpha_quant.app.config import load_config
-from alpha_quant.app.replay import golden_hash, run_replay, write_golden
+from app.config import load_config
+from app.replay import golden_hash, run_replay, write_golden
 
 
 def test_replay_determinism(tmp_path: Path) -> None:

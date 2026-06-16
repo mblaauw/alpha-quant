@@ -1,9 +1,9 @@
-"""Unit tests for M8 composite ranking (alpha_quant.domain.ranking)."""
+"""Unit tests for M8 composite ranking (domain.ranking)."""
 
 from datetime import date
 
-from alpha_quant.domain.models import Candidate
-from alpha_quant.domain.ranking import rank
+from domain.models import Candidate
+from domain.ranking import rank
 
 
 def _candidate(

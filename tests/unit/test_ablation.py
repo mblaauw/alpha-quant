@@ -1,9 +1,9 @@
-"""Unit tests for shadow ablation books (alpha_quant.domain.ablation)."""
+"""Unit tests for shadow ablation books (domain.ablation)."""
 
 import math
 from datetime import date, datetime
 
-from alpha_quant.domain.ablation import (
+from domain.ablation import (
     NO_CROWDING_VETO_CONFIG,
     NO_INSIDER_CONFIG,
     RULES_ONLY_CONFIG,
@@ -13,8 +13,8 @@ from alpha_quant.domain.ablation import (
     compute_ablation_comparison,
     compute_spy_buy_and_hold,
 )
-from alpha_quant.domain.models import Bar, Order, Position, Quote
-from alpha_quant.domain.risk import RiskAction
+from domain.models import Bar, Order, Position, Quote
+from domain.risk import RiskAction
 
 
 def _make_bar(symbol: str, date: date, open: float, high: float, low: float, close: float) -> Bar:
@@ -67,7 +67,7 @@ class TestAblationConfig:
         assert RULES_ONLY_CONFIG.disable_crowding_veto is True
 
     def test_shadow_configs_include_rules_only(self) -> None:
-        from alpha_quant.domain.ablation import SHADOW_CONFIGS
+        from domain.ablation import SHADOW_CONFIGS
 
         assert "RULES_ONLY" in SHADOW_CONFIGS
         assert SHADOW_CONFIGS["RULES_ONLY"].disable_insider is True
@@ -365,13 +365,13 @@ class TestComputeSpyBuyAndHold:
 
 class TestPortfolioSnapshotBook:
     def test_default_book_is_paper(self) -> None:
-        from alpha_quant.domain.models import PortfolioSnapshot
+        from domain.models import PortfolioSnapshot
 
         snap = PortfolioSnapshot(date=date(2025, 1, 2), cash=100_000.0, equity=100_000.0)
         assert snap.book == "PAPER"
 
     def test_shadow_book_name(self) -> None:
-        from alpha_quant.domain.models import PortfolioSnapshot
+        from domain.models import PortfolioSnapshot
 
         snap = PortfolioSnapshot(
             date=date(2025, 1, 2), cash=100_000.0, equity=100_000.0, book="RULES_ONLY"

@@ -2,9 +2,9 @@
 
 from datetime import date
 
-from alpha_quant.app.paper import PaperPortfolio
-from alpha_quant.domain.models import Bar, Position
-from alpha_quant.domain.risk import RiskAction
+from app.paper import PaperPortfolio
+from domain.models import Bar, Position
+from domain.risk import RiskAction
 
 
 class _FakeStore:

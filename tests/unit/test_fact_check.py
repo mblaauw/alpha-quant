@@ -1,9 +1,9 @@
-"""Unit tests for fact-checker (alpha_quant.domain.fact_check)."""
+"""Unit tests for fact-checker (domain.fact_check)."""
 
 from datetime import date
 
-from alpha_quant.domain.fact_check import render_template, verify
-from alpha_quant.domain.narration import NarrationContext
+from domain.fact_check import render_template, verify
+from domain.narration import NarrationContext
 
 
 def _ctx(**overrides: object) -> NarrationContext:
@@ -81,7 +81,7 @@ class TestRenderTemplate:
         assert "No concept selected" in result or "none" in result
 
     def test_position_count(self) -> None:
-        from alpha_quant.domain.narration import PositionNarration
+        from domain.narration import PositionNarration
 
         ctx = _ctx(
             positions=[

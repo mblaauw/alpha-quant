@@ -1,9 +1,9 @@
-"""Unit tests for M3 technical score (alpha_quant.domain.technical)."""
+"""Unit tests for M3 technical score (domain.technical)."""
 
 from datetime import date
 
-from alpha_quant.domain.models import Bar, IndicatorState
-from alpha_quant.domain.technical import TechnicalScore, momentum_score, score
+from domain.models import Bar, IndicatorState
+from domain.technical import TechnicalScore, momentum_score, score
 
 
 def _bar(close: float, volume: float = 1_000_000) -> Bar:

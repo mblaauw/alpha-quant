@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from alpha_quant.app.store import CanonicalStore
-from alpha_quant.domain.journal import JournalEntry
-from alpha_quant.domain.models import (
+from app.store import CanonicalStore
+from domain.journal import JournalEntry
+from domain.models import (
     EarningsEntry,
     FundamentalsSnapshot,
     InsiderTransaction,

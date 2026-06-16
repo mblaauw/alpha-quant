@@ -1,8 +1,8 @@
-"""Unit tests for M7 earnings blackout (alpha_quant.domain.blackout)."""
+"""Unit tests for M7 earnings blackout (domain.blackout)."""
 
 from datetime import date
 
-from alpha_quant.domain.blackout import check
+from domain.blackout import check
 from tests.conftest import make_earnings
 
 

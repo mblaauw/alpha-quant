@@ -1,9 +1,9 @@
-"""Unit tests for ask command (alpha_quant.domain.ask)."""
+"""Unit tests for ask command (domain.ask)."""
 
 from datetime import UTC, datetime
 
-from alpha_quant.domain.ask import extract_symbol, format_blocked_answer, is_concept_query
-from alpha_quant.domain.events import CandidateBlocked
+from domain.ask import extract_symbol, format_blocked_answer, is_concept_query
+from domain.events import CandidateBlocked
 
 
 def _blocked(

@@ -5,15 +5,15 @@ from pathlib import Path
 
 import pytest
 
-from alpha_quant.adapters.fake.fixture_store import FixtureStore
-from alpha_quant.adapters.real.event_sink import SqliteEventSink
-from alpha_quant.adapters.real.token_bucket import TokenBucket
-from alpha_quant.domain.events import (
+from adapters.fake.fixture_store import FixtureStore
+from adapters.real.event_sink import SqliteEventSink
+from adapters.real.token_bucket import TokenBucket
+from domain.events import (
     CandidateBlocked,
     CandidateScored,
     PipelineRunStarted,
 )
-from alpha_quant.domain.models import Bar, Decision
+from domain.models import Bar, Decision
 
 
 class TestTokenBucket:

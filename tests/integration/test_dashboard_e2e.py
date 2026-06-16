@@ -16,7 +16,7 @@ import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 DASHBOARD_PATH = str(
-    Path(__file__).resolve().parent.parent.parent / "alpha_quant" / "app" / "dashboard.py"
+    Path(__file__).resolve().parent.parent.parent / "src" / "app" / "dashboard.py"
 )
 
 

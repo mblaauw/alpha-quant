@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-import alpha_quant.app.halt as halt_mod
-from alpha_quant.app.halt import clear_halt, halt_file_path, is_halted, read_halt, write_halt
+import app.halt as halt_mod
+from app.halt import clear_halt, halt_file_path, is_halted, read_halt, write_halt
 
 
 @pytest.fixture(autouse=True)

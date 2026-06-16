@@ -1,17 +1,17 @@
 import httpx
 
-from alpha_quant.adapters.fake.fixture_fundamentals import FixtureFundamentals
-from alpha_quant.adapters.fake.fixture_insider_feed import FixtureInsiderFeed
-from alpha_quant.adapters.fake.fixture_market_data import FixtureMarketData
-from alpha_quant.adapters.fake.fixture_sentiment_feed import FixtureSentimentFeed
-from alpha_quant.adapters.fake.virtual_clock import VirtualClock
-from alpha_quant.adapters.real.base_connector import BaseConnector
-from alpha_quant.adapters.real.clock import SystemClock
-from alpha_quant.adapters.real.openinsider_connector import OpenInsiderConnector
-from alpha_quant.adapters.real.reddit_sentiment_connector import RedditSentimentConnector
-from alpha_quant.adapters.real.sec_connector import SECConnector
-from alpha_quant.app.config import AppConfig
-from alpha_quant.app.factory import (
+from adapters.fake.fixture_fundamentals import FixtureFundamentals
+from adapters.fake.fixture_insider_feed import FixtureInsiderFeed
+from adapters.fake.fixture_market_data import FixtureMarketData
+from adapters.fake.fixture_sentiment_feed import FixtureSentimentFeed
+from adapters.fake.virtual_clock import VirtualClock
+from adapters.real.base_connector import BaseConnector
+from adapters.real.clock import SystemClock
+from adapters.real.openinsider_connector import OpenInsiderConnector
+from adapters.real.reddit_sentiment_connector import RedditSentimentConnector
+from adapters.real.sec_connector import SECConnector
+from app.config import AppConfig
+from app.factory import (
     create_clock,
     create_fundamentals,
     create_insider_feed,

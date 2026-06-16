@@ -29,7 +29,7 @@ def _run_and_kill() -> bool:
     env["ALPHA_QUANT_DEV"] = "1"
 
     proc = subprocess.Popen(
-        [sys.executable, "-m", "alpha_quant", "run", "--mode", "fixture"],
+        [sys.executable, "-m", "app.cli", "run", "--mode", "fixture"],
         cwd=str(DATA_DIR),
         env=env,
         stdout=subprocess.DEVNULL,
@@ -51,7 +51,7 @@ def _verify_idempotent() -> bool:
     env["ALPHA_QUANT_DEV"] = "1"
 
     result = subprocess.run(
-        [sys.executable, "-m", "alpha_quant", "run", "--mode", "fixture"],
+        [sys.executable, "-m", "app.cli", "run", "--mode", "fixture"],
         cwd=str(DATA_DIR),
         env=env,
         capture_output=True,

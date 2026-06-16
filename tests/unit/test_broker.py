@@ -1,7 +1,7 @@
 """Unit tests for FakeBroker lifecycle."""
 
-from alpha_quant.adapters.fake.fake_broker import FakeBroker
-from alpha_quant.domain.models import Order
+from adapters.fake.fake_broker import FakeBroker
+from domain.models import Order
 
 
 class TestFakeBroker:

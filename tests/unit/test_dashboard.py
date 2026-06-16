@@ -6,7 +6,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from alpha_quant.app.dashboard import (
+from app.dashboard import (
     _build_concepts_manifest,
     _load_equity_curve,
     _load_journals,

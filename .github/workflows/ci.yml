@@ -27,16 +27,16 @@ jobs:
         run: uv sync --frozen --extra dev
 
       - name: Lint (ruff check)
-        run: uv run ruff check alpha_quant/
+        run: uv run ruff check src/
 
       - name: Format (ruff format)
-        run: uv run ruff format --check alpha_quant/
+        run: uv run ruff format --check src/
 
       - name: Type check (ty)
-        run: uv run ty check alpha_quant/
+        run: uv run ty check src/
 
       - name: Test with coverage
-        run: uv run pytest -q --cov=alpha_quant --cov-report=term --cov-fail-under=70
+        run: uv run pytest -q --cov=src --cov-report=term --cov-fail-under=70
 
       - name: Golden replay (determinism)
         run: |
@@ -53,7 +53,7 @@ jobs:
 
       - name: Verify no alpaca.trading import (I13) — broker adapter is the only exception
         run: |
-          RESULT=$(grep -rn "alpaca\.trading" alpha_quant/ --include="*.py" \
+          RESULT=$(grep -rn "alpaca\.trading" src/ --include="*.py" \
             --exclude="alpaca_broker.py" || true)
           if [ -n "$RESULT" ]; then
             echo "::error::alpaca.trading imported outside broker adapter"
@@ -63,7 +63,7 @@ jobs:
 
       - name: Verify no clock readings in domain core (I9) — events.py default_factory is excluded
         run: |
-          RESULT=$(grep -rnE "(datetime\.now\(|date\.today\(|time\.time\()" alpha_quant/domain/ \
+          RESULT=$(grep -rnE "(datetime\.now\(|date\.today\(|time\.time\()" src/domain/ \
             --include="*.py" --exclude="events.py" || true)
           if [ -n "$RESULT" ]; then
             echo "::error::Clock reading in domain/ violates I9. Route through Clock port."
@@ -73,8 +73,8 @@ jobs:
 
       - name: Verify no bare datetime.now() without UTC
         run: |
-          RESULT=$(grep -rn "datetime\.now(" alpha_quant/ --include="*.py" \
-            --exclude="alpha_quant/adapters/real/clock.py" | grep -v "now(UTC)" || true)
+          RESULT=$(grep -rn "datetime\.now(" src/ --include="*.py" \
+            --exclude="src/adapters/real/clock.py" | grep -v "now(UTC)" || true)
           if [ -n "$RESULT" ]; then
             echo "::error::datetime.now() called without UTC. Use datetime.now(UTC)."
             echo "$RESULT"

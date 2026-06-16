@@ -1,9 +1,9 @@
-"""Unit tests for daily journal generator (alpha_quant.domain.journal)."""
+"""Unit tests for daily journal generator (domain.journal)."""
 
 from datetime import date
 
-from alpha_quant.domain.journal import JournalEntry, generate_journal
-from alpha_quant.domain.narration import NarrationContext, PositionNarration
+from domain.journal import JournalEntry, generate_journal
+from domain.narration import NarrationContext, PositionNarration
 
 
 def _ctx(

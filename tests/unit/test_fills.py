@@ -1,8 +1,8 @@
-"""Unit tests for fill model (alpha_quant.domain.fills)."""
+"""Unit tests for fill model (domain.fills)."""
 
 from datetime import date, datetime
 
-from alpha_quant.domain.fills import (
+from domain.fills import (
     FillConfig,
     apply_corporate_action,
     fill_entry_order,
@@ -10,7 +10,7 @@ from alpha_quant.domain.fills import (
     fill_stop_loss,
     make_fill_id,
 )
-from alpha_quant.domain.models import Bar, CorporateAction, Order, Position, Quote
+from domain.models import Bar, CorporateAction, Order, Position, Quote
 
 
 def _bar(open_v: float = 100.0, low: float = 95.0, high: float | None = None) -> Bar:

@@ -4,9 +4,9 @@ from datetime import date
 
 import httpx
 
-from alpha_quant.adapters.real.base_connector import FetchResult
-from alpha_quant.app.store.schema import model_to_pylist
-from alpha_quant.domain.models import (
+from adapters.real.base_connector import FetchResult
+from app.store.schema import model_to_pylist
+from domain.models import (
     Bar,
     CorporateAction,
     EarningsEntry,
@@ -30,7 +30,7 @@ def test_fetch_result_fetch_id_default_none() -> None:
 
 
 def test_eodhd_parse_bar_with_fetch_id() -> None:
-    from alpha_quant.adapters.real.eodhd_connector import EODHDConnector
+    from adapters.real.eodhd_connector import EODHDConnector
 
     conn = EODHDConnector(api_token="test")
     entry = {

@@ -3,9 +3,9 @@
 from datetime import date
 from pathlib import Path
 
-from alpha_quant.app.paper import PaperPortfolio
-from alpha_quant.app.store import CanonicalStore
-from alpha_quant.domain.models import Bar, Order
+from app.paper import PaperPortfolio
+from app.store import CanonicalStore
+from domain.models import Bar, Order
 
 
 def test_full_entry_fill_mark_cycle(tmp_path: Path) -> None:
@@ -83,7 +83,7 @@ def test_stop_loss_exit(tmp_path: Path) -> None:
     pos = positions[0].model_copy(update={"stop_price": 90.0})
     store.save_position(pos)
 
-    from alpha_quant.domain.risk import RiskAction
+    from domain.risk import RiskAction
 
     risk_result = portfolio.process_risk_actions(
         actions=[RiskAction(action_type="stop", symbol="AAPL", shares=100.0, reason="stop hit")],

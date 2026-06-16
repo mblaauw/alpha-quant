@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import date
 
-from alpha_quant.app.pipeline_steps import derive_step, load_bars_step, validate_step
-from alpha_quant.domain.models import Bar
-from alpha_quant.ports.store import Store
+from app.pipeline_steps import derive_step, load_bars_step, validate_step
+from domain.models import Bar
+from ports.store import Store
 
 
 def _make_bars(count: int = 400, start_price: float = 100.0) -> list[Bar]:
