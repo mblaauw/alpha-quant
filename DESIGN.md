@@ -34,30 +34,66 @@ src/
 ├── domain/                      # pure functions, no I/O (§1 rationale)
 │   ├── __init__.py              # re-exports models + events
 │   ├── models.py                # all pydantic data models (frozen)
-│   ├── events.py                # 20 discriminated domain event types (plus BaseDomainEvent base)
+│   ├── events.py                # 22 discriminated domain event types (plus BaseDomainEvent base)
 │   ├── normalize.py             # boundary parsing: bytes → pydantic models
+│   ├── _normalize_helpers.py    # normalization utility functions
 │   ├── validate.py              # quality gates → QUARANTINE/DATA_HALT
 │   ├── derive.py                # incremental O(1) indicator engine (numpy)
 │   ├── universe.py              # M1 universe selection
+│   ├── regime.py                # M2 regime detection
+│   ├── technical.py             # M3 technical score
+│   ├── fundamental.py           # M4 fundamental quality gate
+│   ├── insider_signal.py        # M5 insider cluster signal
+│   ├── crowding.py              # M6 crowding veto
+│   ├── blackout.py              # M7 earnings blackout
+│   ├── ranking.py               # M8 composite ranking
+│   ├── scoring.py               # composite score computation
+│   ├── ablation.py              # shadow ablation books
+│   ├── fills.py                 # fill model (across backtest/replay/paper)
+│   ├── risk.py                  # risk management (stops, trails, drawdown)
+│   ├── sizing.py                # position sizing
+│   ├── loop_helpers.py          # shared decision-loop helpers
+│   ├── invariants.py            # self-consistency assertions
+│   ├── events.py                # domain event types
+│   ├── narration.py             # narration context builder
+│   ├── journal.py               # daily journal generator
+│   ├── reporting.py             # weekly/monthly report generators
+│   ├── fact_check.py            # LLM fact-checking
+│   ├── ask.py                   # natural-language query
+│   ├── calendar.py              # trading calendar utilities
+│   ├── corp_actions.py          # corporate action adjustment factors
+│   ├── degradation.py           # source degradation fallback
+│   ├── constants.py             # shared constants
 │   └── exceptions.py            # AlphaQuantError, DataNormalizationError
 ├── ports/                       # ABC interfaces for all external dependencies
+│   ├── __init__.py              # re-exports
+│   ├── broker.py                # port interface; FakeBroker and AlpacaBroker adapters exist, live execution out of v1 scope (§9.4)
 │   ├── clock.py                 # injected clock abstraction; most consumers use it, a few direct reads remain (tracked)
-│   ├── market_data.py  fundamentals.py  insider_feed.py  sentiment_feed.py
-│   ├── llm.py  store.py  event_sink.py
-│   └── broker.py                # port interface; FakeBroker and AlpacaBroker adapters exist, live execution out of v1 scope (§9.4)
+│   ├── event_sink.py            # typed event persistence
+│   ├── fundamentals.py          # fundamentals snapshot access
+│   ├── insider_feed.py          # insider transaction access
+│   ├── llm.py                   # LLM interface (explainer only — never in decision path)
+│   ├── market_data.py           # bar/quote data access
+│   ├── sentiment_feed.py        # mention count access
+│   └── store.py                 # DuckDB-backed state store
 ├── adapters/
 │   ├── real/                    # production implementations
+│   │   ├── __init__.py          # re-exports
 │   │   ├── clock.py             # SystemClock — wraps datetime.now(UTC)
 │   │   ├── base_connector.py    # shared HTTP: httpx, tenacity retry, token-bucket, vault
 │   │   ├── token_bucket.py      # thread-safe rate limiter
-│   │   ├── event_sink.py        # SqliteEventSink (secondary; primary event persistence is through CanonicalStore/DuckDB)
+│   │   ├── event_sink.py        # DuckDB + SQLite event sinks
 │   │   ├── eodhd_connector.py   # EODHD: bars, fundamentals, earnings
 │   │   ├── alpaca_connector.py  # Alpaca Data API: quotes, calendar, latest bar
+│   │   ├── alpaca_broker.py     # broker adapter (inactive in v1)
 │   │   ├── sec_connector.py     # SEC EDGAR: ticker → CIK mapping
 │   │   ├── openinsider_connector.py  # OpenInsider HTML scraping
-│   │   └── reddit_sentiment_connector.py  # Reddit public JSON
+│   │   ├── reddit_sentiment_connector.py  # Reddit public JSON
+│   │   └── llm_adapter.py       # OpenAI-compatible LLM client
 │   └── fake/                    # test/fixture implementations
+│       ├── __init__.py          # re-exports
 │       ├── virtual_clock.py     # deterministic clock for replay/backtest
+│       ├── fake_broker.py       # in-memory broker
 │       ├── fake_event_sink.py   # in-memory event store
 │       ├── canned_llm.py        # static template responses
 │       ├── fixture_market_data.py    # bars from fixture parquet
@@ -66,7 +102,8 @@ src/
 │       ├── fixture_sentiment_feed.py # mention counts from fixture
 │       └── fixture_store.py         # in-memory store for test isolation
 ├── app/                         # application wiring + infrastructure
-│   ├── __init__.py              # CLI entry point (argparse)
+│   ├── __init__.py              # empty (re-exports handled at subpackage level)
+│   ├── cli.py                   # CLI entry point (argparse)
 │   ├── _loop.py                 # shared decision-loop helpers
 │   ├── alerts.py                # alert generation
 │   ├── backtest.py              # historical backtest engine
@@ -75,13 +112,16 @@ src/
 │   ├── catalog.py               # fixture integrity verification
 │   ├── config.py                # pydantic-settings + TOML loading
 │   ├── dashboard.py             # Streamlit dashboard
+│   ├── event_log.py             # typed event log
 │   ├── factory.py               # dependency injection factory
 │   ├── fixtures.py              # freeze_bundle: parquet + manifest writer
 │   ├── halt.py                  # halt file management
 │   ├── paper.py                 # paper trading engine
 │   ├── pipeline.py              # main daily pipeline
+│   ├── pipeline_steps.py        # pipeline step models
 │   ├── replay.py                # golden replay harness
 │   ├── scheduler.py             # APScheduler-based daily scheduling
+│   ├── step_models.py           # pipeline step data models
 │   ├── vault.py                 # append-only zstd-compressed raw payload archive
 │   └── store/                   # DuckDB-backed state + analytical store
 │       ├── __init__.py          # re-exports
@@ -96,15 +136,20 @@ src/
 │       ├── position_store.py    # position persistence
 │       ├── schema.py            # SQL schema definitions
 │       └── state.py             # CanonicalStore composite (inherits all mixins)
-├── tests/                       # test suite
+├── tests/                       # test suite (repo root — not under src/)
 │   ├── unit/                    # unit tests (pure domain functions)
-│   └── integration/             # integration tests (adapter contracts)
-├── fixtures/                    # versioned bootstrap dataset (§3.7)
+│   ├── integration/             # integration tests (adapter contracts)
+│   ├── chaos/                   # chaos tests (kill-mid-run, corruption)
+│   └── qa/                      # QA smoke tests (shell scripts)
+├── fixtures/                    # versioned bootstrap dataset (§3.7) — repo root
 │   └── golden/                  # golden replay outputs for CI
-├── docs/
+├── docs/                        # documentation — repo root
 │   ├── adr/                     # architecture decision records
 │   ├── architecture/            # C4 diagrams (LikeC4 DSL)
+│   ├── planning/                # backlog, roadmap, issue creation
 │   └── spike-*.md               # evaluation spike reports
+├── concepts/                    # concept cards (markdown)
+├── scripts/                     # utility scripts
 ├── config.toml                  # config template (secrets in config.local.toml)
 └── config.local.toml.example    # local override template
 ```
