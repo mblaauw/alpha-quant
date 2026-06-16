@@ -731,13 +731,13 @@ def reports_tab(state: duckdb.DuckDBPyConnection) -> None:
 
     reports = _cached_load_reports("state")
     if not reports.empty:
-        selected = st.selectbox(
-            "Select report",
-            [f"{r.report_date} ({r.report_type})" for _, r in reports.iterrows()],
-        )
+        options = {
+            f"{r.report_date} | {r.report_type}": (str(r.report_date), r.report_type)
+            for _, r in reports.iterrows()
+        }
+        selected = st.selectbox("Select report", list(options.keys()))
         if selected:
-            dt_str, rtype = selected.split(" (")
-            rtype = rtype.rstrip(")")
+            dt_str, rtype = options[selected]
             row = _safe_query(
                 state,
                 "SELECT content FROM reports WHERE report_date = ? AND report_type = ?",
@@ -807,7 +807,13 @@ def decision_tab(state: duckdb.DuckDBPyConnection) -> None:
             _empty_state("Select or type a symbol to explore its history", ":mag:")
             return
     else:
-        symbol = st.text_input("Symbol", placeholder="e.g. AAPL").strip().upper()
+        symbol = ""
+        symbol_input = st.text_input("Symbol", placeholder="e.g. AAPL").strip().upper()
+        if symbol_input:
+            if not symbol_input.isalnum() or len(symbol_input) > 5:
+                st.warning("Enter a valid symbol (1-5 alphanumeric characters)")
+            else:
+                symbol = symbol_input
         if not symbol:
             _empty_state("Enter a symbol to explore its decision history", ":mag:")
             return
@@ -929,6 +935,9 @@ def main() -> None:
     )
 
     st.caption(f"Data directory: {DATA_DIR.resolve()}")
+
+    if "active_tab" not in st.session_state:
+        st.session_state.active_tab = 0
 
     try:
         cfg = load_config()
