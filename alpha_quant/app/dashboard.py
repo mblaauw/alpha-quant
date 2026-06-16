@@ -114,7 +114,7 @@ def _safe_json_loads(payload: str) -> dict | None:
     """Parse JSON safely, returning None on failure."""
     try:
         return json.loads(payload)
-    except json.JSONDecodeError, TypeError, ValueError:
+    except (json.JSONDecodeError, TypeError, ValueError):  # fmt: skip
         return None
 
 
