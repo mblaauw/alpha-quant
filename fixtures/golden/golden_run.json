@@ -90,79 +90,79 @@
     },
     {
       "day": 4,
-      "equity": 86774.75
+      "equity": 86869.65
     },
     {
       "day": 5,
-      "equity": 87357.77
+      "equity": 87452.67
     },
     {
       "day": 6,
-      "equity": 87687.83
+      "equity": 87782.73
     },
     {
       "day": 7,
-      "equity": 88209.7
+      "equity": 88304.6
     },
     {
       "day": 8,
-      "equity": 87920.93
+      "equity": 88015.83
     },
     {
       "day": 9,
-      "equity": 88138.52
+      "equity": 88233.42
     },
     {
       "day": 10,
-      "equity": 87168.6
+      "equity": 87263.5
     },
     {
       "day": 11,
-      "equity": 87298.03
+      "equity": 87392.93
     },
     {
       "day": 12,
-      "equity": 86753.64
+      "equity": 86848.54
     },
     {
       "day": 13,
-      "equity": 86535.12
+      "equity": 86630.02
     },
     {
       "day": 14,
-      "equity": 86371.95
+      "equity": 86466.85
     },
     {
       "day": 15,
-      "equity": 86079.94
+      "equity": 86174.84
     },
     {
       "day": 16,
-      "equity": 86226.16
+      "equity": 86321.06
     },
     {
       "day": 17,
-      "equity": 86273.06
+      "equity": 86367.96
     },
     {
       "day": 18,
-      "equity": 86411.34
+      "equity": 86506.24
     },
     {
       "day": 19,
-      "equity": 87019.61
+      "equity": 87114.51
     },
     {
       "day": 20,
-      "equity": 87702.56
+      "equity": 87797.46
     },
     {
       "day": 21,
-      "equity": 86973.13
+      "equity": 87068.03
     },
     {
       "day": 22,
-      "equity": 86480.02
+      "equity": 86574.92
     }
   ],
   "fills": [
@@ -210,7 +210,7 @@
     },
     {
       "fill_id": "0e06c6eda7370e3f77bda6f6619b61d6ea81201fd32be36af5979665427ffc02",
-      "price": 85.0,
+      "price": 85.65,
       "quantity": -146.0,
       "symbol": "^VIX"
     },
@@ -229,18 +229,18 @@
   ],
   "meta": {
     "command": "replay",
-    "config_hash": "0ba58e0425476076",
+    "config_hash": "916e7be5f3f959ec",
     "fixture_hash": "f6913918b7a1e7284ec6a2fa6e533f94a8e5772c7cbf8e9dbbd846696105379f",
     "fixture_path": "fixtures/v1",
     "from_date": "2024-01-01",
     "to_date": "2024-01-31"
   },
   "metrics": {
-    "cagr_pct": -79.64,
-    "max_drawdown_pct": -14.37,
+    "cagr_pct": -79.39,
+    "max_drawdown_pct": -14.28,
     "num_fills": 10,
     "num_trades": 10,
-    "total_return_pct": -13.52
+    "total_return_pct": -13.43
   },
   "symbols": {
     "total": 52
