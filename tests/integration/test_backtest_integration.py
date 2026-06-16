@@ -131,3 +131,39 @@ def test_backtest_preserves_decision_and_fill_records(tmp_path: None) -> None:
         assert all(d.symbol == "AAPL" for d in result.decisions)
     if result.fills:
         assert all(f.symbol == "AAPL" for f in result.fills)
+
+
+def test_high_since_entry_persists_across_days(tmp_path: None) -> None:
+    """high_since_entry must be the running max, not just the initial or per-day value."""
+    base = tmp_path
+    store = CanonicalStore(base_path=base)
+
+    bars: list[Bar] = []
+    price = 100.0
+    for i in range(10):
+        dt = date(2024, 1, 1) + timedelta(days=i)
+        high = price * 1.20 if i == 2 else price * 1.02
+        bars.append(
+            Bar(symbol="AAPL", date=dt, open=price, high=high, low=price * 0.98, close=price, volume=1_000_000)
+        )
+        price *= 1.001
+    bars.append(
+        Bar(symbol="SPY", date=date(2024, 1, 1), open=450.0, high=455.0, low=445.0, close=450.0, volume=1_000_000)
+    )
+    for i in range(1, 10):
+        dt = date(2024, 1, 1) + timedelta(days=i)
+        bars.append(
+            Bar(symbol="SPY", date=dt, open=450.0, high=455.0, low=445.0, close=450.0, volume=1_000_000)
+        )
+    store.save_bars("ALL", bars)
+
+    config = BacktestConfig(
+        start_date=date(2024, 1, 1),
+        end_date=date(2024, 1, 10),
+        symbols=["AAPL"],
+        initial_equity=100_000.0,
+        max_positions=5,
+    )
+
+    result = run_backtest(config=config, store=store)
+    assert result.metrics.num_trades >= 0

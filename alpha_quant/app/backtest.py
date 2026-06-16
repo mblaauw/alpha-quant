@@ -264,6 +264,11 @@ def run_backtest(
                 trade_date,
             )
 
+            new_high = max(pos.high_since_entry or pos.entry_price or 0.0, bar.high)
+            if new_high > (pos.high_since_entry or 0.0):
+                pos = pos.model_copy(update={"high_since_entry": new_high})
+                positions[sym] = pos
+
             if risk_actions:
                 fill = fill_stop_loss(pos, bar, order_id=f"{sym}_stop", config=fill_config)
                 if fill is None:
