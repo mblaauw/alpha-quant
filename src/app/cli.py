@@ -37,7 +37,9 @@ RELATIVE_DATE_RE = re.compile(r"^(\d+)([dmy])\s*$")
 
 
 def _configure_logging() -> None:
-    is_dev = os.environ.get("ALPHA_QUANT_DEV", "").strip() in ("1", "true", "yes")
+    is_dev = (
+        os.environ.get("ALPHA_QUANT_DEV", "").strip() in ("1", "true", "yes") or sys.stderr.isatty()
+    )
 
     shared_processors: list[structlog.typing.Processor] = [
         structlog.processors.TimeStamper(fmt="iso"),
