@@ -104,3 +104,34 @@ class TestCheck:
         sunday_before = date(2025, 12, 21)
         result = check("AAPL", sunday_before, [make_earnings("AAPL", earnings_date)])
         assert result == "PASS"
+
+    def test_ignores_past_earnings_when_future_exists(self) -> None:
+        result = check(
+            "AAPL",
+            date(2026, 6, 16),
+            [
+                make_earnings("AAPL", date(2026, 3, 15)),
+                make_earnings("AAPL", date(2026, 6, 22)),
+            ],
+        )
+        assert result == "BLOCK"
+
+    def test_only_past_earnings_returns_pass(self) -> None:
+        result = check(
+            "AAPL",
+            date(2026, 6, 16),
+            [make_earnings("AAPL", date(2026, 3, 15))],
+        )
+        assert result == "PASS"
+
+    def test_mixed_past_and_future_uses_next_future(self) -> None:
+        result = check(
+            "AAPL",
+            date(2026, 6, 16),
+            [
+                make_earnings("AAPL", date(2026, 3, 15)),
+                make_earnings("AAPL", date(2026, 6, 22)),
+                make_earnings("AAPL", date(2026, 9, 15)),
+            ],
+        )
+        assert result == "BLOCK"
