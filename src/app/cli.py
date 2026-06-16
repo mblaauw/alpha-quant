@@ -1,18 +1,38 @@
-import argparse
 import contextlib
+import hashlib
 import json
 import os
+import re
 import sys
-from datetime import date
+from collections.abc import Sequence
+from datetime import date, timedelta
 from importlib.metadata import version as _version
 from pathlib import Path
 
 import structlog
+import typer
+from rich.console import Console
+from rich.panel import Panel
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
+from rich.prompt import Confirm as RichConfirm
+from rich.table import Table
+
+from app.config import AppConfig, ConfigError, load_config, redact_config
 
 __version__ = _version("alpha-quant")
-from app.bootstrap import run_bootstrap
-from app.config import ConfigError, load_config, redact_config
-from app.replay import run_replay, write_golden
+
+log = structlog.get_logger()
+console = Console()
+
+app = typer.Typer(
+    name="alpha-quant",
+    help="Deterministic, daily-cadence, long-only equity trading system",
+    rich_markup_mode="rich",
+    pretty_exceptions_show_locals=False,
+    no_args_is_help=True,
+)
+
+RELATIVE_DATE_RE = re.compile(r"^(\d+)([dmy])\s*$")
 
 
 def _configure_logging() -> None:
@@ -26,7 +46,7 @@ def _configure_logging() -> None:
     ]
 
     if is_dev:
-        processors: list[structlog.typing.Processor] = [
+        processors = [
             *shared_processors,
             structlog.dev.ConsoleRenderer(),
         ]
@@ -46,8 +66,104 @@ def _configure_logging() -> None:
     )
 
 
-def cmd_run(args: argparse.Namespace) -> None:
-    import hashlib
+def _parse_date(value: str) -> date:
+    """Parse ISO date or relative string like ``7d``, ``30d``, ``3m``, ``1y``."""
+    value = value.strip()
+    if m := RELATIVE_DATE_RE.match(value):
+        amount = int(m.group(1))
+        unit = m.group(2)
+        today = date.today()
+        if unit == "d":
+            return today - timedelta(days=amount)
+        elif unit == "m":
+            return today - timedelta(days=amount * 30)
+        elif unit == "y":
+            return today - timedelta(days=amount * 365)
+    return date.fromisoformat(value)
+
+
+def _print_panel(
+    title: str, items: Sequence[tuple[str, str]], *, border_style: str = "cyan"
+) -> None:
+    content = "\n".join(f"  {k:<12} {v}" for k, v in items)
+    console.print(Panel(content, title=f"[bold]{title}[/bold]", border_style=border_style))
+
+
+def _print_error(title: str, message: str) -> None:
+    log.error("cli_error", title=title, message=message)
+    console.print(
+        Panel(f"[red]{message}[/red]", title=f"[red]\u2717 {title}[/red]", border_style="red")
+    )
+
+
+def _check_connection(source: str, ok: bool, table: Table) -> None:
+    status = "[green]\u25cf OK[/green]" if ok else "[red]\u25cf FAIL[/red]"
+    table.add_row(source, status)
+
+
+def _load_config_cached(ctx: typer.Context) -> AppConfig:
+    config_path: str | None = ctx.obj.get("config_path")
+    config = load_config(config_path)
+    if ctx.obj.get("verbose"):
+        console.print_json(data=redact_config(config))
+    return config
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        console.print(f"alpha-quant [cyan]{__version__}[/cyan]")
+        raise typer.Exit()
+
+
+@app.callback()
+def main_callback(
+    ctx: typer.Context,
+    config: str | None = typer.Option(  # noqa: B008
+        None,
+        "--config",
+        "-c",
+        help="Path to config.toml (default: ./config.toml or ~/.alpha-quant/config.toml)",
+        envvar="ALPHA_QUANT_CONFIG",
+    ),
+    verbose: bool = typer.Option(  # noqa: B008
+        False,
+        "--verbose",
+        "-v",
+        help="Show resolved configuration (secrets redacted)",
+    ),
+    version: bool = typer.Option(  # noqa: B008
+        False,
+        "--version",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show version and exit",
+    ),
+) -> None:
+    """Alpha-Quant CLI — deterministic, daily-cadence, long-only equity system."""
+    _configure_logging()
+    ctx.ensure_object(dict)
+    ctx.obj["config_path"] = config
+    ctx.obj["verbose"] = verbose
+
+
+# ── Run ────────────────────────────────────────────────────────────────────────────────
+
+
+@app.command(rich_help_panel="Run")
+def run(
+    ctx: typer.Context,
+    mode: str = typer.Option(  # noqa: B008
+        "live",
+        "--mode",
+        "-m",
+        help="Run mode: live (needs API keys) or fixture (deterministic replay)",
+    ),
+) -> None:
+    """Execute the daily pipeline.
+
+    Runs the full decision engine (M1-M8), paper fills, shadow books, and
+    journal narration for today's date.
+    """
     from datetime import date
     from pathlib import Path
 
@@ -67,14 +183,14 @@ def cmd_run(args: argparse.Namespace) -> None:
     from domain.risk import RiskConfig as DomainRiskConfig
     from domain.sizing import SizingConfig
 
-    config = load_config(args.config)
-    config.data.mode = args.mode
+    config = _load_config_cached(ctx)
+    config.data.mode = mode
 
     if is_halted():
-        print("[alpha-quant] run: pipeline halted — use `alpha-quant halt --resume` to clear")
+        _print_error("Pipeline Halted", "Use alpha-quant halt --resume to clear")
         return
 
-    vault = None
+    vault: Vault | None = None
     if config.data.mode == "live":
         vault = Vault(base_path=Path("vault"))
 
@@ -84,16 +200,20 @@ def cmd_run(args: argparse.Namespace) -> None:
     insider = create_insider_feed(config, vault)
     sentiment = create_sentiment_feed(config, vault)
 
-    print(
-        f"[alpha-quant] run: mode={config.data.mode},"
-        f" {type(market_data).__name__},"
-        f" {type(fundamentals).__name__},"
-        f" {type(insider).__name__},"
-        f" {type(sentiment).__name__},"
-        f" {type(clock).__name__}"
+    adapter_names = [
+        type(market_data).__name__,
+        type(fundamentals).__name__,
+        type(insider).__name__,
+        type(sentiment).__name__,
+        type(clock).__name__,
+    ]
+    _print_panel(
+        "Daily Pipeline Run",
+        [
+            ("Mode", f"[cyan]{mode}[/cyan]"),
+            ("Adapters", ", ".join(adapter_names)),
+        ],
     )
-    if args.verbose_config:
-        print(json.dumps(redact_config(config), indent=2, default=str))
 
     store = CanonicalStore(base_path=Path("data"))
     cfg_redacted = redact_config(config)
@@ -137,47 +257,131 @@ def cmd_run(args: argparse.Namespace) -> None:
         prev_regime=prev_regime,
     )
 
-    status = "completed"
+    status_text = "completed"
     if result.halted:
-        status = "halted"
+        status_text = "halted"
     elif result.violations:
-        status = "violations"
+        status_text = "violations"
+
+    status_styles = {
+        "completed": "[green]completed[/green]",
+        "halted": "[red]halted[/red]",
+        "violations": "[yellow]violations[/yellow]",
+    }
 
     persist_run_result(store, result)
-    store.complete_run(run_id, status=status)
+    store.complete_run(run_id, status=status_text)
 
-    print(
-        f"[alpha-quant] run: {status},"
-        f" decisions={len(result.decisions)},"
-        f" fills={len(result.fills)},"
-        f" events={len(result.events)},"
-        f" violations={len(result.violations)}"
+    border = (
+        "green"
+        if status_text == "completed"
+        else "yellow"
+        if status_text == "violations"
+        else "red"
+    )
+    _print_panel(
+        "Pipeline Result",
+        [
+            ("Status", status_styles.get(status_text, status_text)),
+            ("Run ID", run_id[:8]),
+            ("Decisions", str(len(result.decisions))),
+            ("Fills", str(len(result.fills))),
+            ("Events", str(len(result.events))),
+            ("Violations", str(len(result.violations))),
+        ],
+        border_style=border,
     )
 
 
-def _check_connection(source: str, ok: bool) -> None:
-    status = "OK" if ok else "FAIL"
-    print(f"  {source}: {status}")
+# ── Replay ─────────────────────────────────────────────────────────────────────────────
 
 
-def cmd_replay(args: argparse.Namespace) -> None:
-    config = load_config(args.config)
-    fixture = args.fixture_path
-    from_date = args.from_date
-    to_date = args.to_date
-    output = run_replay(config, from_date, to_date, fixture)
-    if args.output:
-        path = write_golden(output, args.output)
-        digest = __import__("hashlib").sha256(path.read_bytes()).hexdigest()[:16]
-        print(f"[alpha-quant] replay: golden output written to {path} (sha256={digest})")
+@app.command(rich_help_panel="Run")
+def replay(
+    ctx: typer.Context,
+    from_date: str = typer.Option(  # noqa: B008
+        ...,
+        "--from-date",
+        help="Start date: YYYY-MM-DD or relative like 7d, 3m, 1y",
+    ),
+    to_date: str = typer.Option(  # noqa: B008
+        ...,
+        "--to-date",
+        help="End date: YYYY-MM-DD or relative",
+    ),
+    fixture: str | None = typer.Option(  # noqa: B008
+        None,
+        "--fixture",
+        help="Fixture bundle path (default: ./fixtures/v1)",
+    ),
+    output: str | None = typer.Option(  # noqa: B008
+        None,
+        "--output",
+        help="Write golden output to this file",
+    ),
+) -> None:
+    """Full-DAG replay over fixture data.
+
+    Runs the entire pipeline against deterministic fixture data for a
+    historical period. Add --output to write a golden file that CI
+    can hash-check.
+    """
+
+    from app.replay import run_replay, write_golden
+
+    config = _load_config_cached(ctx)
+    fd = _parse_date(from_date)
+    td = _parse_date(to_date)
+
+    with console.status(f"[cyan]Replaying {fd} \u2192 {td}...", spinner="dots"):
+        result = run_replay(config, from_date, to_date, fixture)
+
+    if output:
+        path = write_golden(result, output)
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+        _print_panel(
+            "Golden Replay",
+            [
+                ("Period", f"{fd} \u2192 {td}"),
+                ("Fixture", fixture or "fixtures/v1"),
+                ("Output", f"[green]{path}[/green]"),
+                ("SHA256", f"[dim]{digest}[/dim]"),
+            ],
+            border_style="green",
+        )
     else:
-        print(f"[alpha-quant] replay (from={from_date} to={to_date}, fixture={fixture})")
-    if args.verbose_config:
-        print(json.dumps(redact_config(config), indent=2, default=str))
+        _print_panel(
+            "Replay Complete",
+            [
+                ("Period", f"{fd} \u2192 {td}"),
+                ("Fixture", fixture or "fixtures/v1"),
+            ],
+            border_style="green",
+        )
 
 
-def cmd_backtest(args: argparse.Namespace) -> None:
-    from datetime import date
+# ── Backtest ────────────────────────────────────────────────────────────────────────────
+
+
+@app.command(rich_help_panel="Run")
+def backtest(
+    ctx: typer.Context,
+    from_date: str = typer.Option(  # noqa: B008
+        ...,
+        "--from-date",
+        help="Start date: YYYY-MM-DD or relative like 7d, 3m, 1y",
+    ),
+    to_date: str = typer.Option(  # noqa: B008
+        ...,
+        "--to-date",
+        help="End date: YYYY-MM-DD or relative",
+    ),
+) -> None:
+    """Run the event-driven historical backtester.
+
+    Uses the same fill model, risk management, and decision engine as the live
+    pipeline. Results are comparable by design.
+    """
     from pathlib import Path
 
     from app.backtest import BacktestConfig, run_backtest
@@ -186,10 +390,11 @@ def cmd_backtest(args: argparse.Namespace) -> None:
     from domain.risk import RiskConfig as DomainRiskConfig
     from domain.sizing import SizingConfig
 
-    config = load_config(args.config)
+    config = _load_config_cached(ctx)
     store = CanonicalStore(base_path=Path("data"))
-    from_date = date.fromisoformat(args.from_date)
-    to_date = date.fromisoformat(args.to_date)
+    fd = _parse_date(from_date)
+    td = _parse_date(to_date)
+
     fill_config = FillConfig(slippage_bps=float(config.paper.slippage_bps))
     risk_config = DomainRiskConfig(
         stop_atr_mult=config.risk.stop_atr_mult,
@@ -205,54 +410,125 @@ def cmd_backtest(args: argparse.Namespace) -> None:
         max_gross_exposure=config.portfolio.max_gross_exposure,
     )
     bt_config = BacktestConfig(
-        start_date=from_date,
-        end_date=to_date,
+        start_date=fd,
+        end_date=td,
         initial_equity=config.paper.starting_equity,
         symbols=config.bootstrap.symbols + config.bootstrap.include_benchmarks,
     )
-    result = run_backtest(
-        config=bt_config,
-        store=store,
-        fill_config=fill_config,
-        risk_config=risk_config,
-        sizing_config=sizing_config,
+
+    with console.status(f"[cyan]Backtesting {fd} \u2192 {td}...", spinner="dots"):
+        result = run_backtest(
+            config=bt_config,
+            store=store,
+            fill_config=fill_config,
+            risk_config=risk_config,
+            sizing_config=sizing_config,
+        )
+
+    metrics = result.metrics
+    return_pct = metrics.total_return_pct
+    sharpe = metrics.sharpe
+    dd = metrics.max_drawdown_pct
+
+    return_color = "green" if return_pct > 0 else "red"
+    sharpe_color = "green" if sharpe > 1.0 else "yellow" if sharpe > 0 else "red"
+    dd_color = "green" if dd > -5 else "yellow" if dd > -15 else "red"
+
+    _print_panel(
+        "Backtest Results",
+        [
+            ("Period", f"{fd} \u2192 {td}"),
+            ("Return", f"[{return_color}]{return_pct:+.1f}%[/{return_color}]"),
+            ("Sharpe", f"[{sharpe_color}]{sharpe:.2f}[/{sharpe_color}]"),
+            ("Max DD", f"[{dd_color}]{dd:.1f}%[/{dd_color}]"),
+            ("Trades", str(metrics.num_trades)),
+        ],
+        border_style="green" if return_pct > 0 else "yellow",
     )
-    print(
-        f"[alpha-quant] backtest: {from_date} → {to_date},"
-        f" {result.metrics.total_return_pct:.1f}% return,"
-        f" {result.metrics.sharpe:.2f} sharpe,"
-        f" {result.metrics.max_drawdown_pct:.1f}% max dd,"
-        f" {result.metrics.num_trades} trades"
-    )
-    if args.verbose_config:
-        print(json.dumps(redact_config(config), indent=2, default=str))
 
 
-def cmd_bootstrap(args: argparse.Namespace) -> None:
+# ── Bootstrap ───────────────────────────────────────────────────────────────────────────
+
+
+@app.command(rich_help_panel="Data")
+def bootstrap(
+    ctx: typer.Context,
+    fixture_only: bool = typer.Option(  # noqa: B008
+        False,
+        "--fixture-only",
+        help="Skip API fetch, regenerate fixture bundle from existing vault",
+    ),
+    vault: str | None = typer.Option(  # noqa: B008
+        None,
+        "--vault",
+        help="Vault directory path (default: ./vault)",
+    ),
+) -> None:
+    """Fetch and freeze a fixture bundle for development.
+
+    Downloads historical data for all configured symbols, then freezes a
+    deterministic fixture bundle used by replay and run --mode fixture.
+    """
     import time
     from pathlib import Path
 
-    config = load_config(args.config)
+    from app.bootstrap import run_bootstrap
+
+    config = _load_config_cached(ctx)
     t0 = time.perf_counter()
-    result = run_bootstrap(
-        config=config,
-        vault_base=Path(args.vault or "vault"),
-        fixture_base=Path("."),
-        fixture_only=args.fixture_only,
-    )
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        console=console,
+        transient=True,
+    ) as progress:
+        if fixture_only:
+            progress.add_task("[cyan]Freezing fixture bundle from vault...", total=1)
+        else:
+            progress.add_task("[cyan]Fetching data and freezing fixture bundle...", total=1)
+
+        result = run_bootstrap(
+            config=config,
+            vault_base=Path(vault or "vault"),
+            fixture_base=Path("."),
+            fixture_only=fixture_only,
+        )
+
     elapsed = time.perf_counter() - t0
-    print(
-        f"[alpha-quant] bootstrap: {result['symbols_processed']} symbols, "
-        f"{result['total_bars']} bars, "
-        f"bundle at {result['bundle_path']} "
-        f"({elapsed:.1f}s)"
+
+    _print_panel(
+        "Bootstrap Complete",
+        [
+            ("Symbols", str(result["symbols_processed"])),
+            ("Bars", f"{result['total_bars']:,}"),
+            ("Bundle", result["bundle_path"]),
+            ("Time", f"{elapsed:.1f}s"),
+        ],
+        border_style="green",
     )
-    if args.verbose_config:
-        print(json.dumps(redact_config(config), indent=2, default=str))
 
 
-def cmd_ingest(args: argparse.Namespace) -> None:
-    """Fetch and normalize live data into the canonical store."""
+# ── Ingest ──────────────────────────────────────────────────────────────────────────────
+
+
+@app.command(rich_help_panel="Data")
+def ingest(
+    ctx: typer.Context,
+    days: int = typer.Option(  # noqa: B008
+        400,
+        "--days",
+        "-d",
+        help="Lookback days for historical data",
+    ),
+) -> None:
+    """Fetch live data from APIs into the canonical store.
+
+    Downloads daily bars, fundamentals snapshots, insider transactions, and
+    social sentiment for all universe symbols. Run this before alpha-quant run.
+    """
     from datetime import date, timedelta
     from pathlib import Path
 
@@ -265,7 +541,7 @@ def cmd_ingest(args: argparse.Namespace) -> None:
     from app.store import CanonicalStore
     from app.vault import Vault
 
-    config = load_config(args.config)
+    config = _load_config_cached(ctx)
     config.data.mode = "live"
 
     vault = Vault(base_path=Path("vault"))
@@ -278,50 +554,60 @@ def cmd_ingest(args: argparse.Namespace) -> None:
     universe = config.bootstrap.symbols + config.bootstrap.include_benchmarks
 
     today = date.today()
-    lookback = today - timedelta(days=args.days or 400)
+    lookback = today - timedelta(days=days)
     results: dict[str, list[str]] = {}
 
-    for symbol in universe:
-        sym_results: list[str] = []
+    progress = Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        console=console,
+    )
 
-        # Market data
-        try:
-            bars = market_data.daily_bars(symbol, lookback, today)
-            if bars:
-                store.save_bars(symbol, bars)
-                sym_results.append(f"bars={len(bars)}")
-        except Exception as e:
-            sym_results.append(f"bars=FAIL({e})")
+    with progress:
+        ingest_task = progress.add_task(
+            f"[cyan]Ingesting {len(universe)} symbols...",
+            total=len(universe),
+        )
 
-        # Fundamentals
-        try:
-            snap = fundamentals.snapshot(symbol)
-            if snap is not None:
-                store.save_fundamentals(symbol, [snap])
-                sym_results.append("fundamentals=OK")
-        except Exception as e:
-            sym_results.append(f"fundamentals=FAIL({e})")
+        for symbol in universe:
+            sym_results: list[str] = []
 
-        # Insider transactions
-        try:
-            txns = insider.cluster_transactions(symbol)
-            if txns:
-                store.save_insider_transactions(symbol, txns)
-                sym_results.append(f"insider={len(txns)}")
-        except Exception as e:
-            sym_results.append(f"insider=FAIL({e})")
+            try:
+                bars = market_data.daily_bars(symbol, lookback, today)
+                if bars:
+                    store.save_bars(symbol, bars)
+                    sym_results.append(f"bars={len(bars)}")
+            except Exception as e:
+                sym_results.append(f"bars=[red]FAIL({e})[/red]")
 
-        # Sentiment
-        try:
-            mentions = sentiment.mention_counts(symbol)
-            if mentions:
-                store.save_mentions(symbol, mentions)
-                sym_results.append(f"mentions={len(mentions)}")
-        except Exception as e:
-            sym_results.append(f"mentions=FAIL({e})")
+            try:
+                snap = fundamentals.snapshot(symbol)
+                if snap is not None:
+                    store.save_fundamentals(symbol, [snap])
+                    sym_results.append("fundamentals=[green]OK[/green]")
+            except Exception as e:
+                sym_results.append(f"fundamentals=[red]FAIL({e})[/red]")
 
-        results[symbol] = sym_results
-        print(f"  {symbol}: {', '.join(sym_results)}")
+            try:
+                txns = insider.cluster_transactions(symbol)
+                if txns:
+                    store.save_insider_transactions(symbol, txns)
+                    sym_results.append(f"insider={len(txns)}")
+            except Exception as e:
+                sym_results.append(f"insider=[red]FAIL({e})[/red]")
+
+            try:
+                mentions = sentiment.mention_counts(symbol)
+                if mentions:
+                    store.save_mentions(symbol, mentions)
+                    sym_results.append(f"mentions={len(mentions)}")
+            except Exception as e:
+                sym_results.append(f"mentions=[red]FAIL({e})[/red]")
+
+            results[symbol] = sym_results
+            progress.advance(ingest_task)
 
     total_bars = 0
     for rr in results.values():
@@ -332,50 +618,100 @@ def cmd_ingest(args: argparse.Namespace) -> None:
                     total_bars += int(value)
     ok = sum(1 for rr in results.values() for r in rr if "FAIL" not in r)
     fail = sum(1 for rr in results.values() for r in rr if "FAIL" in r)
-    print(
-        f"[alpha-quant] ingest: {len(universe)} symbols,"
-        f" {total_bars} bars total,"
-        f" {ok} ok, {fail} failed"
+
+    border = "green" if fail == 0 else "yellow"
+    _print_panel(
+        "Ingest Complete",
+        [
+            ("Symbols", str(len(universe))),
+            ("Bars", f"{total_bars:,}"),
+            ("OK", f"[green]{ok}[/green]"),
+            ("Failed", f"[red]{fail}[/red]" if fail else "[green]0[/green]"),
+        ],
+        border_style=border,
     )
 
 
-def cmd_journal(args: argparse.Namespace) -> None:
+# ── Journal ─────────────────────────────────────────────────────────────────────────────
+
+
+@app.command(rich_help_panel="Query")
+def journal(
+    ctx: typer.Context,
+    since: str = typer.Option(  # noqa: B008
+        "7d",
+        "--since",
+        "-s",
+        help="Show entries since: 7d, 30d, or YYYY-MM-DD",
+    ),
+) -> None:
+    """Display recent daily journal entries.
+
+    Shows trading journal entries with LLM narration. Use --since to control
+    the lookback window.
+    """
     from pathlib import Path
 
     from app.store import CanonicalStore
 
-    config = load_config(args.config)
+    _ = _load_config_cached(ctx)  # handles --verbose
     store = CanonicalStore(base_path=Path("data"))
     runs = store.list_runs()
+
     if not runs:
-        print("[alpha-quant] journal: no runs found")
+        console.print("[yellow]No journal entries found.[/yellow]")
     else:
+        table = Table(title="Recent Runs", border_style="cyan")
+        table.add_column("Date", style="cyan")
+        table.add_column("Run ID", style="dim")
+        table.add_column("Status")
+
         for r in runs[:10]:
-            print(
-                f"  {str(r.get('start_ts', ''))[:10]}"
-                f"  {r.get('run_id', '')[:8]}"
-                f"  {r.get('status', '')}"
-            )
-    if args.verbose_config:
-        print(json.dumps(redact_config(config), indent=2, default=str))
+            run_date = str(r.get("start_ts", ""))[:10]
+            run_id = r.get("run_id", "")[:8]
+            run_status = r.get("status", "")
+            status_styles = {
+                "completed": "[green]completed[/green]",
+                "halted": "[red]halted[/red]",
+                "violations": "[yellow]violations[/yellow]",
+            }
+            table.add_row(run_date, run_id, status_styles.get(run_status, run_status))
+
+        console.print(table)
 
 
-def cmd_ask(args: argparse.Namespace) -> None:
+# ── Ask ─────────────────────────────────────────────────────────────────────────────────
+
+
+@app.command(rich_help_panel="Query")
+def ask(
+    ctx: typer.Context,
+    query: list[str] = typer.Argument(  # noqa: B008
+        ...,
+        help="Natural-language query about decisions and events",  # fmt: skip
+    ),
+) -> None:
+    """Query recorded decisions and events in natural language.
+
+    Ask questions about why decisions were made, what the system is thinking,
+    or get concept explanations.
+    """
     from pathlib import Path
 
     from app.store import CanonicalStore
-    from domain.ask import ask, is_concept_query
+    from domain.ask import ask as ask_domain
+    from domain.ask import is_concept_query
 
-    query = " ".join(args.query)
+    query_text = " ".join(query)
     store = CanonicalStore(base_path=Path("data"))
 
     concept_card: str | None = None
-    if is_concept_query(query):
+    if is_concept_query(query_text):
         concepts_dir = Path(__file__).resolve().parent / "concepts"
-        concept_card = _load_concept_card(query, concepts_dir)
+        concept_card = _load_concept_card(query_text, concepts_dir)
 
-    result = ask(query, store, concept_card=concept_card, ref_date=date.today())
-    print(result)
+    result = ask_domain(query_text, store, concept_card=concept_card, ref_date=date.today())
+    console.print(result)
 
 
 def _load_concept_card(query: str, concepts_dir: Path) -> str | None:
@@ -397,40 +733,100 @@ def _load_concept_card(query: str, concepts_dir: Path) -> str | None:
     return None
 
 
-def cmd_report(args: argparse.Namespace) -> None:
+# ── Report ──────────────────────────────────────────────────────────────────────────────
+
+
+@app.command(rich_help_panel="Query")
+def report(
+    ctx: typer.Context,
+    report_type: str = typer.Option(  # noqa: B008
+        "weekly",
+        "--type",
+        "-t",
+        help="Report type: weekly or monthly",
+    ),
+) -> None:
+    """Generate weekly or monthly performance report.
+
+    Reads persisted report data from the state store. Falls back to the latest
+    portfolio snapshot if no stored report exists.
+    """
     from pathlib import Path
 
     from app.store import CanonicalStore
 
-    config = load_config(args.config)
+    _ = _load_config_cached(ctx)  # handles --verbose
     store = CanonicalStore(base_path=Path("data"))
 
     row = store._state_conn.execute(
         "SELECT report_date, content FROM reports"
         " WHERE report_type = ? ORDER BY report_date DESC LIMIT 1",
-        [args.type],
+        [report_type],
     ).fetchone()
 
     if row is not None:
         report_date, content = row
-        print(f"[alpha-quant] report ({args.type}) — {report_date}:")
-        print()
-        print(content)
+        _print_panel(
+            f"{report_type.title()} Report \u2014 {report_date}",
+            [
+                ("Content", content[:500] + ("..." if len(content) > 500 else "")),
+            ],
+        )
     else:
         snap = store.load_latest_portfolio_snapshot()
         if snap is not None:
-            print(f"[alpha-quant] report ({args.type}): no stored report found")
-            print(
-                f"  Latest snapshot: equity={snap.equity:.2f},"
-                f" cash={snap.cash:.2f}, date={snap.date}"
+            _print_panel(
+                "No Stored Report",
+                [
+                    (
+                        "Latest Snapshot",
+                        f"equity={snap.equity:.2f}, cash={snap.cash:.2f}, date={snap.date}",
+                    ),
+                ],
+                border_style="yellow",
             )
         else:
-            print("[alpha-quant] report: no portfolio data found")
-    if args.verbose_config:
-        print(json.dumps(redact_config(config), indent=2, default=str))
+            _print_panel(
+                "No Data",
+                [
+                    ("Message", "No portfolio data found"),
+                ],
+                border_style="yellow",
+            )
 
 
-def cmd_status(args: argparse.Namespace) -> None:
+# ── Status ──────────────────────────────────────────────────────────────────────────────
+
+
+@app.command(rich_help_panel="Ops")
+def status(
+    ctx: typer.Context,
+    check_connections: bool = typer.Option(  # noqa: B008
+        False,
+        "--check-connections",
+        help="Ping each data source to verify connectivity",
+    ),
+    alerts: bool = typer.Option(  # noqa: B008
+        False,
+        "--alerts",
+        help="Show recent system alerts",
+    ),
+    json_output: bool = typer.Option(  # noqa: B008
+        False,
+        "--json",
+        help="Output status as JSON",
+    ),
+    show_config: bool = typer.Option(  # noqa: B008
+        False,
+        "--show-config",
+        help="Print resolved configuration (secrets redacted)",
+    ),
+) -> None:
+    """Display full system status.
+
+    Shows halt state, last run, portfolio equity/cash, and active positions.
+    Use flags to drill into connections, alerts, or configuration.
+    """
     from pathlib import Path
 
     from adapters.real.base_connector import BaseConnector
@@ -445,22 +841,27 @@ def cmd_status(args: argparse.Namespace) -> None:
     from app.store import CanonicalStore
     from app.vault import Vault
 
-    config = load_config(args.config)
+    config = _load_config_cached(ctx)
 
-    if args.show_alerts:
+    if alerts:
         from app.alerts import get_recent_alerts
 
         recent = get_recent_alerts()
         if not recent:
-            print("[alpha-quant] alerts: none")
+            console.print("[green]No alerts.[/green]")
         else:
-            print("[alpha-quant] alerts:")
+            table = Table(title="Recent Alerts", border_style="yellow")
+            table.add_column("Level", style="bold")
+            table.add_column("Title")
+            table.add_column("Message")
+            table.add_column("Time", style="dim")
             for a in recent[-10:]:
-                print(f"  [{a['level']}] {a['title']}: {a['message']} ({a['timestamp'][:19]})")
+                table.add_row(a["level"], a["title"], a["message"], a["timestamp"][:19])
+            console.print(table)
         return
 
-    if args.check_connections:
-        vault = Vault(base_path=Path("vault")) if config.data.mode == "live" else None
+    if check_connections:
+        vault: Vault | None = Vault(base_path=Path("vault")) if config.data.mode == "live" else None
         connectors: list[tuple[str, object]] = [
             ("market_data", create_market_data(config, vault)),
             ("fundamentals", create_fundamentals(config, vault)),
@@ -468,10 +869,13 @@ def cmd_status(args: argparse.Namespace) -> None:
             ("sentiment_feed", create_sentiment_feed(config, vault)),
             ("sec", create_sec_connector(config, vault)),
         ]
-        print("[alpha-quant] connections:")
+        table = Table(title="Connection Status", border_style="cyan")
+        table.add_column("Source", style="bold")
+        table.add_column("Status")
         for name, conn in connectors:
             ok = conn.check_connection() if isinstance(conn, BaseConnector) else True
-            _check_connection(name, ok)
+            _check_connection(name, ok, table)
+        console.print(table)
         return
 
     store = CanonicalStore(base_path=Path("data"))
@@ -482,261 +886,223 @@ def cmd_status(args: argparse.Namespace) -> None:
     portfolio = store.load_latest_portfolio_snapshot()
     positions = store.load_positions()
 
-    status: dict[str, object] = {
-        "halted": halted,
-        "halt_reason": halt_info.get("reason") if halt_info else None,
-        "halt_timestamp": halt_info.get("timestamp") if halt_info else None,
-        "last_run": last_runs[0] if last_runs else None,
-        "portfolio": {
-            "equity": portfolio.equity if portfolio else None,
-            "cash": portfolio.cash if portfolio else None,
-            "date": str(portfolio.date) if portfolio else None,
-            "positions": len([p for p in positions if p.quantity > 0]),
-        },
-    }
-
-    if args.json:
-        print(json.dumps(status, indent=2, default=str))
-    elif args.show_config:
-        print(json.dumps(redact_config(config), indent=2, default=str))
-    else:
-        print("[alpha-quant] status:")
-        print(f"  halted: {halted}")
-        if halt_info:
-            print(f"  halt reason: {halt_info.get('reason', 'unknown')}")
-            print(f"  halt at: {halt_info.get('timestamp', '')}")
-        if last_runs:
-            r = last_runs[0]
-            print(f"  last run: {r['run_id']} ({r['status']}) at {r['start_ts']}")
-        if portfolio:
-            print(f"  equity: {portfolio.equity:.2f}")
-            print(f"  cash: {portfolio.cash:.2f}")
-        active = [p for p in positions if p.quantity > 0]
-        print(f"  positions: {len(active)}")
-
-
-def cmd_halt(args: argparse.Namespace) -> None:
-    from app.halt import clear_halt, is_halted, read_halt, write_halt
-
-    if args.resume:
-        if not is_halted():
-            print("[alpha-quant] resume: not halted")
-            return
-        info = read_halt() or {}
-        if not args.yes:
-            msg = info.get("reason", "unknown")
-            ts = info.get("timestamp", "")
-            answer = input(f"Clear halt (reason: {msg}, at: {ts})? [y/N] ")
-            if answer.strip().lower() != "y":
-                print("[alpha-quant] resume: cancelled")
-                return
-        clear_halt()
-        print("[alpha-quant] resume: halted cleared")
+    if json_output:
+        status_data: dict[str, object] = {
+            "halted": halted,
+            "halt_reason": halt_info.get("reason") if halt_info else None,
+            "halt_timestamp": str(halt_info.get("timestamp")) if halt_info else None,
+            "last_run": {
+                "run_id": last_runs[0].get("run_id") if last_runs else None,
+                "status": last_runs[0].get("status") if last_runs else None,
+                "start_ts": str(last_runs[0].get("start_ts")) if last_runs else None,
+            }
+            if last_runs
+            else None,
+            "portfolio": {
+                "equity": portfolio.equity if portfolio else None,
+                "cash": portfolio.cash if portfolio else None,
+                "date": str(portfolio.date) if portfolio else None,
+                "positions": len([p for p in positions if p.quantity > 0]),
+            },
+        }
+        console.print_json(data=status_data)
         return
 
-    reason = " ".join(args.reason) if args.reason else "manual halt"
-    write_halt(reason=reason)
-    print(f"[alpha-quant] halt: {reason}")
-    if is_halted():
-        print("[alpha-quant] halt: use `alpha-quant halt --resume` to clear")
+    if show_config:
+        console.print_json(data=redact_config(config))
+        return
+
+    halt_symbol = "[green]\u25cf No[/green]" if not halted else "[red]\u25cf Yes[/red]"
+    items: list[tuple[str, str]] = [("Halted", halt_symbol)]
+
+    if halt_info:
+        items.append(("Halt Reason", halt_info.get("reason", "unknown")))
+        items.append(("Halt At", str(halt_info.get("timestamp", ""))))
+
+    if last_runs:
+        r = last_runs[0]
+        items.append(
+            ("Last Run", f"{r['run_id'][:8]} ({r['status']}) at {str(r['start_ts'])[:19]}")
+        )
+
+    if portfolio:
+        items.append(("Equity", f"[green]${portfolio.equity:,.2f}[/green]"))
+        items.append(("Cash", f"${portfolio.cash:,.2f}"))
+    else:
+        items.append(("Equity", "[yellow]No data[/yellow]"))
+
+    active = [p for p in positions if p.quantity > 0]
+    items.append(("Positions", str(len(active))))
+
+    if active:
+        pos_lines = []
+        for p in active:
+            price = p.current_price or 0
+            pos_lines.append(f"  [cyan]{p.symbol}[/cyan]  {p.quantity} shares  ${price:.2f}")
+        items.append(("Holdings", "\n" + "\n".join(pos_lines)))
+
+    _print_panel("System Status", items)
 
 
-def cmd_schedule(args: argparse.Namespace) -> None:
-    config = load_config(args.config)
-    config.data.mode = args.mode
+# ── Halt ────────────────────────────────────────────────────────────────────────────────
+
+
+@app.command(rich_help_panel="Ops")
+def halt(
+    reason: list[str] = typer.Argument(  # noqa: B008
+        None,
+        help="Reason for halting (optional, multiple words supported)",
+    ),
+    resume: bool = typer.Option(  # noqa: B008
+        False,
+        "--resume",
+        help="Resume pipeline after a halt",
+    ),
+    yes: bool = typer.Option(  # noqa: B008
+        False,
+        "--yes",
+        "-y",
+        help="Skip confirmation prompt",
+    ),
+) -> None:
+    """Halt or resume the pipeline.
+
+    Puts a halt lock in place that blocks pipeline execution. Use --resume
+    to clear it.
+    """
+    from app.halt import clear_halt, is_halted, read_halt, write_halt
+
+    if resume:
+        if not is_halted():
+            _print_error("Not Halted", "Pipeline is not currently halted")
+            return
+        info = read_halt() or {}
+        msg = info.get("reason", "unknown")
+        ts = info.get("timestamp", "")
+        if not yes:
+            prompt = (
+                f"[yellow]Clear halt?[/yellow]\n  Reason: [bold]{msg}[/bold]\n  At: [dim]{ts}[/dim]"
+            )
+            confirm = RichConfirm.ask(prompt, default=False)
+            if not confirm:
+                console.print("[yellow]Resume cancelled.[/yellow]")
+                return
+        clear_halt()
+        _print_panel(
+            "Pipeline Resumed",
+            [
+                ("Status", "[green]Halt cleared[/green]"),
+            ],
+            border_style="green",
+        )
+        return
+
+    reason_text = " ".join(reason) if reason else "manual halt"
+    write_halt(reason=reason_text)
+    _print_panel(
+        "Pipeline Halted",
+        [
+            ("Reason", f"[yellow]{reason_text}[/yellow]"),
+            ("Resume", "Use alpha-quant halt --resume to clear"),
+        ],
+        border_style="red",
+    )
+
+
+# ── Schedule ─────────────────────────────────────────────────────────────────────────────
+
+
+@app.command(rich_help_panel="Ops")
+def schedule(
+    ctx: typer.Context,
+    mode: str = typer.Option(  # noqa: B008
+        "live",
+        "--mode",
+        "-m",
+        help="Schedule mode: live or fixture",
+    ),
+) -> None:
+    """Start the daily scheduler daemon.
+
+    Launches APScheduler to run the pipeline automatically every trading day
+    at 17:30 ET.
+    """
+    config = _load_config_cached(ctx)
+    config.data.mode = mode
 
     from app.scheduler import setup_scheduler
 
-    scheduler = setup_scheduler(config_path=args.config, mode=args.mode)
+    scheduler = setup_scheduler(config_path=ctx.obj.get("config_path"), mode=mode)
+    _print_panel(
+        "Scheduler Started",
+        [
+            ("Mode", f"[cyan]{mode}[/cyan]"),
+            ("Time", "17:30 ET"),
+            ("Stop", "[dim]Ctrl+C to stop[/dim]"),
+        ],
+        border_style="green",
+    )
     try:
         scheduler.start()
     except KeyboardInterrupt:
-        print("[alpha-quant] scheduler: stopped")
+        console.print("[yellow]Scheduler stopped.[/yellow]")
         scheduler.shutdown(wait=False)
 
 
-def cmd_backup(args: argparse.Namespace) -> None:
-    from app.backup import run_backup
+# ── Backup ──────────────────────────────────────────────────────────────────────────────
 
-    path = run_backup(config_path=args.config)
-    print(f"[alpha-quant] backup: created {path}")
 
-    if args.prune:
-        from app.backup import prune_backups
+@app.command(rich_help_panel="Ops")
+def backup(
+    prune: bool = typer.Option(  # noqa: B008
+        False,
+        "--prune",
+        help="Remove old backups per retention policy",
+    ),
+) -> None:
+    """Create a backup archive of the state store and vault.
 
+    Compresses the DuckDB state database and vault data into a single archive.
+    Use --prune to clean up old backups after creating a new one.
+    """
+    from app.backup import prune_backups, run_backup
+
+    path = run_backup(config_path=None)
+    _print_panel(
+        "Backup Created",
+        [
+            ("Path", str(path)),
+        ],
+        border_style="green",
+    )
+
+    if prune:
         removed = prune_backups()
-        for r in removed:
-            print(f"[alpha-quant] backup: pruned {r.name}")
+        if removed:
+            table = Table(title="Pruned Backups", border_style="yellow")
+            table.add_column("File", style="dim")
+            for r in removed:
+                table.add_row(r.name)
+            console.print(table)
+        else:
+            console.print("[green]No old backups to prune.[/green]")
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="alpha-quant",
-        description="Deterministic, daily-cadence, long-only equity trading system",
-    )
-    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    parser.add_argument(
-        "--config",
-        type=str,
-        default=None,
-        help="Path to config.toml (default: $PWD/config.toml or ~/.alpha-quant/config.toml)",
-    )
-    parser.add_argument(
-        "--verbose-config",
-        action="store_true",
-        help="Print resolved config on every command",
-    )
-
-    sub = parser.add_subparsers(dest="command", required=True)
-
-    p_run = sub.add_parser("run", help="Execute daily pipeline")
-    p_run.add_argument(
-        "--mode",
-        choices=["live", "fixture"],
-        default="live",
-        help="Run mode (default: live)",
-    )
-    p_run.set_defaults(func=cmd_run)
-
-    p_replay = sub.add_parser("replay", help="Replay historical period")
-    p_replay.add_argument("--from-date", type=str, required=True)
-    p_replay.add_argument("--to-date", type=str, required=True)
-    p_replay.add_argument(
-        "--fixture",
-        type=str,
-        dest="fixture_path",
-        default=None,
-        help="Fixture bundle path (default: ./fixtures/v1)",
-    )
-    p_replay.add_argument(
-        "--output",
-        type=str,
-        default=None,
-        help="Write golden output to this file",
-    )
-    p_replay.set_defaults(func=cmd_replay)
-
-    p_backtest = sub.add_parser("backtest", help="Run event-driven backtester")
-    p_backtest.add_argument("--from-date", type=str, required=True)
-    p_backtest.add_argument("--to-date", type=str, required=True)
-    p_backtest.set_defaults(func=cmd_backtest)
-
-    p_bootstrap = sub.add_parser("bootstrap", help="Fetch and freeze fixture bundle")
-    p_bootstrap.add_argument(
-        "--fixture-only",
-        action="store_true",
-        help="Skip fetch, regenerate fixture bundle from existing vault",
-    )
-    p_bootstrap.add_argument(
-        "--vault",
-        type=str,
-        default=None,
-        help="Vault directory path (default: ./vault)",
-    )
-    p_bootstrap.set_defaults(func=cmd_bootstrap)
-
-    p_ingest = sub.add_parser("ingest", help="Fetch and normalize live data into canonical store")
-    p_ingest.add_argument(
-        "--days",
-        type=int,
-        default=400,
-        help="Lookback days (default: 400)",
-    )
-    p_ingest.set_defaults(func=cmd_ingest)
-
-    p_journal = sub.add_parser("journal", help="Display recent journal entries")
-    p_journal.add_argument(
-        "--since",
-        type=str,
-        default="7d",
-        help="Show entries since (e.g. 7d, 30d, YYYY-MM-DD)",
-    )
-    p_journal.set_defaults(func=cmd_journal)
-
-    p_ask = sub.add_parser("ask", help="Query recorded decisions")
-    p_ask.add_argument("query", type=str, nargs="+", help="Natural language query")
-    p_ask.set_defaults(func=cmd_ask)
-
-    p_report = sub.add_parser("report", help="Generate weekly or monthly report")
-    p_report.add_argument(
-        "--type",
-        choices=["weekly", "monthly"],
-        default="weekly",
-        help="Report type (default: weekly)",
-    )
-    p_report.set_defaults(func=cmd_report)
-
-    p_status = sub.add_parser("status", help="Full system status")
-    p_status.add_argument(
-        "--check-connections",
-        action="store_true",
-        dest="check_connections",
-        help="Ping each data source",
-    )
-    p_status.add_argument(
-        "--alerts",
-        action="store_true",
-        dest="show_alerts",
-        help="Show recent alerts",
-    )
-    p_status.add_argument(
-        "--json",
-        action="store_true",
-        help="Output as JSON",
-    )
-    p_status.add_argument(
-        "--show-config",
-        action="store_true",
-        dest="show_config",
-        help="Print resolved config (secrets redacted)",
-    )
-    p_status.set_defaults(func=cmd_status)
-
-    p_halt = sub.add_parser("halt", help="Halt or resume pipeline")
-    p_halt.add_argument(
-        "reason",
-        type=str,
-        nargs="*",
-        default=None,
-        help="Reason for halting (optional)",
-    )
-    p_halt.add_argument(
-        "--resume",
-        action="store_true",
-        help="Resume after halt",
-    )
-    p_halt.add_argument(
-        "--yes",
-        action="store_true",
-        help="Skip confirmation for resume",
-    )
-    p_halt.set_defaults(func=cmd_halt)
-
-    p_schedule = sub.add_parser("schedule", help="Start daily scheduler daemon")
-    p_schedule.add_argument(
-        "--mode",
-        choices=["live", "fixture"],
-        default="live",
-        help="Run mode (default: live)",
-    )
-    p_schedule.set_defaults(func=cmd_schedule)
-
-    p_backup = sub.add_parser("backup", help="Create backup archive")
-    p_backup.add_argument("--prune", action="store_true", help="Remove old backups per policy")
-    p_backup.set_defaults(func=cmd_backup)
-
-    return parser
+# ── Entry point ─────────────────────────────────────────────────────────────────────────
 
 
 def main(argv: list[str] | None = None) -> int:
     _configure_logging()
-    parser = build_parser()
-    args = parser.parse_args(argv)
     try:
-        args.func(args)
+        app(args=argv, standalone_mode=False)
+        return 0
+    except SystemExit as e:
+        code = e.code
+        if isinstance(code, int):
+            return code
         return 0
     except ConfigError as e:
-        print(f"error: {e}", file=sys.stderr)
+        _print_error("Configuration Error", str(e))
         return 1
 
 

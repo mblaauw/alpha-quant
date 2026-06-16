@@ -18,6 +18,8 @@ dependencies = [
     "apscheduler>=3.11",
     "streamlit>=1.40",
     "pandas>=2.2",
+    "typer[rich]>=0.15",
+    "rich>=13.0",
 ]
 
 [project.scripts]
@@ -52,6 +54,7 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
+ignore = ["B008"]  # Typer requires function calls in default arguments
 
 [tool.ruff.format]
 quote-style = "double"
