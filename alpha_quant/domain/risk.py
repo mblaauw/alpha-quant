@@ -109,7 +109,7 @@ def evaluate_stops(
                 )
             )
 
-    if highest >= entry + r * cfg.partial_take_at_r:
+    if not position.partial_taken and highest >= entry + r * cfg.partial_take_at_r:
         partial_qty = position.quantity * 0.5
         actions.append(
             RiskAction(

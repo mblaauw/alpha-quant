@@ -36,6 +36,7 @@ def _position(
     quantity: float = 100.0,
     avg_cost: float = 100.0,
     stop_price: float | None = 90.0,
+    partial_taken: bool = False,
 ) -> Position:
     return Position(
         symbol="AAPL",
@@ -45,6 +46,7 @@ def _position(
         current_price=avg_cost,
         stop_price=stop_price,
         market_value=quantity * avg_cost,
+        partial_taken=partial_taken,
     )
 
 
@@ -110,6 +112,18 @@ class TestEvaluateStops:
         partials = [a for a in result if a.action_type == "partial_take"]
         if partials:
             assert partials[0].shares == 50.0
+
+    def test_partial_take_fires_only_once(self) -> None:
+        config = RiskConfig(partial_take_at_r=1.0)
+        bar = _bar(open_v=118.0, high=120.0, low=115.0)
+        pos = _position(quantity=100.0, avg_cost=100.0, stop_price=80.0)
+        pos_taken = _position(quantity=100.0, avg_cost=100.0, stop_price=80.0, partial_taken=True)
+
+        result1 = evaluate_stops(pos, bar, atr=5.0, highest_since_entry=100.0, config=config)
+        result2 = evaluate_stops(pos_taken, bar, atr=5.0, highest_since_entry=100.0, config=config)
+
+        assert any(a.action_type == "partial_take" for a in result1)
+        assert not any(a.action_type == "partial_take" for a in result2)
 
 
 class TestEvaluateTimeStop:
