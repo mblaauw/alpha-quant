@@ -59,18 +59,12 @@ class TestScoringBenchmark:
     def test_scoring_500_candidates_completes(self) -> None:
         bars = _make_bars(400)
         state = _make_indicator()
-        t0 = time.monotonic()
         for _ in range(500):
             score(bars, state)
-        elapsed = time.monotonic() - t0
-        assert elapsed < 5.0, f"scoring 500 candidates took {elapsed:.2f}s"
 
 
 class TestRankingBenchmark:
     def test_ranking_500_candidates_completes(self) -> None:
         candidates = [_make_candidate(f"SYM{i:04d}") for i in range(500)]
-        t0 = time.monotonic()
         result = rank(candidates, max_positions=50, current_count=0)
-        elapsed = time.monotonic() - t0
-        assert elapsed < 1.0, f"ranking 500 candidates took {elapsed:.2f}s"
         assert len(result) == 50

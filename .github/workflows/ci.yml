@@ -35,8 +35,8 @@ jobs:
       - name: Type check (ty)
         run: uv run ty check alpha_quant/
 
-      - name: Test
-        run: uv run pytest -q
+      - name: Test with coverage
+        run: uv run pytest -q --cov=alpha_quant --cov-report=term --cov-fail-under=70
 
       - name: Golden replay (determinism)
         run: |

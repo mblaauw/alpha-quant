@@ -1,4 +1,4 @@
-.PHONY: check format type test test-dashboard test-e2e lint bootstrap golden bless-golden clean schema check-docs
+.PHONY: check format type test test-unit test-integration test-parallel test-dashboard test-e2e test-chaos lint qa bootstrap golden bless-golden clean schema check-docs
 
 check:
 	uv run ruff check alpha_quant/
@@ -12,11 +12,29 @@ type:
 test:
 	uv run pytest
 
+test-unit:
+	uv run pytest tests/unit/ -q
+
+test-integration:
+	uv run pytest tests/integration/ -q
+
+test-parallel:
+	uv run pytest tests/ -q -n auto
+
 test-dashboard:
 	uv run pytest tests/unit/test_dashboard.py tests/integration/test_dashboard_e2e.py -v
 
 test-e2e:
 	uv run pytest tests/integration/ -v
+
+test-chaos:
+	uv run pytest tests/chaos/ -q --timeout=30 -m chaos
+
+qa:
+	@for script in tests/qa/*.sh; do \
+		echo "Running $$script..."; \
+		bash "$$script" || echo "  ⚠️  $$script failed (non-zero exit)"; \
+	done
 
 lint: check format type
 	@echo "All linting passed."

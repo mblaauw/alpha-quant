@@ -7,7 +7,7 @@ from tests.conftest import make_earnings
 
 
 class TestCheck:
-    def test_pass_when_nomake_earnings(self) -> None:
+    def test_pass_when_no_earnings(self) -> None:
         result = check("AAPL", date(2026, 6, 11), [])
         assert result == "PASS"
 
@@ -73,7 +73,7 @@ class TestCheck:
         )
         assert result == "PASS"
 
-    def test_uses_soonestmake_earnings(self) -> None:
+    def test_uses_soonest_earnings(self) -> None:
         result = check(
             "AAPL",
             date(2026, 6, 20),
