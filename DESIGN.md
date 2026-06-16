@@ -148,7 +148,7 @@ src/
 │   ├── architecture/            # C4 diagrams (LikeC4 DSL)
 │   ├── planning/                # backlog, roadmap, issue creation
 │   └── spike-*.md               # evaluation spike reports
-├── concepts/                    # concept cards (markdown)
+├── src/app/concepts/            # concept cards (markdown)
 ├── scripts/                     # utility scripts
 ├── config.toml                  # config template (secrets in config.local.toml)
 └── config.local.toml.example    # local override template
