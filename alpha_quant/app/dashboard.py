@@ -1,6 +1,7 @@
 """Streamlit dashboard — read-only view of system state."""
 
 import json
+import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -128,6 +129,10 @@ def _safe_query(
     except (duckdb.CatalogException, duckdb.BinderException) as e:
         logger.warning("dashboard_query_failed", query=query[:80], error=str(e))
         st.warning(f"Query failed: {e}")
+        return pd.DataFrame()
+    except duckdb.Error as e:
+        logger.warning("dashboard_query_failed_unexpected", query=query[:80], error=str(e))
+        st.warning(f"Unexpected database error: {e}")
         return pd.DataFrame()
 
 
@@ -812,8 +817,8 @@ def decision_tab(state: duckdb.DuckDBPyConnection) -> None:
         symbol = ""
         symbol_input = st.text_input("Symbol", placeholder="e.g. AAPL").strip().upper()
         if symbol_input:
-            if not symbol_input.isalnum() or len(symbol_input) > 5:
-                st.warning("Enter a valid symbol (1-5 alphanumeric characters)")
+            if not re.match(r"^[A-Za-z0-9.-]{1,10}$", symbol_input):
+                st.warning("Enter a valid symbol (1-10 chars, letters, digits, dots and hyphens)")
             else:
                 symbol = symbol_input
         if not symbol:
