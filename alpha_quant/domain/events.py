@@ -141,6 +141,14 @@ class ErrorOccurred(BaseDomainEvent):
     context: dict = Field(default_factory=dict)
 
 
+class PipelineStepCompleted(BaseDomainEvent):
+    event_type: Literal["pipeline_step_completed"] = "pipeline_step_completed"
+    step_name: str
+    duration_s: float
+    symbols_processed: int = 0
+    items_processed: int = 0
+
+
 DomainEvent = Annotated[
     PipelineRunStarted
     | PipelineRunCompleted
@@ -161,6 +169,7 @@ DomainEvent = Annotated[
     | DrawdownLadderTripped
     | BookMarked
     | ConsistencyViolation
-    | ErrorOccurred,
+    | ErrorOccurred
+    | PipelineStepCompleted,
     Field(discriminator="event_type"),
 ]

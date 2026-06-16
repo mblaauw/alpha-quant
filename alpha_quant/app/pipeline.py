@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
@@ -38,6 +40,7 @@ from alpha_quant.domain.events import (
     PartialTaken,
     PipelineRunCompleted,
     PipelineRunStarted,
+    PipelineStepCompleted,
     RegimeChanged,
     SourceDegraded,
     StalenessHaltSet,
@@ -94,6 +97,31 @@ class RunResult:
     new_equity: float | None = None
 
 
+@contextmanager
+def _time_step(
+    step_name: str,
+    run_id: str,
+    events: list[DomainEvent],
+    symbols_processed: int = 0,
+    items_processed: int = 0,
+) -> Generator[None]:
+    start = datetime.now(UTC)
+    try:
+        yield
+    finally:
+        duration = (datetime.now(UTC) - start).total_seconds()
+        events.append(
+            PipelineStepCompleted(
+                run_id=run_id,
+                source="pipeline",
+                step_name=step_name,
+                duration_s=duration,
+                symbols_processed=symbols_processed,
+                items_processed=items_processed,
+            )
+        )
+
+
 def run(
     run_date: date,
     store: Store,
@@ -134,46 +162,47 @@ def run(
     symbols = ensure_spy(universe)
 
     all_bars: dict[str, list[Bar]] = {}
-    for symbol in symbols:
-        bars: list[Bar] = []
-        try:
-            bars = store.load_bars(symbol, lookback_start, run_date)
-        except Exception:
-            logger.warning("store_bar_load_failed", symbol=symbol)
-        if not bars and market_data is not None:
+    with _time_step("bar_load", run_id, events, symbols_processed=len(symbols)):
+        for symbol in symbols:
+            bars: list[Bar] = []
             try:
-                bars = market_data.daily_bars(symbol, lookback_start, run_date)
-                if bars:
-                    events.append(
-                        DataIngested(
-                            run_id=run_id,
-                            source="pipeline",
-                            connector="market_data",
-                            symbol=symbol,
-                            records=len(bars),
-                        )
-                    )
+                bars = store.load_bars(symbol, lookback_start, run_date)
             except Exception:
-                logger.exception("market_data_bar_load_failed", symbol=symbol)
-        if bars:
-            all_bars[symbol] = bars
-        else:
-            events.append(
-                SourceDegraded(
-                    run_id=run_id,
-                    source="pipeline",
-                    source_name=symbol,
-                    fallback="skip",
+                logger.warning("store_bar_load_failed", symbol=symbol)
+            if not bars and market_data is not None:
+                try:
+                    bars = market_data.daily_bars(symbol, lookback_start, run_date)
+                    if bars:
+                        events.append(
+                            DataIngested(
+                                run_id=run_id,
+                                source="pipeline",
+                                connector="market_data",
+                                symbol=symbol,
+                                records=len(bars),
+                            )
+                        )
+                except Exception:
+                    logger.exception("market_data_bar_load_failed", symbol=symbol)
+            if bars:
+                all_bars[symbol] = bars
+            else:
+                events.append(
+                    SourceDegraded(
+                        run_id=run_id,
+                        source="pipeline",
+                        source_name=symbol,
+                        fallback="skip",
+                    )
                 )
-            )
-            events.append(
-                ErrorOccurred(
-                    run_id=run_id,
-                    source="pipeline",
-                    error="No bar data from store or market_data",
-                    context={"symbol": symbol, "operation": "bar_load"},
+                events.append(
+                    ErrorOccurred(
+                        run_id=run_id,
+                        source="pipeline",
+                        error="No bar data from store or market_data",
+                        context={"symbol": symbol, "operation": "bar_load"},
+                    )
                 )
-            )
 
     if not all_bars.get("SPY"):
         duration = (datetime.now(UTC) - now).total_seconds()
@@ -196,56 +225,58 @@ def run(
         )
 
     # --- 2. Validate bars ---
-    for symbol, bars in all_bars.items():
-        if not bars:
-            continue
-        results = validate_bars(bars)
-        for vr in results:
-            events.append(
-                DataQuarantined(
-                    run_id=run_id,
-                    source="pipeline",
-                    symbol=symbol,
-                    reason=vr.check,
-                    detail="; ".join(vr.issues),
-                )
-            )
-            if vr.severity == "HALT":
-                halted = True
-                write_halt(reason=vr.check, run_id=run_id)
+    with _time_step("validate", run_id, events, symbols_processed=len(all_bars)):
+        for symbol, bars in all_bars.items():
+            if not bars:
+                continue
+            results = validate_bars(bars)
+            for vr in results:
                 events.append(
-                    StalenessHaltSet(
+                    DataQuarantined(
                         run_id=run_id,
                         source="pipeline",
                         symbol=symbol,
-                        hours_since_last=0.0,
+                        reason=vr.check,
+                        detail="; ".join(vr.issues),
                     )
                 )
+                if vr.severity == "HALT":
+                    halted = True
+                    write_halt(reason=vr.check, run_id=run_id)
+                    events.append(
+                        StalenessHaltSet(
+                            run_id=run_id,
+                            source="pipeline",
+                            symbol=symbol,
+                            hours_since_last=0.0,
+                        )
+                    )
 
     # --- 3. Derive indicators ---
     indicator_states: dict[str, IndicatorState] = {}
-    for symbol, bars in all_bars.items():
-        if bars:
-            try:
-                indicator_states[symbol] = backfill_indicator_state(bars)
-                events.append(
-                    IndicatorStateUpdated(
-                        run_id=run_id,
-                        source="pipeline",
-                        symbol=symbol,
-                        indicator_count=len(bars),
+    with _time_step("derive", run_id, events, symbols_processed=len(all_bars)):
+        for symbol, bars in all_bars.items():
+            if bars:
+                try:
+                    indicator_states[symbol] = backfill_indicator_state(bars)
+                    events.append(
+                        IndicatorStateUpdated(
+                            run_id=run_id,
+                            source="pipeline",
+                            symbol=symbol,
+                            indicator_count=len(bars),
+                        )
                     )
-                )
-            except Exception as e:
-                logger.exception("indicator_backfill_failed", symbol=symbol)
-                events.append(
-                    ErrorOccurred(
-                        run_id=run_id,
-                        source="pipeline",
-                        error=str(e),
-                        context={"symbol": symbol, "operation": "indicator_backfill"},
+                except Exception as e:
+                    logger.exception("indicator_backfill_failed", symbol=symbol)
+                    events.append(
+                        ErrorOccurred(
+                            run_id=run_id,
+                            source="pipeline",
+                            error=str(e),
+                            context={"symbol": symbol, "operation": "indicator_backfill"},
+                        )
                     )
-                )
 
     # --- 3b. Validate indicators ---
     for symbol, state in indicator_states.items():
@@ -262,24 +293,26 @@ def run(
             )
 
     # --- 4. Regime ---
-    spy_state = indicator_states.get("SPY")
-    regime, regime_mult = detect_regime_and_multiplier(spy_state)
-    if regime != prev_regime:
-        events.append(
-            RegimeChanged(
-                run_id=run_id,
-                source="pipeline",
-                previous=prev_regime,
-                current=regime,
+    with _time_step("regime", run_id, events):
+        spy_state = indicator_states.get("SPY")
+        regime, regime_mult = detect_regime_and_multiplier(spy_state)
+        if regime != prev_regime:
+            events.append(
+                RegimeChanged(
+                    run_id=run_id,
+                    source="pipeline",
+                    previous=prev_regime,
+                    current=regime,
+                )
             )
-        )
-    prices: dict[str, float] = {}
-    for symbol in symbols:
-        bars = all_bars.get(symbol, [])
-        if bars:
-            prices[symbol] = bars[-1].close
+        prices: dict[str, float] = {}
+        for symbol in symbols:
+            bars = all_bars.get(symbol, [])
+            if bars:
+                prices[symbol] = bars[-1].close
 
     # --- 5. Risk exits ---
+    _ts_risk = datetime.now(UTC)
     existing_positions = store.load_positions()
     positions_map: dict[str, Position] = {p.symbol: p for p in existing_positions}
     violations: list[InvariantViolation] = []
@@ -434,7 +467,18 @@ def run(
             )
         )
 
+    events.append(
+        PipelineStepCompleted(
+            run_id=run_id,
+            source="pipeline",
+            step_name="risk",
+            duration_s=(datetime.now(UTC) - _ts_risk).total_seconds(),
+            symbols_processed=len(positions_map),
+        )
+    )
+
     # --- 6. Decide (score + rank + size) ---
+    _ts_decide = datetime.now(UTC)
     new_positions_count = len([p for p in store.load_positions() if p.quantity > 0])
     slots = cfg.max_positions - new_positions_count
 
@@ -651,7 +695,18 @@ def run(
     )
     store.save_portfolio_snapshot(main_snap)
 
+    events.append(
+        PipelineStepCompleted(
+            run_id=run_id,
+            source="pipeline",
+            step_name="decide",
+            duration_s=(datetime.now(UTC) - _ts_decide).total_seconds(),
+            items_processed=len(entry_decisions),
+        )
+    )
+
     # --- 7. Shadow books ---
+    _ts_shadow = datetime.now(UTC)
     if shadow_books is not None:
         pop_equity = (prev_equity or 100_000.0) + cash_adjust
         if mech_data is None:
@@ -746,32 +801,44 @@ def run(
 
             fills.extend(sh_results_fills)
 
+    events.append(
+        PipelineStepCompleted(
+            run_id=run_id,
+            source="pipeline",
+            step_name="shadow_books",
+            duration_s=(datetime.now(UTC) - _ts_shadow).total_seconds(),
+            items_processed=len(shadow_books) if shadow_books else 0,
+        )
+    )
+
     # --- Mark to market ---
-    all_positions = store.load_positions()
-    for pos in all_positions:
-        price = prices.get(pos.symbol)
-        if price is not None and pos.quantity > 0:
-            mark = round(pos.quantity * price, 2)
-            unrel_pl = round((price - pos.avg_cost) * pos.quantity, 2)
-            store.save_position(
-                pos.model_copy(
-                    update={
-                        "current_price": price,
-                        "market_value": mark,
-                        "unrealized_pl": unrel_pl,
-                    }
+    with _time_step("mark_to_market", run_id, events, symbols_processed=len(all_positions)):
+        all_positions = store.load_positions()
+        for pos in all_positions:
+            price = prices.get(pos.symbol)
+            if price is not None and pos.quantity > 0:
+                mark = round(pos.quantity * price, 2)
+                unrel_pl = round((price - pos.avg_cost) * pos.quantity, 2)
+                store.save_position(
+                    pos.model_copy(
+                        update={
+                            "current_price": price,
+                            "market_value": mark,
+                            "unrealized_pl": unrel_pl,
+                        }
+                    )
                 )
-            )
 
     # --- Self-consistency ---
-    prev_snap_sc = store.load_latest_portfolio_snapshot()
-    base = prev_snap_sc.cash if prev_snap_sc else (prev_equity or 0.0)
-    cash = base + cash_adjust - entry_cost
-    all_positions = store.load_positions()
-    total_mark = sum(p.market_value or 0 for p in all_positions)
-    current_equity = round(cash + total_mark, 2)
-    inv = check_invariants(equity=current_equity, cash=cash, positions=all_positions)
-    violations.extend(inv)
+    with _time_step("consistency", run_id, events):
+        prev_snap_sc = store.load_latest_portfolio_snapshot()
+        base = prev_snap_sc.cash if prev_snap_sc else (prev_equity or 0.0)
+        cash = base + cash_adjust - entry_cost
+        all_positions = store.load_positions()
+        total_mark = sum(p.market_value or 0 for p in all_positions)
+        current_equity = round(cash + total_mark, 2)
+        inv = check_invariants(equity=current_equity, cash=cash, positions=all_positions)
+        violations.extend(inv)
     for v in inv:
         events.append(
             ConsistencyViolation(

@@ -180,14 +180,12 @@ class Order(BaseModel):
 
     @model_validator(mode="after")
     def _validate_fill_quantity(self) -> Self:
-        if (
-            self.filled_quantity is not None
-            and self.quantity is not None
-            and self.filled_quantity > self.quantity
-        ):
+        if self.filled_quantity is not None and self.filled_quantity > self.quantity:
             raise ValueError(
                 f"filled_quantity ({self.filled_quantity}) > quantity ({self.quantity})"
             )
+        if self.filled_quantity is not None and self.filled_quantity < 0:
+            raise ValueError(f"filled_quantity ({self.filled_quantity}) < 0")
         return self
 
 
