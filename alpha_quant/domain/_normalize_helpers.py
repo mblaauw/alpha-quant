@@ -1,4 +1,9 @@
-"""Internal helpers for normalizing raw data from external sources."""
+"""Internal helpers for normalizing raw data from external sources.
+
+Note: ``except (ValueError, TypeError):`` lines carry ``# fmt: skip``
+because ``ruff format`` corrupts multi-exception ``except`` tuples
+into Python 2 syntax, producing ``SyntaxError``. See AGENTS.md.
+"""
 
 from __future__ import annotations
 
