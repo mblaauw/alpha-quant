@@ -22,7 +22,7 @@ def _candidate(
         scores=scores,
         composite_score=0.0,
         regime="RISK_ON",
-        gate_results={"m1": True, "m4": True},
+        gate_results={"m1": not blocked, "m4": True},
         block_reason="blocked" if blocked else None,
     )
 

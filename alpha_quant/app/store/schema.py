@@ -78,83 +78,8 @@ _CANONICAL_SCHEMAS: dict[str, list[tuple[str, pa.DataType]]] = {
 }
 
 
-def _maybe_fetch_id(m: object) -> str | None:
-    return getattr(m, "fetch_id", None)
-
-
 def model_to_pylist(models: list[Any], model_name: str) -> list[dict[str, Any]]:
-    match model_name:
-        case "bars":
-            return [
-                {
-                    "symbol": m.symbol,
-                    _BAR_DATE_COL: m.date,
-                    "open": m.open,
-                    "high": m.high,
-                    "low": m.low,
-                    "close": m.close,
-                    "volume": m.volume,
-                    "adj_close": m.adj_close,
-                    "fetch_id": _maybe_fetch_id(m),
-                }
-                for m in models
-            ]
-        case "fundamentals":
-            return [m.model_dump() for m in models] if models else []
-        case "insider_transactions":
-            return [
-                {
-                    "symbol": m.symbol,
-                    "filing_date": m.filing_date,
-                    "transaction_date": m.transaction_date,
-                    "owner": m.owner,
-                    "title": m.title,
-                    "transaction_type": m.transaction_type,
-                    "shares_traded": m.shares_traded,
-                    "price": m.price,
-                    "shares_held": m.shares_held,
-                    "fetch_id": _maybe_fetch_id(m),
-                }
-                for m in models
-            ]
-        case "mentions":
-            return [
-                {
-                    "symbol": m.symbol,
-                    "mention_date": m.mention_date,
-                    "source": m.source,
-                    "count": m.count,
-                    "fetch_id": _maybe_fetch_id(m),
-                }
-                for m in models
-            ]
-        case "corp_actions":
-            return [
-                {
-                    "symbol": m.symbol,
-                    "effective_date": m.effective_date,
-                    "action_type": m.action_type,
-                    "ratio": m.ratio,
-                    "amount": m.amount,
-                    "fetch_id": _maybe_fetch_id(m),
-                }
-                for m in models
-            ]
-        case "earnings":
-            return [
-                {
-                    "symbol": m.symbol,
-                    "date": m.date,
-                    "eps_estimate": m.eps_estimate,
-                    "eps_actual": m.eps_actual,
-                    "revenue_estimate": m.revenue_estimate,
-                    "revenue_actual": m.revenue_actual,
-                    "fetch_id": _maybe_fetch_id(m),
-                }
-                for m in models
-            ]
-        case _:
-            return [m.model_dump() for m in models]
+    return [m.model_dump() for m in models]
 
 
 def partition_col(model_name: str) -> str:
@@ -181,7 +106,9 @@ def dedup_keys(dataset: str) -> str:
         "corp_actions": "symbol, effective_date, action_type",
         "earnings": "symbol, date",
     }
-    return mapping.get(dataset, "rowid")
+    if dataset not in mapping:
+        raise ValueError(f"unknown dataset: {dataset}")
+    return mapping[dataset]
 
 
 def get_schema(dataset: str) -> pa.Schema:

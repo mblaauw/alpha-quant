@@ -5,6 +5,7 @@ from datetime import date
 from typing import Literal
 
 import numpy as np
+from pydantic import BaseModel, ConfigDict
 
 from alpha_quant.domain.fills import FillConfig, fill_entry_order, fill_partial_take, fill_stop_loss
 from alpha_quant.domain.invariants import InvariantViolation, check_invariants
@@ -26,8 +27,8 @@ ABLATION_MECHANISMS: list[AblationMechanism] = [
 ]
 
 
-@dataclass
-class AblationConfig:
+class AblationConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
     disable_insider: bool = False
     disable_crowding_veto: bool = False
 

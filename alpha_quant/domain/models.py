@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Bar(BaseModel):
@@ -43,6 +43,15 @@ class Quote(BaseModel):
     bid_size: float | None = None
     ask_size: float | None = None
     volume: float | None = None
+
+    @model_validator(mode="after")
+    def _validate_spread(self) -> Self:
+        if self.bid is not None and self.ask is not None and self.bid > self.ask:
+            raise ValueError(f"bid ({self.bid}) > ask ({self.ask})")
+        all_set = self.bid is not None and self.ask is not None and self.price is not None
+        if all_set and not (self.bid <= self.price <= self.ask):
+            raise ValueError(f"price ({self.price}) not in bid-ask range [{self.bid}, {self.ask}]")
+        return self
 
 
 class TradingDay(BaseModel):
@@ -147,6 +156,12 @@ class Candidate(BaseModel):
     block_reason: str | None = None
     sector: str | None = None
 
+    @model_validator(mode="after")
+    def _validate_gate_consistency(self) -> Self:
+        if self.block_reason is not None and all(self.gate_results.values()):
+            raise ValueError(f"block_reason set ({self.block_reason}) but all gates passed")
+        return self
+
 
 class Order(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -216,12 +231,12 @@ class Decision(BaseModel):
     date: date
     action: str
     confidence: float
-    reasons: list[str] = []
+    reasons: list[str] = Field(default_factory=list)
     candidate: Candidate | None = None
     position: Position | None = None
     order: Order | None = None
-    risk_results: dict[str, float] = {}
-    mechanism_results: dict[str, float] = {}
+    risk_results: dict[str, float] = Field(default_factory=dict)
+    mechanism_results: dict[str, float] = Field(default_factory=dict)
 
 
 class UniverseMember(BaseModel):

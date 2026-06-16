@@ -1,16 +1,15 @@
 from __future__ import annotations
 
+from pydantic import BaseModel, ConfigDict
+
 from alpha_quant.domain.models import EarningsEntry, FundamentalsSnapshot
 
 
-class QualityVerdict:
-    def __init__(self, passed: bool, passed_degraded: bool = False, reason: str = "") -> None:
-        self.passed = passed
-        self.passed_degraded = passed_degraded
-        self.reason = reason
-
-    def __repr__(self) -> str:
-        return f"QualityVerdict(passed={self.passed}, degraded={self.passed_degraded})"
+class QualityVerdict(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    passed: bool
+    passed_degraded: bool = False
+    reason: str = ""
 
 
 def evaluate(

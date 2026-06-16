@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 import numpy as np
+from pydantic import BaseModel, ConfigDict
 
 from alpha_quant.domain.models import Bar, IndicatorState
 
 _isnan = np.isnan
 
 
-class TechnicalScore:
-    def __init__(self, score: float) -> None:
-        self.score = score
-
-    def __repr__(self) -> str:
-        return f"TechnicalScore(score={self.score:.4f})"
+class TechnicalScore(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    score: float
 
 
 def score(bars: list[Bar], indicator: IndicatorState) -> TechnicalScore:
@@ -20,7 +18,7 @@ def score(bars: list[Bar], indicator: IndicatorState) -> TechnicalScore:
     close = vals.get("processed_close")
 
     if close is None or _isnan(close):
-        return TechnicalScore(0.0)
+        return TechnicalScore(score=0.0)
 
     weights = {
         "trend": 0.3125,
@@ -44,7 +42,7 @@ def score(bars: list[Bar], indicator: IndicatorState) -> TechnicalScore:
         + atr_s * weights["atr"]
     )
 
-    return TechnicalScore(round(max(0.0, min(1.0, composite)), 4))
+    return TechnicalScore(score=round(max(0.0, min(1.0, composite)), 4))
 
 
 def _trend_score(close: float, vals: dict[str, float]) -> float:

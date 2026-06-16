@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
+from pydantic import BaseModel, ConfigDict, Field
 
 from alpha_quant.domain.calendar import next_market_day
 from alpha_quant.domain.models import Bar, FundamentalsSnapshot, IndicatorState
@@ -12,18 +13,12 @@ _isinf = np.isinf
 _ISSUE_PREVIEW = 3
 
 
-class ValidationResult:
-    def __init__(
-        self,
-        is_valid: bool,
-        check: str = "",
-        issues: list[str] | None = None,
-        severity: str = "WARN",
-    ) -> None:
-        self.is_valid = is_valid
-        self.check = check
-        self.issues = issues or []
-        self.severity = severity
+class ValidationResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    is_valid: bool
+    check: str = ""
+    issues: list[str] = Field(default_factory=list)
+    severity: str = "WARN"
 
 
 def _nan_inf_issues(val: Any, name: str) -> list[str]:
