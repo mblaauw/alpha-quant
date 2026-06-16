@@ -98,10 +98,12 @@ Branch naming: `<scope>-<description>` (e.g. `port-interfaces-p0.2`, `fake-adapt
 - Verify the code at every step (or use `make check`, `make format`, `make type`, `make test` as aliases):
 
 ```bash
-make check    # ruff check
-make format   # ruff format
-make type     # ty check
-make test     # pytest tests/ -q
+make check       # ruff check
+make format      # ruff format
+make format-check # ruff format --check (CI-equivalent)
+make type        # ty check alpha_quant/ (CI-equivalent)
+make type-all    # ty check alpha_quant/ tests/ (full)
+make test        # pytest tests/ -q
 ```
 
 If golden replay fixture behavior changes, re-bless the golden hash:
