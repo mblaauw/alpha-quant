@@ -17,7 +17,7 @@ def check(
     earnings_calendar: list[EarningsEntry],
     window_days: int = 3,
 ) -> BlackoutVerdict:
-    report = _next_earnings(symbol, earnings_calendar)
+    report = _next_earnings(symbol, earnings_calendar, target_date)
     if report is None:
         return "PASS"
 
@@ -28,8 +28,8 @@ def check(
     return "PASS"
 
 
-def _next_earnings(symbol: str, calendar: list[EarningsEntry]) -> date | None:
-    upcoming = [e.date for e in calendar if e.symbol.upper() == symbol.upper()]
+def _next_earnings(symbol: str, calendar: list[EarningsEntry], after: date) -> date | None:
+    upcoming = [e.date for e in calendar if e.symbol.upper() == symbol.upper() and e.date > after]
     if not upcoming:
         return None
     return min(upcoming)
