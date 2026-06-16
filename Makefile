@@ -1,4 +1,4 @@
-.PHONY: check format type test test-unit test-integration test-parallel test-dashboard test-e2e test-chaos lint qa bootstrap golden bless-golden clean schema coverage check-docs
+.PHONY: check format format-check type type-all test test-unit test-integration test-parallel test-dashboard test-e2e test-chaos lint qa bootstrap golden bless-golden clean schema coverage check-docs
 
 check:
 	uv run ruff check alpha_quant/
@@ -6,7 +6,13 @@ check:
 format:
 	uv run ruff format alpha_quant/
 
+format-check:
+	uv run ruff format --check alpha_quant/
+
 type:
+	uv run ty check alpha_quant/
+
+type-all:
 	uv run ty check alpha_quant/ tests/
 
 test:
