@@ -61,8 +61,8 @@ class OrderStoreMixin(OrderStore):
     def save_fill(self, fill: Fill) -> None:
         self._state_conn.execute(
             "INSERT OR REPLACE INTO fills"
-            " (fill_id, order_id, symbol, quantity, price, filled_at)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
+            " (fill_id, order_id, symbol, quantity, price, filled_at, fee)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
             [
                 fill.fill_id,
                 fill.order_id,
@@ -70,13 +70,14 @@ class OrderStoreMixin(OrderStore):
                 fill.quantity,
                 fill.price,
                 fill.timestamp,
+                fill.fee,
             ],
         )
 
     @override
     def load_fills(self, order_id: str) -> list[Fill]:
         rows = self._state_conn.execute(
-            "SELECT fill_id, order_id, symbol, quantity, price, filled_at"
+            "SELECT fill_id, order_id, symbol, quantity, price, filled_at, fee"
             " FROM fills WHERE order_id = ? ORDER BY filled_at",
             [order_id],
         ).fetchall()
@@ -88,6 +89,7 @@ class OrderStoreMixin(OrderStore):
                 quantity=r[3],
                 price=r[4],
                 timestamp=r[5],
+                fee=r[6],
             )
             for r in rows
         ]
