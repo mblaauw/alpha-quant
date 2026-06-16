@@ -118,10 +118,16 @@ def evaluate(
 
 
 def _sell_penalty(sell_txns: list[InsiderTransaction]) -> float:
-    c_suite_sells = sum(1 for t in sell_txns if t.title and _is_officer_role(t.title.lower()))
-    if c_suite_sells >= 3:
-        return min(0.3, c_suite_sells * 0.05)
-    return 0.0
+    c_suite_sells = [t for t in sell_txns if t.title and _is_officer_role(t.title.lower())]
+    if len(c_suite_sells) < 3:
+        return 0.0
+    total_value = sum(
+        t.shares_traded * (t.price or 0) for t in c_suite_sells if t.shares_traded > 0
+    )
+    if total_value < 50_000:
+        return 0.0
+    penalty = min(0.3, total_value / 50_000_000 * 0.15)
+    return max(0.0, penalty)
 
 
 def _is_officer_role(title_lower: str) -> bool:
