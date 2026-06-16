@@ -173,8 +173,8 @@ class Order(BaseModel):
     order_type: str
     limit_price: float | None = None
     status: str
-    submitted_at: date | None = None
-    fill_date: date | None = None
+    submitted_at: datetime | None = None
+    fill_date: datetime | None = None
     filled_quantity: float | None = None
     avg_fill_price: float | None = None
 
@@ -198,6 +198,7 @@ class Fill(BaseModel):
     quantity: float
     price: float
     timestamp: datetime
+    fee: float | None = None
 
 
 class Position(BaseModel):

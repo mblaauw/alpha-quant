@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -28,7 +28,7 @@ class TestOrderValidation:
             order_type="limit",
             limit_price=150.0,
             status="filled",
-            fill_date=date(2026, 6, 11),
+            fill_date=datetime(2026, 6, 11),
             filled_quantity=100.0,
             avg_fill_price=149.5,
         )
@@ -42,7 +42,7 @@ class TestOrderValidation:
             quantity=50.0,
             order_type="market",
             status="filled",
-            fill_date=date(2026, 6, 11),
+            fill_date=datetime(2026, 6, 11),
             filled_quantity=50.0,
         )
         assert o.filled_quantity == 50.0
@@ -56,7 +56,7 @@ class TestOrderValidation:
                 quantity=100.0,
                 order_type="market",
                 status="filled",
-                fill_date=date(2026, 6, 11),
+                fill_date=datetime(2026, 6, 11),
                 filled_quantity=150.0,
             )
 
@@ -69,10 +69,10 @@ class TestOrderValidation:
             order_type="limit",
             limit_price=180.0,
             status="partially_filled",
-            submitted_at=date(2026, 6, 10),
-            fill_date=date(2026, 6, 11),
+            submitted_at=datetime(2026, 6, 10),
+            fill_date=datetime(2026, 6, 11),
             filled_quantity=75.0,
             avg_fill_price=179.8,
         )
         assert o.filled_quantity == 75.0
-        assert o.submitted_at == date(2026, 6, 10)
+        assert o.submitted_at == datetime(2026, 6, 10)

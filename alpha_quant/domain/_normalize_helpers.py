@@ -4,6 +4,7 @@ import re
 from datetime import date, datetime
 from typing import Any
 
+from alpha_quant.domain.exceptions import DataNormalizationError
 from alpha_quant.domain.models import InsiderTransaction
 
 
@@ -17,8 +18,6 @@ def _float(value: Any) -> float | None:
 
 
 def _expect_type(raw: Any, expected: type, description: str, source: str = "normalize") -> None:
-    from alpha_quant.domain.exceptions import DataNormalizationError
-
     if not isinstance(raw, expected):
         raise DataNormalizationError(
             f"Expected {description}, got {type(raw).__name__}",

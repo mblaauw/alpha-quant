@@ -46,7 +46,7 @@ class AlpacaBroker(Broker):
             order_type="market",
             status=str(alpaca_order.status),
             submitted_at=order.submitted_at,
-            fill_date=datetime.now(UTC).date(),
+            fill_date=datetime.now(UTC),
             filled_quantity=float(str(alpaca_order.filled_qty)) if alpaca_order.filled_qty else 0.0,
             avg_fill_price=float(str(alpaca_order.filled_avg_price))
             if alpaca_order.filled_avg_price

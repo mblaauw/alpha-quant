@@ -599,7 +599,7 @@ def run(
                 quantity=float(final_shares),
                 order_type="MARKET",
                 status="submitted",
-                submitted_at=run_date,
+                submitted_at=datetime.combine(run_date, datetime.min.time()),
             )
             fill = fill_entry_order(order, bar, prev_close, config=fc)
             if fill is None:
