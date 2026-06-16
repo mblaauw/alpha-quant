@@ -97,7 +97,7 @@ def fill_stop_loss(
 
     cfg = config or FillConfig()
     slippage = _slippage_pct(quote=quote, config=cfg)
-    fill_price = bar.open * (1.0 - slippage)
+    fill_price = min(bar.open, position.stop_price) * (1.0 - slippage)
     fill_qty = position.quantity
 
     fill_id = make_fill_id(order_id, bar.date)
