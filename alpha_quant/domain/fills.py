@@ -6,9 +6,12 @@ import hashlib
 from datetime import date, datetime
 from datetime import time as dtime
 
+import structlog
 from pydantic import BaseModel, ConfigDict
 
 from alpha_quant.domain.models import Bar, CorporateAction, Fill, Order, Position, Quote
+
+logger = structlog.get_logger()
 
 
 class FillConfig(BaseModel):
@@ -118,6 +121,7 @@ def fill_partial_take(
 ) -> Fill | None:
     sell_qty = int(position.quantity * 0.5)
     if sell_qty <= 0:
+        logger.debug("Skipping partial take — position too small", quantity=position.quantity)
         return None
 
     cfg = config or FillConfig()

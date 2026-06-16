@@ -213,7 +213,7 @@ def _build_incremental_series(bars: list[Bar]) -> dict[str, np.ndarray]:
         state = update_indicator_state(state, bar)
         for k in keys:
             val = state.values.get(k)
-            if val is not None and not np.isnan(val):
+            if val is not None and not np.isnan(val) and not np.isinf(val):
                 series[k][i] = val
     return series
 
