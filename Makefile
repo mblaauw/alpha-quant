@@ -56,8 +56,8 @@ golden:
 		--output fixtures/golden/golden_run.json
 
 schema:
-	uv run python -c "from alpha_quant.app.config import AppConfig; import json; json.dump(AppConfig.model_json_schema(), open('config-schema.json','w'), indent=2)"
-	@echo "Generated config-schema.json"
+	uv run python -c "from alpha_quant.app.config import AppConfig; import json; json.dump(AppConfig.model_json_schema(), open('docs/config-schema.json','w'), indent=2)"
+	@echo "Generated docs/config-schema.json"
 
 clean:
 	rm -rf .pytest_cache .ruff_cache .mypy_cache

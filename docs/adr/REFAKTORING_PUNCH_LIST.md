@@ -112,10 +112,7 @@
 - **Status:** ✅ Not dead — trail_price used in risk.py/paper.py/store; decisions used in CLI/scheduler/tests
 
 ### P2.12: Add JSON config schema generation
-- **Files:** `alpha_quant/app/config.py` (or new script)
-- **Change:** Call `AppConfig.model_json_schema()` and write to `docs/config-schema.json`
-- **Effort:** 10 min, 1 file, ~3 lines
-- **Rationale:** Available via Pydantic but never used. Would auto-generate config documentation.
+- **Status:** ✅ Done — `make schema` generates `docs/config-schema.json` via `AppConfig.model_json_schema()`
 
 ### P2.13: Make drawdown ladder rolling window instead of all-time peak
 

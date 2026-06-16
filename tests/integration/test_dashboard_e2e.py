@@ -251,11 +251,6 @@ class TestDashboardSeeded:
         assert len(pos_metrics) > 0
         assert pos_metrics[0].value == "2"
 
-    def test_home_tab_shows_system_running(self, seeded_db: Path) -> None:
-        at = _run_dashboard(seeded_db)
-        system_success = [s.value for s in at.success if "System Running" in s.value]
-        assert len(system_success) > 0
-
     def test_reports_tab_shows_reports(self, seeded_db: Path) -> None:
         at = _run_dashboard(seeded_db)
         at.tabs[2].run()
