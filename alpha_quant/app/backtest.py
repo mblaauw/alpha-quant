@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 import numpy as np
+import structlog
 
 from alpha_quant.app._loop import (
     MechanismData,
@@ -36,6 +37,8 @@ from alpha_quant.domain.risk import (
 )
 from alpha_quant.domain.sizing import SizingConfig
 from alpha_quant.ports.store import Store
+
+logger = structlog.get_logger()
 
 
 @dataclass
@@ -186,25 +189,25 @@ def run_backtest(
             if fund:
                 mech_data.fundamentals[symbol] = fund[0]
         except Exception:
-            pass
+            logger.warning("Failed to load fundamentals", symbol=symbol)
         try:
             txns = store.load_insider_transactions(symbol)
             if txns:
                 mech_data.insider_txns[symbol] = txns
         except Exception:
-            pass
+            logger.warning("Failed to load insider_txns", symbol=symbol)
         try:
             earnings = store.load_earnings(symbol)
             if earnings:
                 mech_data.earnings[symbol] = earnings
         except Exception:
-            pass
+            logger.warning("Failed to load earnings", symbol=symbol)
         try:
             mentions = store.load_mentions(symbol)
             if mentions:
                 mech_data.mentions[symbol] = mentions
         except Exception:
-            pass
+            logger.warning("Failed to load mentions", symbol=symbol)
 
     trading_dates = _trading_dates(store, config.start_date, config.end_date)
     if not trading_dates or not all_bars.get("SPY"):
