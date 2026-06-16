@@ -1,3 +1,5 @@
+"""Report generation for portfolio and run summaries."""
+
 from __future__ import annotations
 
 from datetime import date

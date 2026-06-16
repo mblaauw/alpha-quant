@@ -1,3 +1,5 @@
+"""Fill model — entry and stop-loss order execution simulation."""
+
 from __future__ import annotations
 
 import hashlib

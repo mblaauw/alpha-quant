@@ -1,3 +1,5 @@
+"""Validation rules for bars and indicator states."""
+
 from __future__ import annotations
 
 from typing import Any

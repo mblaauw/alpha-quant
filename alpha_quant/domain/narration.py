@@ -1,3 +1,5 @@
+"""Narration/description generation for trades and decisions."""
+
 from __future__ import annotations
 
 from datetime import date

@@ -1,3 +1,5 @@
+"""Fact-checking utilities for LLM-generated content."""
+
 from __future__ import annotations
 
 import re

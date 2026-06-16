@@ -1,3 +1,5 @@
+"""Candidate ranking and sector-diversified selection."""
+
 from __future__ import annotations
 
 from alpha_quant.domain.models import Candidate

@@ -1,3 +1,5 @@
+"""Core domain models — Bar, Position, Order, Fill, Decision, and all value objects."""
+
 from __future__ import annotations
 
 from datetime import date, datetime

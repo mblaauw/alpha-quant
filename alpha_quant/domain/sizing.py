@@ -1,3 +1,5 @@
+"""Position sizing models (ATR-based, fixed fraction)."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field

@@ -1,3 +1,5 @@
+"""Incremental indicator computation (EMA, RSI, ATR, MACD)."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -435,6 +437,7 @@ _REF_TOLERANCE = 1e-6
 
 
 def verify_indicator_external() -> dict[str, float]:
+    """Validate incremental engine against hardcoded reference data."""
     n = len(_REF_INPUT["close"])
     dt = date(2026, 1, 1)
 

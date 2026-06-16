@@ -1,3 +1,5 @@
+"""Fundamental quality evaluation (accrual, D/E, cash flow)."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict

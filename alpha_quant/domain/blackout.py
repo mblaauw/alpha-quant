@@ -1,3 +1,5 @@
+"""Blackout period detection for earnings and events."""
+
 from __future__ import annotations
 
 from datetime import date, timedelta

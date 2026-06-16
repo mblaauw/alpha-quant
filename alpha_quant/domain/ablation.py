@@ -1,3 +1,5 @@
+"""Ablation study configuration and shadow book simulation."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

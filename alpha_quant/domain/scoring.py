@@ -1,3 +1,5 @@
+"""Composite scoring for trade candidates."""
+
 from __future__ import annotations
 
 

@@ -1,3 +1,5 @@
+"""System invariant checks (equity, cash, position consistency)."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
