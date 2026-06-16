@@ -3,6 +3,13 @@ import time
 
 
 class TokenBucket:
+    """Rate limiter with token bucket algorithm.
+
+    Thread-safe via lock. Note that `wait_time()` computes the estimated
+    wait without consuming a token — a concurrent `consume()` call between
+    `wait_time()` and the subsequent `consume()` may change the actual wait.
+    """
+
     def __init__(self, tokens_per_second: float, max_burst: float) -> None:
         self._rate = tokens_per_second
         self._max = max_burst

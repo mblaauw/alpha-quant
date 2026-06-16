@@ -685,7 +685,7 @@ def run(
         today_pnl = today_equity - prev_snap.equity
         daily_halt_actions = evaluate_daily_loss(today_pnl, today_equity, rc)
         for action in daily_halt_actions:
-            events.append(action)  # type: ignore
+            events.append(action)  # type: ignore  # RiskAction ≠ DomainEvent; stored as JSON payload
 
     main_snap = PortfolioSnapshot(
         date=run_date,

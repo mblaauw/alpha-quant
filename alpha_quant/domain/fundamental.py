@@ -16,6 +16,7 @@ def evaluate(
     fundamentals: FundamentalsSnapshot,
     sector_median_de: float | None = None,
     recent_earnings: EarningsEntry | None = None,
+    accrual_threshold: float = 0.05,
 ) -> QualityVerdict:
     if _all_missing(fundamentals):
         return QualityVerdict(passed=True, passed_degraded=True, reason="no fundamentals data")
@@ -37,8 +38,13 @@ def evaluate(
 
     accrual_ratio = _compute_accrual_ratio(fundamentals)
     accrual_skipped = False
-    if accrual_ratio is not None and (accrual_ratio < -0.05 or accrual_ratio > 0.05):
-        failures.append(f"accrual ratio ({accrual_ratio:.4f}) outside [-0.05, 0.05]")
+    if accrual_ratio is not None and (
+        accrual_ratio < -accrual_threshold or accrual_ratio > accrual_threshold
+    ):
+        failures.append(
+            f"accrual ratio ({accrual_ratio:.4f}) outside"
+            f" [-{accrual_threshold:.2f}, {accrual_threshold:.2f}]"
+        )
     elif (
         accrual_ratio is None
         and fundamentals.total_liabilities is None

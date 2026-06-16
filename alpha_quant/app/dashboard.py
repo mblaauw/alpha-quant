@@ -27,15 +27,15 @@ from alpha_quant.domain.events import (
 logger = structlog.get_logger()
 
 
-_EVT_CANDIDATE_SCORED = CandidateScored.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
-_EVT_CANDIDATE_BLOCKED = CandidateBlocked.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
-_EVT_CANDIDATE_PROMOTED = CandidatePromoted.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
-_EVT_FILL_BOOKED = FillBooked.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
-_EVT_STOP_ADJUSTED = StopAdjusted.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
-_EVT_PARTIAL_TAKEN = PartialTaken.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
-_EVT_TIME_STOP_TRIGGERED = TimeStopTriggered.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
-_EVT_STALENESS_HALT_SET = StalenessHaltSet.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
-_EVT_CONSISTENCY_VIOLATION = ConsistencyViolation.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
+_EVT_CANDIDATE_SCORED = CandidateScored.model_fields["event_type"].default  # type: ignore[unresolved-attribute]  # pydantic Literal default — ty can't resolve
+_EVT_CANDIDATE_BLOCKED = CandidateBlocked.model_fields["event_type"].default  # type: ignore[unresolved-attribute]  # pydantic Literal default — ty can't resolve
+_EVT_CANDIDATE_PROMOTED = CandidatePromoted.model_fields["event_type"].default  # type: ignore[unresolved-attribute]  # pydantic Literal default — ty can't resolve
+_EVT_FILL_BOOKED = FillBooked.model_fields["event_type"].default  # type: ignore[unresolved-attribute]  # pydantic Literal default — ty can't resolve
+_EVT_STOP_ADJUSTED = StopAdjusted.model_fields["event_type"].default  # type: ignore[unresolved-attribute]  # pydantic Literal default — ty can't resolve
+_EVT_PARTIAL_TAKEN = PartialTaken.model_fields["event_type"].default  # type: ignore[unresolved-attribute]  # pydantic Literal default — ty can't resolve
+_EVT_TIME_STOP_TRIGGERED = TimeStopTriggered.model_fields["event_type"].default  # type: ignore[unresolved-attribute]  # pydantic Literal default — ty can't resolve
+_EVT_STALENESS_HALT_SET = StalenessHaltSet.model_fields["event_type"].default  # type: ignore[unresolved-attribute]  # pydantic Literal default — ty can't resolve
+_EVT_CONSISTENCY_VIOLATION = ConsistencyViolation.model_fields["event_type"].default  # type: ignore[unresolved-attribute]  # pydantic Literal default — ty can't resolve
 
 _CACHE_TTL = 60
 
@@ -943,7 +943,7 @@ def main() -> None:
             elapsed = time.time() - st.session_state.last_refresh
             if elapsed >= refresh_secs:
                 st.session_state.last_refresh = time.time()
-                st.rerun()  # type: ignore[attr-defined]
+                st.rerun()  # type: ignore[attr-defined]  # Streamlit stubs don't expose rerun()
 
     if not DATA_DIR.exists():
         st.warning(f"Data directory not found: {DATA_DIR}")
