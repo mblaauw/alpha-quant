@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from alpha_quant.domain.event_log import EventLog
+from alpha_quant.app.event_log import EventLog
 from alpha_quant.domain.events import PipelineRunStarted
 
 
