@@ -22,12 +22,10 @@ lint: check format type
 	@echo "All linting passed."
 
 bootstrap:
-	export PYTHONHASHSEED=0
-	uv run alpha-quant bootstrap
+	PYTHONHASHSEED=0 uv run alpha-quant bootstrap
 
 golden:
-	export PYTHONHASHSEED=0
-	uv run alpha-quant replay \
+	PYTHONHASHSEED=0 uv run alpha-quant replay \
 		--fixture fixtures/v1 \
 		--from-date 2024-01-01 \
 		--to-date 2024-01-31 \
