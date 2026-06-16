@@ -38,6 +38,12 @@ class FixtureStore(Store):
         self._portfolio_snapshots: list[PortfolioSnapshot] = []
         self._journals: dict[date, JournalEntry] = {}
         self._reports: dict[tuple[date, str], ReportEntry] = {}
+        self._decisions: dict[str, list[Decision]] = {}
+        self._indicator_states: dict[tuple[str, date], IndicatorState] = {}
+        self._corp_actions: dict[str, list[CorporateAction]] = {}
+        self._earnings: dict[str, list[EarningsEntry]] = {}
+        self._quarantine: list[dict[str, object]] = []
+        self._runs: dict[str, str] = {}
 
     @contextmanager
     def transaction(self) -> Generator[Self]:
@@ -59,11 +65,11 @@ class FixtureStore(Store):
 
     @override
     def save_decision(self, decision: Decision) -> None:
-        pass
+        self._decisions.setdefault(decision.symbol, []).append(decision)
 
     @override
     def load_decisions(self, symbol: str, since: date) -> list[Decision]:
-        return []
+        return [d for d in self._decisions.get(symbol, []) if d.date >= since]
 
     @override
     def save_order(self, order: Order) -> None:
@@ -112,27 +118,27 @@ class FixtureStore(Store):
 
     @override
     def save_indicator_state(self, state: IndicatorState) -> None:
-        pass
+        self._indicator_states[(state.symbol, state.date)] = state
 
     @override
     def load_indicator_state(self, symbol: str, dt: date) -> IndicatorState | None:
-        return None
+        return self._indicator_states.get((symbol, dt))
 
     @override
     def save_corp_actions(self, symbol: str, actions: list[CorporateAction]) -> None:
-        pass
+        self._corp_actions[symbol] = actions
 
     @override
     def load_corp_actions(self, symbol: str) -> list[CorporateAction]:
-        return []
+        return self._corp_actions.get(symbol, [])
 
     @override
     def save_earnings(self, symbol: str, entries: list[EarningsEntry]) -> None:
-        pass
+        self._earnings[symbol] = entries
 
     @override
     def load_earnings(self, symbol: str) -> list[EarningsEntry]:
-        return []
+        return self._earnings.get(symbol, [])
 
     @override
     def load_fundamentals(self, symbol: str) -> list[FundamentalsSnapshot]:
@@ -193,27 +199,45 @@ class FixtureStore(Store):
 
     @override
     def add_quarantine(self, symbol: str, reason: str, severity: str = "QUARANTINE") -> None:
-        pass
+        self._quarantine.append(
+            {
+                "symbol": symbol,
+                "reason": reason,
+                "severity": severity,
+                "quarantined_date": date.today(),
+                "cleared_date": None,
+            }
+        )
 
     @override
     def list_quarantine(self, cleared: bool = False) -> list[dict[str, object]]:
-        return []
+        if cleared:
+            return [q for q in self._quarantine if q.get("cleared_date") is not None]
+        return [q for q in self._quarantine if q.get("cleared_date") is None]
 
     @override
     def clear_quarantine(self, symbol: str) -> None:
-        pass
+        for q in self._quarantine:
+            if q["symbol"] == symbol:
+                q["cleared_date"] = date.today()
+
+    _run_counter: int = 0
 
     @override
     def register_run(self, run_type: str, config_hash: str, fixture_version: str = "") -> str:
-        return "fixture-run-id"
+        FixtureStore._run_counter += 1
+        run_id = f"fixture-run-{FixtureStore._run_counter}"
+        self._runs[run_id] = run_type
+        return run_id
 
     @override
     def complete_run(self, run_id: str, status: str = "completed", manifest_hash: str = "") -> None:
-        pass
+        if run_id in self._runs:
+            self._runs[run_id] = status
 
     @override
     def list_runs(self, since_date: date | None = None) -> list[dict[str, object]]:
-        return []
+        return [{"run_id": rid, "run_type": rt} for rid, rt in self._runs.items()]
 
     @override
     def close(self) -> None:

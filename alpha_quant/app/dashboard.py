@@ -1,6 +1,7 @@
 """Streamlit dashboard — read-only view of system state."""
 
 import json
+import time
 from pathlib import Path
 
 import duckdb
@@ -8,6 +9,7 @@ import pandas as pd
 import streamlit as st
 import structlog
 
+from alpha_quant.app.config import ConfigError, load_config
 from alpha_quant.app.halt import is_halted, read_halt
 from alpha_quant.domain.events import (
     CandidateBlocked,
@@ -33,6 +35,8 @@ _EVT_PARTIAL_TAKEN = PartialTaken.model_fields["event_type"].default  # type: ig
 _EVT_TIME_STOP_TRIGGERED = TimeStopTriggered.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
 _EVT_STALENESS_HALT_SET = StalenessHaltSet.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
 _EVT_CONSISTENCY_VIOLATION = ConsistencyViolation.model_fields["event_type"].default  # type: ignore[unresolved-attribute]
+
+_CACHE_TTL = 60
 
 st.set_page_config(
     page_title="Alpha Quant Dashboard",
@@ -208,6 +212,94 @@ def _load_symbol_options(state: duckdb.DuckDBPyConnection) -> pd.DataFrame:
     )
 
 
+def _get_state_conn() -> duckdb.DuckDBPyConnection | None:
+    conns = _connect()
+    if conns is None:
+        return None
+    _, state = conns
+    return state
+
+
+@st.cache_data(ttl=_CACHE_TTL)
+def _cached_load_equity_curve(conn_id: str, book: str = "PAPER") -> pd.DataFrame:
+    state = _get_state_conn()
+    if state is None:
+        return pd.DataFrame()
+    return _load_equity_curve(state, book)
+
+
+@st.cache_data(ttl=_CACHE_TTL)
+def _cached_load_positions(conn_id: str) -> pd.DataFrame:
+    state = _get_state_conn()
+    if state is None:
+        return pd.DataFrame()
+    return _load_positions(state)
+
+
+@st.cache_data(ttl=_CACHE_TTL)
+def _cached_load_journals(conn_id: str) -> pd.DataFrame:
+    state = _get_state_conn()
+    if state is None:
+        return pd.DataFrame()
+    return _load_journals(state)
+
+
+@st.cache_data(ttl=_CACHE_TTL)
+def _cached_load_reports(conn_id: str) -> pd.DataFrame:
+    state = _get_state_conn()
+    if state is None:
+        return pd.DataFrame()
+    return _load_reports(state)
+
+
+@st.cache_data(ttl=_CACHE_TTL)
+def _cached_load_latest_run(conn_id: str) -> pd.DataFrame:
+    state = _get_state_conn()
+    if state is None:
+        return pd.DataFrame()
+    return _load_latest_run(state)
+
+
+@st.cache_data(ttl=_CACHE_TTL)
+def _cached_load_all_runs(conn_id: str) -> pd.DataFrame:
+    state = _get_state_conn()
+    if state is None:
+        return pd.DataFrame()
+    return _load_all_runs(state)
+
+
+@st.cache_data(ttl=_CACHE_TTL)
+def _cached_load_run_events(conn_id: str, run_id: str) -> pd.DataFrame:
+    state = _get_state_conn()
+    if state is None:
+        return pd.DataFrame()
+    return _load_run_events(state, run_id)
+
+
+@st.cache_data(ttl=_CACHE_TTL)
+def _cached_load_quarantine(conn_id: str) -> pd.DataFrame:
+    state = _get_state_conn()
+    if state is None:
+        return pd.DataFrame()
+    return _load_quarantine(state)
+
+
+@st.cache_data(ttl=_CACHE_TTL)
+def _cached_load_staleness_events(conn_id: str) -> pd.DataFrame:
+    state = _get_state_conn()
+    if state is None:
+        return pd.DataFrame()
+    return _load_staleness_events(state)
+
+
+@st.cache_data(ttl=_CACHE_TTL)
+def _cached_load_symbol_options(conn_id: str) -> pd.DataFrame:
+    state = _get_state_conn()
+    if state is None:
+        return pd.DataFrame()
+    return _load_symbol_options(state)
+
+
 def _read_markdown(path: Path) -> str:
     try:
         return path.read_text()
@@ -258,7 +350,7 @@ def _daily_briefing(state: duckdb.DuckDBPyConnection, run_id: str | None) -> Non
     else:
         _status_badge("success", "System Running — No active halts")
 
-    runs = _load_latest_run(state)
+    runs = _cached_load_latest_run("state")
     if runs.empty:
         return
 
@@ -273,7 +365,7 @@ def _daily_briefing(state: duckdb.DuckDBPyConnection, run_id: str | None) -> Non
     col3.metric("Run Date", run_date, help=_help_text("Run Date"))
 
     if run_id:
-        events_df = _load_run_events(state, run_id)
+        events_df = _cached_load_run_events("state", run_id)
         if not events_df.empty:
             scored = len(events_df[events_df["event_type"] == _EVT_CANDIDATE_SCORED])
             blocked = len(events_df[events_df["event_type"] == _EVT_CANDIDATE_BLOCKED])
@@ -289,7 +381,7 @@ def _daily_briefing(state: duckdb.DuckDBPyConnection, run_id: str | None) -> Non
                 fc3.metric("Promoted", promoted, help=_help_text("Promoted"))
                 fc4.metric("Fills", filled, help=_help_text("Fills"))
 
-    equity_df = _load_equity_curve(state)
+    equity_df = _cached_load_equity_curve("state")
     if len(equity_df) >= 2:
         prev_eq = float(equity_df.iloc[-2].equity)
         curr_eq = float(equity_df.iloc[-1].equity)
@@ -299,8 +391,8 @@ def _daily_briefing(state: duckdb.DuckDBPyConnection, run_id: str | None) -> Non
     elif len(equity_df) == 1:
         st.caption(f"Equity: **${float(equity_df.iloc[0].equity):,.2f}**")
 
-    quarantined = _load_quarantine(state)
-    staleness = _load_staleness_events(state)
+    quarantined = _cached_load_quarantine("state")
+    staleness = _cached_load_staleness_events("state")
     attention_items: list[str] = []
     if not quarantined.empty:
         attention_items.append(f"{len(quarantined)} quarantined")
@@ -313,10 +405,10 @@ def _daily_briefing(state: duckdb.DuckDBPyConnection, run_id: str | None) -> Non
 def _attention_center(state: duckdb.DuckDBPyConnection) -> None:
     _section_header("Attention Center", "Items requiring review")
 
-    quarantined = _load_quarantine(state)
-    staleness = _load_staleness_events(state)
-    positions = _load_positions(state)
-    equity_df = _load_equity_curve(state)
+    quarantined = _cached_load_quarantine("state")
+    staleness = _cached_load_staleness_events("state")
+    positions = _cached_load_positions("state")
+    equity_df = _cached_load_equity_curve("state")
 
     items: list[dict[str, str]] = []
 
@@ -400,7 +492,7 @@ def _attention_center(state: duckdb.DuckDBPyConnection) -> None:
 def _decision_funnel(state: duckdb.DuckDBPyConnection) -> None:
     _section_header("Decision Funnel", "How candidates moved through the pipeline")
 
-    runs = _load_latest_run(state)
+    runs = _cached_load_latest_run("state")
     if runs.empty:
         _empty_state("No run data available")
         return
@@ -410,7 +502,7 @@ def _decision_funnel(state: duckdb.DuckDBPyConnection) -> None:
         _empty_state("No run ID available")
         return
 
-    events_df = _load_run_events(state, run_id)
+    events_df = _cached_load_run_events("state", run_id)
     if events_df.empty:
         _empty_state("No events for latest run")
         return
@@ -505,7 +597,7 @@ def _decision_funnel(state: duckdb.DuckDBPyConnection) -> None:
 def _run_history(state: duckdb.DuckDBPyConnection) -> None:
     _section_header("Run History", "Recent pipeline runs")
 
-    all_runs = _load_all_runs(state)
+    all_runs = _cached_load_all_runs("state")
     if all_runs.empty:
         _empty_state("No runs found")
         return
@@ -527,13 +619,13 @@ def _run_history(state: duckdb.DuckDBPyConnection) -> None:
 
 
 def home_tab(state: duckdb.DuckDBPyConnection) -> None:
-    runs = _load_latest_run(state)
+    runs = _cached_load_latest_run("state")
     run_id: str | None = str(runs.iloc[0]["run_id"]) if not runs.empty else None
 
     _daily_briefing(state, run_id)
     _attention_center(state)
 
-    equity_df = _load_equity_curve(state)
+    equity_df = _cached_load_equity_curve("state")
     if not equity_df.empty:
         _section_header("Equity Curve")
         st.line_chart(equity_df, x="equity_date", y="equity")
@@ -551,7 +643,7 @@ def home_tab(state: duckdb.DuckDBPyConnection) -> None:
     _decision_funnel(state)
 
     _section_header("Portfolio Summary")
-    positions = _load_positions(state)
+    positions = _cached_load_positions("state")
     if not positions.empty:
         total_value = float(positions["market_value"].sum())
         total_pl = float(positions["unrealized_pl"].sum())
@@ -572,7 +664,7 @@ def home_tab(state: duckdb.DuckDBPyConnection) -> None:
 def portfolio_tab(state: duckdb.DuckDBPyConnection) -> None:
     _section_header("Portfolio Risk", "Position-level risk analysis")
 
-    positions = _load_positions(state)
+    positions = _cached_load_positions("state")
     if positions.empty:
         _empty_state("No open positions")
         return
@@ -631,7 +723,7 @@ def portfolio_tab(state: duckdb.DuckDBPyConnection) -> None:
 def reports_tab(state: duckdb.DuckDBPyConnection) -> None:
     _section_header("Reports")
 
-    reports = _load_reports(state)
+    reports = _cached_load_reports("state")
     if not reports.empty:
         selected = st.selectbox(
             "Select report",
@@ -688,7 +780,7 @@ def concepts_tab() -> None:
 def decision_tab(state: duckdb.DuckDBPyConnection) -> None:
     _section_header("Decision Explorer", "Investigate per-symbol decision and event history")
 
-    symbols_df = _load_symbol_options(state)
+    symbols_df = _cached_load_symbol_options("state")
     available_symbols: list[str] = symbols_df["symbol"].tolist() if not symbols_df.empty else []
 
     jump_sym = st.session_state.pop("jump_symbol", "")
@@ -799,7 +891,7 @@ def decision_tab(state: duckdb.DuckDBPyConnection) -> None:
 def journal_tab(state: duckdb.DuckDBPyConnection) -> None:
     _section_header("Journal", "Daily journal entries")
 
-    journals = _load_journals(state)
+    journals = _cached_load_journals("state")
     if not journals.empty:
         dates = journals["entry_date"].tolist()
         selected_date = st.selectbox("Select journal date", dates, format_func=str)
@@ -832,6 +924,21 @@ def main() -> None:
 
     st.caption(f"Data directory: {DATA_DIR.resolve()}")
 
+    try:
+        cfg = load_config()
+        refresh_secs = cfg.dashboard.refresh_seconds
+    except ConfigError:
+        refresh_secs = 0
+
+    if refresh_secs > 0:
+        if "last_refresh" not in st.session_state:
+            st.session_state.last_refresh = time.time()
+        else:
+            elapsed = time.time() - st.session_state.last_refresh
+            if elapsed >= refresh_secs:
+                st.session_state.last_refresh = time.time()
+                st.rerun()  # type: ignore[attr-defined]
+
     if not DATA_DIR.exists():
         st.warning(f"Data directory not found: {DATA_DIR}")
         _empty_state("Run the pipeline at least once to generate data.")
@@ -852,23 +959,24 @@ def main() -> None:
         ["Home", "Portfolio Risk", "Reports", "Concept Cards", "Journal", "Decision Explorer"]
     )
 
-    with tab1:
-        home_tab(state)
+    with st.spinner("Refreshing..."):
+        with tab1:
+            home_tab(state)
 
-    with tab2:
-        portfolio_tab(state)
+        with tab2:
+            portfolio_tab(state)
 
-    with tab3:
-        reports_tab(state)
+        with tab3:
+            reports_tab(state)
 
-    with tab4:
-        concepts_tab()
+        with tab4:
+            concepts_tab()
 
-    with tab5:
-        journal_tab(state)
+        with tab5:
+            journal_tab(state)
 
-    with tab6:
-        decision_tab(state)
+        with tab6:
+            decision_tab(state)
 
 
 if __name__ == "__main__":

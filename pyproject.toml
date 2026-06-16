@@ -58,7 +58,6 @@ quote-style = "double"
 [tool.ty.environment]
 python-version = "3.14"
 python = "./.venv"
-python-platform = "darwin"
 
 [tool.ty.rules]
 possibly-unresolved-reference = "error"
@@ -76,3 +75,4 @@ exclude = [".venv"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+filterwarnings = ["error"]

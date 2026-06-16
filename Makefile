@@ -7,7 +7,7 @@ format:
 	uv run ruff format alpha_quant/
 
 type:
-	uv run ty check alpha_quant/
+	uv run ty check alpha_quant/ tests/
 
 test:
 	uv run pytest
