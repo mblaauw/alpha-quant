@@ -110,4 +110,4 @@ def dedup_keys(dataset: str) -> str:
 
 def get_schema(dataset: str) -> pa.Schema:
     fields = _CANONICAL_SCHEMAS[dataset]
-    return pa.schema([pa.field(name, typ, nullable=typ != pa.date32()) for name, typ in fields])
+    return pa.schema([pa.field(name, typ, nullable=True) for name, typ in fields])

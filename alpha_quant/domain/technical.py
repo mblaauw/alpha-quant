@@ -111,7 +111,9 @@ def _volume_score(bars: list[Bar]) -> float:
     current = bars[-1].volume
     if current <= 0:
         return 0.0
-    avg = sum(b.volume for b in bars[:-1]) / (n - 1)
+    window = min(n - 1, 20)
+    baseline = bars[-window - 1 : -1] if window > 0 else bars[:-1]
+    avg = sum(b.volume for b in baseline) / len(baseline)
     if avg <= 0:
         return 0.5
     ratio = current / avg
