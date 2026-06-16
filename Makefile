@@ -64,7 +64,7 @@ coverage:
 check-docs:
 	@echo "Checking for stale documentation patterns..."
 	@failed=0; \
-	check() { label=$$1; shift; if grep -rni "$$@" 2>/dev/null | grep -qviE 'remove|removed|removal|changed|chang|ADR-0027|0007-use-sqlite|0008-use-custom|0010-use-custom|0014-use-streamlit|0017-use-golden'; then echo "  ❌ $$label"; grep -rni "$$@" 2>/dev/null | grep -viE 'remove|removed|removal|changed|chang|ADR-0027|0007-use-sqlite|0008-use-custom|0010-use-custom|0014-use-streamlit|0017-use-golden' | sed 's/^/      /'; failed=1; else echo "  ✅ $$label"; fi; }; \
+	check() { label=$$1; shift; if grep -rni "$$@" 2>/dev/null | grep -qviE 'remove|removed|removal|changed|chang|SqliteEventSink|ADR-0027|0007-use-sqlite|0008-use-custom|0010-use-custom|0014-use-streamlit|0017-use-golden'; then echo "  ❌ $$label"; grep -rni "$$@" 2>/dev/null | grep -viE 'remove|removed|removal|changed|chang|SqliteEventSink|ADR-0027|0007-use-sqlite|0008-use-custom|0010-use-custom|0014-use-streamlit|0017-use-golden' | sed 's/^/      /'; failed=1; else echo "  ✅ $$label"; fi; }; \
 	check 'pytest + hypothesis' 'pytest + hypothesis' docs/ README.md DESIGN.md --include='*.md'; \
 	check 'stale SQLite references in docs' 'SQLite scanner\|SQLite state\|SQLite State Store' docs/ README.md --include='*.md'; \
 	check 'stale SQLite references in tests/' '"SQLite\|Sqlite' tests/ --include='*.py'; \

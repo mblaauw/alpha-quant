@@ -2,7 +2,7 @@ from alpha_quant.adapters.real.alpaca_connector import AlpacaConnector
 from alpha_quant.adapters.real.base_connector import BaseConnector
 from alpha_quant.adapters.real.clock import SystemClock
 from alpha_quant.adapters.real.eodhd_connector import EODHDConnector
-from alpha_quant.adapters.real.event_sink import SqliteEventSink
+from alpha_quant.adapters.real.event_sink import DuckDBEventSink, SqliteEventSink
 from alpha_quant.adapters.real.openinsider_connector import OpenInsiderConnector
 from alpha_quant.adapters.real.reddit_sentiment_connector import RedditSentimentConnector
 from alpha_quant.adapters.real.sec_connector import SECConnector
@@ -15,6 +15,7 @@ __all__ = [
     "OpenInsiderConnector",
     "RedditSentimentConnector",
     "SECConnector",
+    "DuckDBEventSink",
     "SqliteEventSink",
     "SystemClock",
     "TokenBucket",
