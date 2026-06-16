@@ -83,14 +83,13 @@ fi
 # ── AC-4: Version consistency between pyproject.toml and __init__.py ──
 echo "--- AC-4: version consistency ---"
 PKG_VERSION=$(python3 -c "import re; print(re.search(r'version\s*=\s*\"([^\"]+)\"', open('$CLONE_DIR/pyproject.toml').read()).group(1))")
-INIT_VERSION=$(cd "$CLONE_DIR" && python3 -c "
-import sys; sys.path.insert(0, '.');
-from alpha_quant import __version__; print(__version__)
+PKG_META_VERSION=$(cd "$CLONE_DIR" && python3 -c "
+from importlib.metadata import version; print(version('alpha-quant'))
 " 2>/dev/null || echo "FAIL")
-if [ "$PKG_VERSION" = "$INIT_VERSION" ]; then
+if [ "$PKG_VERSION" = "$PKG_META_VERSION" ]; then
   pass
 else
-  fail "pyproject.toml version ($PKG_VERSION) != __init__.py version ($INIT_VERSION)"
+  fail "pyproject.toml version ($PKG_VERSION) != importlib.metadata version ($PKG_META_VERSION)"
 fi
 
 # ── AC-5: pytest discovery ──
