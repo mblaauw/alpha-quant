@@ -1,3 +1,9 @@
+"""Pipeline halt detection and control.
+
+The system writes a ``.HALT`` sentinel file to prevent further pipeline
+runs after a critical failure (staleness halt, max drawdown, data corruption).
+"""
+
 from __future__ import annotations
 
 import json
@@ -8,14 +14,22 @@ HALT_PATH = Path("data") / ".HALT"
 
 
 def halt_file_path() -> Path:
+    """Return the path to the halt sentinel file."""
     return HALT_PATH
 
 
 def is_halted() -> bool:
+    """Return True if a halt sentinel file exists."""
     return HALT_PATH.exists()
 
 
 def read_halt() -> dict[str, str] | None:
+    """Read halt metadata from the sentinel file.
+
+    Returns:
+        Dict with keys ``reason``, ``timestamp``, and optionally ``run_id``,
+        or ``None`` if no halt is active.
+    """
     if not HALT_PATH.exists():
         return None
     try:
@@ -26,6 +40,12 @@ def read_halt() -> dict[str, str] | None:
 
 
 def write_halt(reason: str, run_id: str = "") -> None:
+    """Write a halt sentinel file with the given reason.
+
+    Args:
+        reason: Short description of why the pipeline halted.
+        run_id: Optional run ID for traceability.
+    """
     HALT_PATH.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, str] = {
         "reason": reason,
@@ -37,6 +57,11 @@ def write_halt(reason: str, run_id: str = "") -> None:
 
 
 def clear_halt() -> bool:
+    """Remove the halt sentinel file, if present.
+
+    Returns:
+        True if a file was removed, False if none existed.
+    """
     if not HALT_PATH.exists():
         return False
     HALT_PATH.unlink()

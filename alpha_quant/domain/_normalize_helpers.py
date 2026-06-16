@@ -1,3 +1,5 @@
+"""Internal helpers for normalizing raw data from external sources."""
+
 from __future__ import annotations
 
 import re

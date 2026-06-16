@@ -1,3 +1,5 @@
+"""Corporate action handling (splits, dividends, mergers)."""
+
 from __future__ import annotations
 
 from datetime import date

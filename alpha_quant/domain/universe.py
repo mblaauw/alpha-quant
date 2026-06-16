@@ -1,3 +1,5 @@
+"""Trading universe definition and symbol management."""
+
 from __future__ import annotations
 
 from datetime import date

@@ -1,3 +1,5 @@
+"""Domain models and business logic for the Alpha-Quant trading system."""
+
 from alpha_quant.domain.ablation import (
     NO_CROWDING_VETO_CONFIG,
     NO_INSIDER_CONFIG,

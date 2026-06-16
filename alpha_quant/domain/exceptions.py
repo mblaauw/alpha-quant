@@ -1,3 +1,6 @@
+"""Domain-specific exception types."""
+
+
 class AlphaQuantError(Exception): ...
 
 

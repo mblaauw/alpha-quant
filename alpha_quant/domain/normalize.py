@@ -1,3 +1,5 @@
+"""Data normalization pipeline for external API responses."""
+
 from __future__ import annotations
 
 import json

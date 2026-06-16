@@ -1,3 +1,5 @@
+"""Market regime detection (risk-on/risk-off) using SPY indicators."""
+
 from __future__ import annotations
 
 from typing import Literal

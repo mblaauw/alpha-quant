@@ -1,3 +1,5 @@
+"""Ask/query interface for LLM-based analysis."""
+
 from __future__ import annotations
 
 import re

@@ -1,3 +1,5 @@
+"""Risk management — stops, trailing stops, partial takes, drawdown, daily loss halt."""
+
 from __future__ import annotations
 
 from datetime import date

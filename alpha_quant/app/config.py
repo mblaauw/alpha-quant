@@ -9,6 +9,8 @@ from alpha_quant.domain.risk import RiskConfig
 
 
 class BootstrapConfig(BaseModel):
+    """Configuration for initial data bootstrap (symbol list, history length)."""
+
     symbols: list[str]
     history_years: int = 3
     include_benchmarks: list[str] = ["SPY", "^VIX"]
@@ -22,6 +24,8 @@ class BootstrapConfig(BaseModel):
 
 
 class DataConfig(BaseModel):
+    """Data source configuration — fixture vs live, staleness thresholds."""
+
     mode: str = "fixture"
     indicator_state: bool = True
     staleness_halt_hours: int = 30
@@ -154,6 +158,8 @@ class ConnectorConfig(BaseModel):
 
 
 class DashboardConfig(BaseModel):
+    """Streamlit dashboard configuration — refresh interval, display options."""
+
     host: str = "localhost"
     port: int = 8501
     refresh_seconds: int = 60
@@ -174,6 +180,8 @@ class DashboardConfig(BaseModel):
 
 
 class AppConfig(BaseSettings):
+    """Top-level application configuration aggregating all sub-configs."""
+
     model_config = SettingsConfigDict(
         env_prefix="ALPHA_QUANT_",
         env_nested_delimiter="__",

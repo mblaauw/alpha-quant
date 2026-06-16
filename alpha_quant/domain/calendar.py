@@ -1,3 +1,5 @@
+"""Trading calendar and market holiday detection."""
+
 from datetime import date, timedelta
 
 
