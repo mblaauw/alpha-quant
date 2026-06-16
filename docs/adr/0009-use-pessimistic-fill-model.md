@@ -34,7 +34,7 @@ Chosen option: **Option A — Custom pessimistic fill model**.
 
 Rationale:
 1. Gap-through-stop fills at open, not stop — this is the honest, realistic treatment. A stock that gaps below the stop on an earnings miss should not be modeled as filling at the stop price
-2. Gap-up entries cancel (0.2% band) — prevents "perfect entry" bias in paper results
+2. Gap-up entries cancel (2% band) — prevents "perfect entry" bias in paper results
 3. Variable slippage from live Alpaca quotes — during high volatility, slippage increases naturally
 4. One model, five consumers (I8) — backtest, replay, paper, and 3 shadow books all use the same function
 5. Idempotent by construction: `fill_id = hash(decision_id, fill_date)` — determinism is a non-negotiable property (I7)

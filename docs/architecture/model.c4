@@ -156,15 +156,15 @@ model {
       technology 'pydantic'
 
       logicalComponent fillEntry 'Fill Entry' {
-        description 'Entry order filling: fills at T+1 open + slippage. Cancels if gap > 0.2% from decision quote.'
+        description 'Entry order filling: fills at T+1 open + slippage. Cancels if gap > 2% from decision quote.'
       }
 
       logicalComponent fillStop 'Fill Stop' {
-        description 'Stop-loss execution: if bar.low <= stop_price, fill at min(open, stop_price) - slippage. Gap-downs fill at open (pessimistic).'
+        description 'Stop-loss execution: if bar.low <= stop_price, fill at min(open, stop_price) - slippage. Gap-downs fill at open (pessimistic); intraday-break fills at stop price.'
       }
 
       logicalComponent fillPartial 'Fill Partial Take' {
-        description 'Partial take-profit: if bar.high >= take_price, sell 50% at max(open, take_price) + slippage.'
+        description 'Partial take-profit: sell 50% at T+1 open - slippage. No take-price threshold check.'
       }
 
       logicalComponent fillCorpAction 'Fill Corporate Action' {

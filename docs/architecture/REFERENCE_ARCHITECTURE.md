@@ -149,7 +149,7 @@ See [docs/adr/README.md](../adr/README.md) for full ADR index.
 
 The most distinctive architectural decision. Unlike backtesting libraries that fill stops at the stop price or naive models that fill at the close, Alpha-Quant's fill model:
 - **Gap-through-stops**: if `bar.low <= stop_price`, fills at `min(open, stop_price) - slippage`
-- **Gap-up entries**: cancels if the open gaps >0.2% above the decision quote
+- **Gap-up entries**: cancels if the open gaps >2% above the decision quote
 - **Variable slippage**: rate-dependent (0.05–0.15%) with floor/ceiling
 
 This ensures paper performance is an upper bound on achievable live results.

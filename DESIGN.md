@@ -330,7 +330,7 @@ What this removes: broker reconciliation, order-rejection handling, partial-fill
 
 Daily-bar discipline; decisions at close of day *T*, executions at *T+1*:
 
-- **Entries:** filled at *T+1 open* + slippage (5 bps + half-spread estimate from the latest Alpaca quote when live, fixed estimate in replay/backtest). If *T+1* open gaps beyond the limit band (±0.2% of decision-time quote), the order cancels and re-evaluates next run — identical to the old broker behavior.
+- **Entries:** filled at *T+1 open* + slippage (5 bps + half-spread estimate from the latest Alpaca quote when live, fixed estimate in replay/backtest). If *T+1* open gaps beyond the limit band (±2% of decision-time quote), the order cancels and re-evaluates next run — identical to the old broker behavior.
 - **Stops:** evaluated against *T+1* intraday range: if `low ≤ stop`, exit at `min(open, stop)` − slippage. Gap-downs fill at the open, not the stop — the pessimistic, honest treatment; ATR stops that "never lose more than 1%" on paper but gap through in reality are how paper systems lie. Ours doesn't.
 - **Partial takes / trails:** trail levels recomputed from *T* close; same `low/high` touch logic, conservative side always.
 - **Dividends & splits:** cash dividends credited on pay date (EODHD calendar); splits adjust positions and stops atomically with the corporate-action record.
