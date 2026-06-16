@@ -12,6 +12,7 @@ from pathlib import Path
 
 import duckdb
 import pytest
+import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 DASHBOARD_PATH = str(
@@ -190,6 +191,7 @@ def no_data_dir(tmp_path: Path) -> Path:
 def _run_dashboard(work_dir: Path) -> AppTest:
     old_cwd = Path.cwd()
     os.chdir(work_dir)
+    st.cache_data.clear()
     try:
         at = AppTest.from_file(DASHBOARD_PATH, default_timeout=10)
         at.run()
