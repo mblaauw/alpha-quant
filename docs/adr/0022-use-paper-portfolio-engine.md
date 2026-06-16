@@ -62,7 +62,7 @@ Rationale:
 
 - DESIGN.md §9: Internal paper-trading engine
 - ADR-0009: Pessimistic fill model
-- `alpha_quant/app/paper.py`
-- `alpha_quant/domain/invariants.py`
-- `alpha_quant/domain/models.py` — `PortfolioSnapshot`
-- `alpha_quant/ports/store.py` — `save_portfolio_snapshot`, `load_latest_portfolio_snapshot`
+- `src/app/paper.py`
+- `src/domain/invariants.py`
+- `src/domain/models.py` — `PortfolioSnapshot`
+- `src/ports/store.py` — `save_portfolio_snapshot`, `load_latest_portfolio_snapshot`

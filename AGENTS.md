@@ -101,8 +101,8 @@ Branch naming: `<scope>-<description>` (e.g. `port-interfaces-p0.2`, `fake-adapt
 make check       # ruff check
 make format      # ruff format
 make format-check # ruff format --check (CI-equivalent)
-make type        # ty check alpha_quant/ (CI-equivalent)
-make type-all    # ty check alpha_quant/ tests/ (full)
+make type        # ty check src/ (CI-equivalent)
+make type-all    # ty check src/ tests/ (full)
 make test        # pytest tests/ -q
 ```
 
@@ -242,9 +242,9 @@ For each issue found in the review:
 - Fix the code locally
 - Re-run the 4 tool checks:
   ```bash
-  uv run ruff check alpha_quant/
-  uv run ruff format alpha_quant/
-  uv run ty check alpha_quant/
+  uv run ruff check src/
+  uv run ruff format src/
+  uv run ty check src/
   uv run pytest tests/ -q
   ```
 - Amend the commit: `git add -A && git commit --amend --no-edit`

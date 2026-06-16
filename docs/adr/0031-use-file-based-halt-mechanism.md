@@ -60,7 +60,7 @@ Rationale:
 
 ## References
 
-- `alpha_quant/app/halt.py` — write_halt, read_halt, is_halted, clear_halt
+- `src/app/halt.py` — write_halt, read_halt, is_halted, clear_halt
 - DESIGN.md §9.2 (Halt mechanics)
 - ADR-0016 (Degrade-don't-block failure model)
 - ADR-0024 (Self-consistency invariants — I12 triggers halt)

@@ -5,24 +5,24 @@
 ### P0.1: Extract `_momentum_score` to shared utility
 
 **Files:**
-- `alpha_quant/domain/technical.py` — rename `_momentum_score` → `momentum_score` (line 67), update call site (line 35)
-- `alpha_quant/app/backtest.py` — remove local `_momentum_score` (function + its `from alpha_quant.domain.models import Bar`), add `from alpha_quant.domain.technical import momentum_score`, update call site
-- `alpha_quant/app/pipeline.py` — same as backtest.py
+- `src/domain/technical.py` — rename `_momentum_score` → `momentum_score` (line 67), update call site (line 35)
+- `src/app/backtest.py` — remove local `_momentum_score` (function + its `from domain.models import Bar`), add `from domain.technical import momentum_score`, update call site
+- `src/app/pipeline.py` — same as backtest.py
 
 ### P0.2: Remove dead code `normalize_reddit_mentions`
 
-**File:** `alpha_quant/domain/normalize.py`
+**File:** `src/domain/normalize.py`
 **Change:** Delete lines 435–474 (`def normalize_reddit_mentions(...)`). Also remove `json` import if no longer needed.
 
 ### P0.3: Fix clock leak in `domain/normalize.py`
 
-**File:** `alpha_quant/domain/normalize.py`
+**File:** `src/domain/normalize.py`
 **Location:** Line ~300, `Quote()` fallback uses `datetime.now(UTC)` when timestamp is None.
 **Change:** Replace with `timestamp | None = None` in return (make timestamp nullable, let caller supply it). Or accept a `now` parameter with default `None`.
 
 ### P0.4: Fix bootstrap determinism
 
-**File:** `alpha_quant/app/bootstrap.py`
+**File:** `src/app/bootstrap.py`
 **Changes (7 sites):** Replace `date.today()` with a `ref_date: date` parameter on each function. Default behavior: pass `ref_date` through from the top-level entry point.
 - `_generate_bars(symbols, years)` → `_generate_bars(symbols, years, ref_date)`
 - `_generate_insider_data(symbols, days)` → `_generate_insider_data(symbols, days, ref_date)`
@@ -55,12 +55,12 @@ Each follows MADR template: Context, Decision Drivers, Options Considered, Decis
 
 ### P1.4: Update domain/__init__.py re-exports
 
-**File:** `alpha_quant/domain/__init__.py`
+**File:** `src/domain/__init__.py`
 **Changes:** Add `CorporateAction`, `PortfolioSnapshot` to imports and `__all__`.
 
 ### P1.5: Fix I8 violations in backtest.py
 
-**File:** `alpha_quant/app/backtest.py`
+**File:** `src/app/backtest.py`
 **Changes:**
 - Replace ad-hoc `sell_price = max(bar.open * 0.99, bar.low)` with `fill_stop_loss()` for exits
 - Replace ad-hoc entry pricing with `fill_entry_order()` for entries
@@ -68,7 +68,7 @@ Each follows MADR template: Context, Decision Drivers, Options Considered, Decis
 
 ### P1.6: Extract shared loop utility
 
-**File:** (new) `alpha_quant/app/_loop.py`
+**File:** (new) `src/app/_loop.py`
 **Extract:** Shared daily-loop helpers (bar loading, indicator updates, market-date iteration) used by both backtest.py and pipeline.py.
 
 ---
@@ -90,12 +90,12 @@ Create unit tests for:
 
 ### P2.2: Wire validate.py into pipeline
 
-**File:** `alpha_quant/app/pipeline.py`
+**File:** `src/app/pipeline.py`
 **Change:** Call `validate.py` functions in the daily run sequence (step 2 of DESIGN §13).
 
 ### P2.3: Integrate PaperPortfolio into backtest
 
-**File:** `alpha_quant/app/backtest.py`
+**File:** `src/app/backtest.py`
 **Change:** Replace manual cash/position tracking with `PaperPortfolio` instance.
 
 ---
@@ -104,9 +104,9 @@ Create unit tests for:
 
 ```bash
 # After exiting plan mode:
-uv run ruff check alpha_quant/
-uv run ruff format alpha_quant/
-uv run ty check alpha_quant/
+uv run ruff check src/
+uv run ruff format src/
+uv run ty check src/
 uv run pytest
 ```
 

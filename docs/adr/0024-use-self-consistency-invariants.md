@@ -60,7 +60,7 @@ Rationale:
 
 - DESIGN.md §9.3: Self-consistency (replaces broker reconciliation)
 - DESIGN.md §16: System invariants I1–I13
-- `alpha_quant/domain/invariants.py`
-- `alpha_quant/app/paper.py` — `self_consistency_check()`
-- `alpha_quant/app/pipeline.py` — run-final self-consistency
+- `src/domain/invariants.py`
+- `src/app/paper.py` — `self_consistency_check()`
+- `src/app/pipeline.py` — run-final self-consistency
 - Refinement backlog P2.1: Property tests for invariants

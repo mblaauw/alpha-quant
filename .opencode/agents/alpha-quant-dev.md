@@ -19,10 +19,10 @@ Alpha-Quant is a **deterministic, daily-cadence, long-only equity paper-trading 
 
 | Layer | Directory | Imports Allowed |
 |-------|-----------|-----------------|
-| Domain | `alpha_quant/domain/` | stdlib, numpy, pydantic only |
-| Ports | `alpha_quant/ports/` | domain (types only) |
-| Adapters | `alpha_quant/adapters/` | ports, domain (types only) |
-| App | `alpha_quant/app/` | domain, ports |
+| Domain | `src/domain/` | stdlib, numpy, pydantic only |
+| Ports | `src/ports/` | domain (types only) |
+| Adapters | `src/adapters/` | ports, domain (types only) |
+| App | `src/app/` | domain, ports |
 
 **Rules:**
 - Domain NEVER imports from adapters or app
@@ -92,4 +92,4 @@ make bless-golden  # re-bless golden replay hash
 
 ## Concept Cards
 
-Reference the concept cards in `alpha_quant/concepts/` for detailed explanations of each mechanism, indicator, and risk model. Use these to answer questions about the trading logic.
+Reference the concept cards in `src/concepts/` for detailed explanations of each mechanism, indicator, and risk model. Use these to answer questions about the trading logic.

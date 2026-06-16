@@ -57,14 +57,14 @@ TradingEvent = Annotated[
 ```bash
 uv run python -c "
 import json
-from alpha_quant.domain.models import PortfolioSnapshot
+from domain.models import PortfolioSnapshot
 print(json.dumps(PortfolioSnapshot.model_json_schema(), indent=2))
 "
 ```
 
 ## Key Domain Models
 
-Located in `alpha_quant/domain/models.py`:
+Located in `src/domain/models.py`:
 - `Bar`, `Quote` — Market data
 - `Position`, `Order`, `Fill` — Trading state
 - `Decision`, `Candidate` — Decision engine output

@@ -30,7 +30,7 @@ Three execution realities, one domain core, one fill model:
 ```
 
 ```
-alpha_quant/
+src/
 ├── domain/                      # pure functions, no I/O (§1 rationale)
 │   ├── __init__.py              # re-exports models + events
 │   ├── models.py                # all pydantic data models (frozen)
