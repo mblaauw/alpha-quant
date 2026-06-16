@@ -3,13 +3,9 @@ from __future__ import annotations
 from datetime import UTC, date
 from typing import Any, override
 
-import structlog
-
 from adapters.real.base_connector import BaseConnector
 from domain.models import Bar, Quote, TradingDay
 from ports.market_data import MarketData
-
-logger = structlog.get_logger()
 
 
 class AlpacaConnector(BaseConnector, MarketData):
@@ -115,7 +111,6 @@ class AlpacaConnector(BaseConnector, MarketData):
                 for b in raw_bars
             ]
         except Exception:
-            logger.warning("alpaca_daily_bars_failed", symbol=symbol)
             return []
 
     def latest_bar(self, symbol: str) -> Bar | None:
