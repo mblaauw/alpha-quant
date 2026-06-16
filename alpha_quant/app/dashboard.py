@@ -972,6 +972,15 @@ def main() -> None:
 
     analytical, state = conn
 
+    with st.sidebar:
+        st.markdown("**System Status**")
+        if is_halted():
+            st.error(":red_circle: Halted")
+        else:
+            st.success(":green_circle: Running")
+        if st.button("Refresh :arrows_counterclockwise:"):
+            st.rerun()  # type: ignore[attr-defined]  # Streamlit stubs don't expose rerun()
+
     st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(

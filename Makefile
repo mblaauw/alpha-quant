@@ -1,4 +1,4 @@
-.PHONY: check format type test test-unit test-integration test-parallel test-dashboard test-e2e test-chaos lint qa bootstrap golden bless-golden clean schema check-docs
+.PHONY: check format type test test-unit test-integration test-parallel test-dashboard test-e2e test-chaos lint qa bootstrap golden bless-golden clean schema coverage check-docs
 
 check:
 	uv run ruff check alpha_quant/
@@ -57,6 +57,9 @@ clean:
 	rm -rf .pytest_cache .ruff_cache .mypy_cache
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name '*.pyc' -delete
+
+coverage:
+	uv run pytest --cov=alpha_quant --cov-report=html --cov-report=term
 
 check-docs:
 	@echo "Checking for stale documentation patterns..."
