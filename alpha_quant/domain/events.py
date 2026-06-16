@@ -138,7 +138,7 @@ class ConsistencyViolation(BaseDomainEvent):
 class ErrorOccurred(BaseDomainEvent):
     event_type: Literal["error_occurred"] = "error_occurred"
     error: str
-    context: dict = {}
+    context: dict = Field(default_factory=dict)
 
 
 DomainEvent = Annotated[

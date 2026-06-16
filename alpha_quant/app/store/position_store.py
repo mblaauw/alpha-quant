@@ -73,9 +73,9 @@ class PositionStoreMixin(PositionStore):
         reg = snapshot.regime or "CAUTION"
         self._state_conn.execute(
             "INSERT OR REPLACE INTO equity_curve"
-            " (equity_date, equity, cash, nav, regime, book)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            [snapshot.date, snapshot.equity, snapshot.cash, snapshot.equity, reg, book],
+            " (equity_date, equity, cash, regime, book)"
+            " VALUES (?, ?, ?, ?, ?)",
+            [snapshot.date, snapshot.equity, snapshot.cash, reg, book],
         )
 
     @override

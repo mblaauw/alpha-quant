@@ -594,7 +594,7 @@ class TestDecideCandidates:
             patch("alpha_quant.domain.loop_helpers.evaluate_insider") as mock_insider,
         ):
             mock_score.return_value = _FakeCandidate()
-            mock_fund.return_value = QualityVerdict(passed=True, reason=None)
+            mock_fund.return_value = QualityVerdict(passed=True)
             mock_bo.return_value = None
             mock_insider.return_value = InsiderVerdict(score=-1.0, reason="insider_selling")
 
@@ -670,7 +670,7 @@ class TestDecideCandidates:
             patch("alpha_quant.domain.loop_helpers.evaluate_crowding") as mock_crowd,
         ):
             mock_score.return_value = _FakeCandidate()
-            mock_fund.return_value = QualityVerdict(passed=True, reason=None)
+            mock_fund.return_value = QualityVerdict(passed=True)
             mock_bo.return_value = None
             mock_insider.return_value = InsiderVerdict(score=2.5, reason=None)
             mock_crowd.return_value = CrowdingVerdict(blocked=False, blocked_until=None, reason=None)
@@ -714,7 +714,7 @@ class TestShadowAblation:
             patch("alpha_quant.domain.loop_helpers.evaluate_insider") as mock_insider,
         ):
             mock_score.return_value = _FakeCandidate()
-            mock_fund.return_value = QualityVerdict(passed=True, reason=None)
+            mock_fund.return_value = QualityVerdict(passed=True)
             mock_bo.return_value = None
             mock_insider.return_value = InsiderVerdict(score=-2.0, reason="insider_selling")
 
