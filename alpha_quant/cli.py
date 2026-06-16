@@ -3,6 +3,8 @@ import contextlib
 import json
 import os
 import sys
+from datetime import date
+from pathlib import Path
 
 import structlog
 
@@ -361,13 +363,37 @@ def cmd_ask(args: argparse.Namespace) -> None:
     from pathlib import Path
 
     from alpha_quant.app.store import CanonicalStore
-    from alpha_quant.domain.ask import ask
+    from alpha_quant.domain.ask import ask, is_concept_query
 
     query = " ".join(args.query)
     store = CanonicalStore(base_path=Path("data"))
-    concepts_dir = Path(__file__).resolve().parent / "concepts"
-    result = ask(query, store, concepts_dir=concepts_dir)
+
+    concept_card: str | None = None
+    if is_concept_query(query):
+        concepts_dir = Path(__file__).resolve().parent / "concepts"
+        concept_card = _load_concept_card(query, concepts_dir)
+
+    result = ask(query, store, concept_card=concept_card, ref_date=date.today())
     print(result)
+
+
+def _load_concept_card(query: str, concepts_dir: Path) -> str | None:
+    import json
+
+    manifest_path = concepts_dir / "concepts.json"
+    if not manifest_path.exists():
+        return None
+
+    with manifest_path.open() as f:
+        cards = json.load(f)
+
+    for word in query.lower().split():
+        for card in cards:
+            if word in card["id"] or word in card["title"].lower():
+                card_path = concepts_dir / f"{card['id']}.md"
+                if card_path.exists():
+                    return card_path.read_text()
+    return None
 
 
 def cmd_report(args: argparse.Namespace) -> None:

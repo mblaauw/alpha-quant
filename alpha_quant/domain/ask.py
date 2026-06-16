@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import UTC, date, datetime, timedelta
-from pathlib import Path
+from datetime import UTC, date, datetime
 
 from alpha_quant.domain.events import CandidateBlocked
 from alpha_quant.ports.store import Store
@@ -109,24 +108,6 @@ def is_concept_query(query: str) -> bool:
     return any(kw in lowered for kw in keywords)
 
 
-def load_concept_card(concept_name: str, concepts_dir: Path) -> str | None:
-    manifest_path = concepts_dir / "concepts.json"
-    if not manifest_path.exists():
-        return None
-    import json
-
-    with manifest_path.open() as f:
-        cards = json.load(f)
-
-    for card in cards:
-        if concept_name.lower() in card["id"] or concept_name.lower() in card["title"].lower():
-            card_path = concepts_dir / f"{card['id']}.md"
-            if card_path.exists():
-                return card_path.read_text()
-
-    return None
-
-
 def format_blocked_answer(
     symbol: str,
     events: list[CandidateBlocked],
@@ -144,22 +125,19 @@ def format_blocked_answer(
 def ask(
     query: str,
     store: Store,
-    concepts_dir: Path | None = None,
+    ref_date: date,
+    concept_card: str | None = None,
     days: int = 30,
-    ref_date: date | None = None,
 ) -> str:
-    if is_concept_query(query) and concepts_dir and concepts_dir.exists():
-        for word in query.lower().split():
-            card = load_concept_card(word, concepts_dir)
-            if card is not None:
-                return card
+    if concept_card is not None:
+        return concept_card
 
     symbol = extract_symbol(query)
     if symbol is None:
         return "I couldn't identify a symbol or concept in your query."
 
     cutoff_dt = datetime.combine(
-        (ref_date or date.today()) - timedelta(days=days),
+        ref_date,
         datetime.min.time(),
         tzinfo=UTC,
     )
