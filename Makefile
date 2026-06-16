@@ -1,4 +1,4 @@
-.PHONY: check format type test test-dashboard test-e2e lint bootstrap golden bless-golden clean check-docs
+.PHONY: check format type test test-dashboard test-e2e lint bootstrap golden bless-golden clean schema check-docs
 
 check:
 	uv run ruff check alpha_quant/
@@ -30,6 +30,10 @@ golden:
 		--from-date 2024-01-01 \
 		--to-date 2024-01-31 \
 		--output fixtures/golden/golden_run.json
+
+schema:
+	uv run python -c "from alpha_quant.app.config import AppConfig; import json; json.dump(AppConfig.model_json_schema(), open('config-schema.json','w'), indent=2)"
+	@echo "Generated config-schema.json"
 
 clean:
 	rm -rf .pytest_cache .ruff_cache .mypy_cache

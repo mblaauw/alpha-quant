@@ -35,10 +35,12 @@ dependencies = [
     { name = "duckdb" },
     { name = "httpx" },
     { name = "numpy" },
+    { name = "pandas" },
     { name = "pyarrow" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "selectolax" },
+    { name = "streamlit" },
     { name = "structlog" },
     { name = "tenacity" },
     { name = "zstandard" },
@@ -46,11 +48,9 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
-    { name = "pandas" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
-    { name = "streamlit" },
     { name = "ty" },
 ]
 
@@ -61,7 +61,7 @@ requires-dist = [
     { name = "duckdb", specifier = ">=1.2" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "numpy", specifier = ">=2.2" },
-    { name = "pandas", marker = "extra == 'dev'", specifier = ">=2.2" },
+    { name = "pandas", specifier = ">=2.2" },
     { name = "pyarrow", specifier = ">=19.0" },
     { name = "pydantic", specifier = ">=2.10" },
     { name = "pydantic-settings", specifier = ">=2.7" },
@@ -69,7 +69,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11" },
     { name = "selectolax", specifier = ">=0.3" },
-    { name = "streamlit", marker = "extra == 'dev'", specifier = ">=1.40" },
+    { name = "streamlit", specifier = ">=1.40" },
     { name = "structlog", specifier = ">=24.4" },
     { name = "tenacity", specifier = ">=9.0" },
     { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.40" },
