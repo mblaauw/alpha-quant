@@ -131,14 +131,12 @@ def _safe_query(
         return pd.DataFrame()
 
 
-def _connect() -> tuple[duckdb.DuckDBPyConnection, duckdb.DuckDBPyConnection] | None:
+def _connect() -> duckdb.DuckDBPyConnection | None:
     state_path = DATA_DIR / "state.db"
     if not state_path.exists():
         return None
     try:
-        analytical = duckdb.connect()
-        state = duckdb.connect(str(state_path))
-        return analytical, state
+        return duckdb.connect(str(state_path))
     except duckdb.IOException as e:
         st.error(f":warning: **Database connection error** — {e}")
         return None
@@ -227,10 +225,9 @@ def _load_symbol_options(state: duckdb.DuckDBPyConnection) -> pd.DataFrame:
 
 
 def _get_state_conn() -> duckdb.DuckDBPyConnection | None:
-    conns = _connect()
-    if conns is None:
+    state = _connect()
+    if state is None:
         return None
-    _, state = conns
     return state
 
 
@@ -938,9 +935,6 @@ def main() -> None:
 
     st.caption(f"Data directory: {DATA_DIR.resolve()}")
 
-    if "active_tab" not in st.session_state:
-        st.session_state.active_tab = 0
-
     try:
         cfg = load_config()
         refresh_secs = cfg.dashboard.refresh_seconds
@@ -966,11 +960,9 @@ def main() -> None:
         _empty_state("Run the pipeline at least once to generate data.")
         return
 
-    conn = _connect()
-    if conn is None:
+    state = _connect()
+    if state is None:
         return
-
-    analytical, state = conn
 
     with st.sidebar:
         st.markdown("**System Status**")
