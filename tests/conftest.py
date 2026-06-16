@@ -8,7 +8,7 @@ from typing import Self
 
 import pytest
 
-from alpha_quant.domain.models import (
+from domain.models import (
     Bar,
     CorporateAction,
     EarningsEntry,

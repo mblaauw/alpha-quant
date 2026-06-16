@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from unittest.mock import patch
 
-from alpha_quant.app.scheduler import run_daily_pipeline
+from app.scheduler import run_daily_pipeline
 
 
 def _mock_config() -> object:
@@ -121,7 +121,7 @@ class _FakeStore:
 
 
 def _mock_violation(check: str) -> object:
-    from alpha_quant.domain.invariants import InvariantViolation
+    from domain.invariants import InvariantViolation
 
     return InvariantViolation(check=check, detail="test violation")
 
@@ -129,10 +129,10 @@ def _mock_violation(check: str) -> object:
 class TestRunDailyPipeline:
     def test_skips_non_market_day(self) -> None:
         with (
-            patch("alpha_quant.app.scheduler.is_market_day", return_value=False),
-            patch("alpha_quant.app.scheduler.is_halted", return_value=False),
-            patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
-            patch("alpha_quant.app.scheduler.CanonicalStore"),
+            patch("app.scheduler.is_market_day", return_value=False),
+            patch("app.scheduler.is_halted", return_value=False),
+            patch("app.scheduler.load_config", return_value=_mock_config()),
+            patch("app.scheduler.CanonicalStore"),
         ):
             result = run_daily_pipeline()
         assert result["status"] == "skipped"
@@ -149,11 +149,11 @@ class TestRunDailyPipeline:
             ]
         )
         with (
-            patch("alpha_quant.app.scheduler.is_market_day", return_value=True),
-            patch("alpha_quant.app.scheduler.is_halted", return_value=False),
-            patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
-            patch("alpha_quant.app.scheduler.CanonicalStore", return_value=fake_store),
-            patch("alpha_quant.app.scheduler.run_pipeline") as mock_run,
+            patch("app.scheduler.is_market_day", return_value=True),
+            patch("app.scheduler.is_halted", return_value=False),
+            patch("app.scheduler.load_config", return_value=_mock_config()),
+            patch("app.scheduler.CanonicalStore", return_value=fake_store),
+            patch("app.scheduler.run_pipeline") as mock_run,
         ):
             result = run_daily_pipeline()
         assert result["status"] == "skipped"
@@ -172,11 +172,11 @@ class TestRunDailyPipeline:
             ]
         )
         with (
-            patch("alpha_quant.app.scheduler.is_market_day", return_value=True),
-            patch("alpha_quant.app.scheduler.is_halted", return_value=False),
-            patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
-            patch("alpha_quant.app.scheduler.CanonicalStore", return_value=fake_store),
-            patch("alpha_quant.app.scheduler.run_pipeline") as mock_run,
+            patch("app.scheduler.is_market_day", return_value=True),
+            patch("app.scheduler.is_halted", return_value=False),
+            patch("app.scheduler.load_config", return_value=_mock_config()),
+            patch("app.scheduler.CanonicalStore", return_value=fake_store),
+            patch("app.scheduler.run_pipeline") as mock_run,
         ):
             result = run_daily_pipeline()
         assert result["status"] == "skipped"
@@ -188,12 +188,12 @@ class TestRunDailyPipeline:
         fake_store = _FakeStore(existing_runs=[])
         mock_result = _mock_run_result(decisions=3, fills=2, events=10)
         with (
-            patch("alpha_quant.app.scheduler.is_market_day", return_value=True),
-            patch("alpha_quant.app.scheduler.is_halted", return_value=False),
-            patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
-            patch("alpha_quant.app.scheduler.CanonicalStore", return_value=fake_store),
-            patch("alpha_quant.app.scheduler.run_pipeline", return_value=mock_result),
-            patch("alpha_quant.app.scheduler.alert"),
+            patch("app.scheduler.is_market_day", return_value=True),
+            patch("app.scheduler.is_halted", return_value=False),
+            patch("app.scheduler.load_config", return_value=_mock_config()),
+            patch("app.scheduler.CanonicalStore", return_value=fake_store),
+            patch("app.scheduler.run_pipeline", return_value=mock_result),
+            patch("app.scheduler.alert"),
         ):
             result = run_daily_pipeline()
         assert result["status"] == "completed"
@@ -209,12 +209,12 @@ class TestRunDailyPipeline:
         fake_store = _FakeStore(existing_runs=[])
         mock_result = _mock_run_result(halted=True)
         with (
-            patch("alpha_quant.app.scheduler.is_market_day", return_value=True),
-            patch("alpha_quant.app.scheduler.is_halted", return_value=False),
-            patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
-            patch("alpha_quant.app.scheduler.CanonicalStore", return_value=fake_store),
-            patch("alpha_quant.app.scheduler.run_pipeline", return_value=mock_result),
-            patch("alpha_quant.app.scheduler.alert"),
+            patch("app.scheduler.is_market_day", return_value=True),
+            patch("app.scheduler.is_halted", return_value=False),
+            patch("app.scheduler.load_config", return_value=_mock_config()),
+            patch("app.scheduler.CanonicalStore", return_value=fake_store),
+            patch("app.scheduler.run_pipeline", return_value=mock_result),
+            patch("app.scheduler.alert"),
         ):
             result = run_daily_pipeline()
         assert result["status"] == "halted"
@@ -224,12 +224,12 @@ class TestRunDailyPipeline:
         fake_store = _FakeStore(existing_runs=[])
         mock_result = _mock_run_result(violations=[_mock_violation("I5")])
         with (
-            patch("alpha_quant.app.scheduler.is_market_day", return_value=True),
-            patch("alpha_quant.app.scheduler.is_halted", return_value=False),
-            patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
-            patch("alpha_quant.app.scheduler.CanonicalStore", return_value=fake_store),
-            patch("alpha_quant.app.scheduler.run_pipeline", return_value=mock_result),
-            patch("alpha_quant.app.scheduler.alert"),
+            patch("app.scheduler.is_market_day", return_value=True),
+            patch("app.scheduler.is_halted", return_value=False),
+            patch("app.scheduler.load_config", return_value=_mock_config()),
+            patch("app.scheduler.CanonicalStore", return_value=fake_store),
+            patch("app.scheduler.run_pipeline", return_value=mock_result),
+            patch("app.scheduler.alert"),
         ):
             result = run_daily_pipeline()
         assert result["status"] == "violations"
@@ -239,12 +239,12 @@ class TestRunDailyPipeline:
     def test_records_failed_run_on_exception(self) -> None:
         fake_store = _FakeStore(existing_runs=[])
         with (
-            patch("alpha_quant.app.scheduler.is_market_day", return_value=True),
-            patch("alpha_quant.app.scheduler.is_halted", return_value=False),
-            patch("alpha_quant.app.scheduler.load_config", return_value=_mock_config()),
-            patch("alpha_quant.app.scheduler.CanonicalStore", return_value=fake_store),
-            patch("alpha_quant.app.scheduler.run_pipeline", side_effect=RuntimeError("boom")),
-            patch("alpha_quant.app.scheduler.alert"),
+            patch("app.scheduler.is_market_day", return_value=True),
+            patch("app.scheduler.is_halted", return_value=False),
+            patch("app.scheduler.load_config", return_value=_mock_config()),
+            patch("app.scheduler.CanonicalStore", return_value=fake_store),
+            patch("app.scheduler.run_pipeline", side_effect=RuntimeError("boom")),
+            patch("app.scheduler.alert"),
         ):
             result = run_daily_pipeline()
         assert result["status"] == "failed"

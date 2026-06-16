@@ -3,9 +3,9 @@
 from datetime import date
 from pathlib import Path
 
-from alpha_quant.app.store import CanonicalStore
-from alpha_quant.domain.journal import JournalEntry
-from alpha_quant.domain.models import (
+from app.store import CanonicalStore
+from domain.journal import JournalEntry
+from domain.models import (
     Bar,
     CorporateAction,
     Decision,

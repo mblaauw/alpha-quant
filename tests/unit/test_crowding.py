@@ -1,8 +1,8 @@
-"""Unit tests for M6 crowding veto (alpha_quant.domain.crowding)."""
+"""Unit tests for M6 crowding veto (domain.crowding)."""
 
 from datetime import date, timedelta
 
-from alpha_quant.domain.crowding import CrowdingVerdict, evaluate
+from domain.crowding import CrowdingVerdict, evaluate
 
 
 class TestEvaluate:

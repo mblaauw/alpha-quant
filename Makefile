@@ -1,19 +1,19 @@
 .PHONY: check format format-check type type-all test test-unit test-integration test-parallel test-dashboard test-e2e test-chaos lint qa bootstrap golden bless-golden clean schema coverage check-docs
 
 check:
-	uv run ruff check alpha_quant/
+	uv run ruff check src/
 
 format:
-	uv run ruff format alpha_quant/
+	uv run ruff format src/
 
 format-check:
-	uv run ruff format --check alpha_quant/
+	uv run ruff format --check src/
 
 type:
-	uv run ty check alpha_quant/
+	uv run ty check src/
 
 type-all:
-	uv run ty check alpha_quant/ tests/
+	uv run ty check src/ tests/
 
 test:
 	uv run pytest
@@ -56,7 +56,7 @@ golden:
 		--output fixtures/golden/golden_run.json
 
 schema:
-	uv run python -c "from alpha_quant.app.config import AppConfig; import json; json.dump(AppConfig.model_json_schema(), open('docs/config-schema.json','w'), indent=2)"
+	uv run python -c "from app.config import AppConfig; import json; json.dump(AppConfig.model_json_schema(), open('docs/config-schema.json','w'), indent=2)"
 	@echo "Generated docs/config-schema.json"
 
 clean:
@@ -65,7 +65,7 @@ clean:
 	find . -type f -name '*.pyc' -delete
 
 coverage:
-	uv run pytest --cov=alpha_quant --cov-report=html --cov-report=term
+	uv run pytest --cov=src --cov-report=html --cov-report=term
 
 check-docs:
 	@echo "Checking for stale documentation patterns..."

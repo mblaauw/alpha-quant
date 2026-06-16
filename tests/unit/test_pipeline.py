@@ -1,12 +1,12 @@
-"""Unit tests for pipeline core flow (alpha_quant.app.pipeline)."""
+"""Unit tests for pipeline core flow (app.pipeline)."""
 
 from datetime import date
 from unittest.mock import patch
 
-from alpha_quant.app.pipeline import RunResult, run
-from alpha_quant.domain.invariants import InvariantViolation
-from alpha_quant.domain.models import Bar, PortfolioSnapshot, Position
-from alpha_quant.domain.risk import RiskConfig
+from app.pipeline import RunResult, run
+from domain.invariants import InvariantViolation
+from domain.models import Bar, PortfolioSnapshot, Position
+from domain.risk import RiskConfig
 
 
 def _bar(open_v: float = 100.0) -> Bar:
@@ -114,8 +114,8 @@ class TestPipelineCore:
         aapl_bars = _make_bars(400, 150.0)
         store = _FakeStore(bars={"SPY": spy_bars, "AAPL": aapl_bars})
         with (
-            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
-            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("app.pipeline.detect_regime_and_multiplier") as mock_regime,
         ):
             mock_backfill.return_value = _FakeIndicatorState()
             mock_regime.return_value = ("RISK_ON", 1.0)
@@ -132,8 +132,8 @@ class TestPipelineCore:
         aapl_bars = _make_bars(400, 150.0)
         store = _FakeStore(bars={"SPY": spy_bars, "AAPL": aapl_bars})
         with (
-            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
-            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("app.pipeline.detect_regime_and_multiplier") as mock_regime,
         ):
             mock_backfill.return_value = _FakeIndicatorState()
             mock_regime.return_value = ("RISK_OFF", 0.0)
@@ -161,9 +161,9 @@ class TestPipelineCore:
             )
         ]
         with (
-            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
-            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
-            patch("alpha_quant.app.pipeline.evaluate_risk_actions") as mock_risk,
+            patch("app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("app.pipeline.evaluate_risk_actions") as mock_risk,
         ):
             mock_backfill.return_value = _FakeIndicatorState()
             mock_regime.return_value = ("RISK_ON", 1.0)
@@ -181,14 +181,14 @@ class TestPipelineCore:
         aapl_bars = _make_bars(400, 150.0)
         store = _FakeStore(bars={"SPY": spy_bars, "AAPL": aapl_bars})
         with (
-            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
-            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
-            patch("alpha_quant.app.pipeline.ensure_spy") as mock_ensure,
-            patch("alpha_quant.app.pipeline.get_bar_for_date") as mock_bar,
-            patch("alpha_quant.app.pipeline.decide_candidates") as mock_decide,
-            patch("alpha_quant.app.pipeline.rank_candidates") as mock_rank,
-            patch("alpha_quant.app.pipeline.compute_atr") as mock_atr,
-            patch("alpha_quant.app.pipeline.size_entry") as mock_size,
+            patch("app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("app.pipeline.ensure_spy") as mock_ensure,
+            patch("app.pipeline.get_bar_for_date") as mock_bar,
+            patch("app.pipeline.decide_candidates") as mock_decide,
+            patch("app.pipeline.rank_candidates") as mock_rank,
+            patch("app.pipeline.compute_atr") as mock_atr,
+            patch("app.pipeline.size_entry") as mock_size,
         ):
             mock_backfill.return_value = _FakeIndicatorState()
             mock_regime.return_value = ("RISK_ON", 1.0)
@@ -227,10 +227,10 @@ class TestPipelineCore:
             )
         ]
         with (
-            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
-            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
-            patch("alpha_quant.app.pipeline.ensure_spy") as mock_ensure,
-            patch("alpha_quant.app.pipeline.check_invariants") as mock_ci,
+            patch("app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("app.pipeline.ensure_spy") as mock_ensure,
+            patch("app.pipeline.check_invariants") as mock_ci,
         ):
             mock_backfill.return_value = _FakeIndicatorState()
             mock_regime.return_value = ("RISK_ON", 1.0)
@@ -251,9 +251,9 @@ class TestPipelineCore:
         aapl_bars = _make_bars(400, 150.0)
         store = _FakeStore(bars={"SPY": spy_bars, "AAPL": aapl_bars})
         with (
-            patch("alpha_quant.app.pipeline.validate_bars") as mock_validate,
-            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
-            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("app.pipeline.validate_bars") as mock_validate,
+            patch("app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("app.pipeline.detect_regime_and_multiplier") as mock_regime,
         ):
             mock_validate.return_value = [
                 type("VR", (), {"check": "test", "issues": ["halt"], "severity": "HALT"})()
@@ -276,8 +276,8 @@ class TestPipelineCore:
         ]
         store = _FakeStore(bars={"SPY": spy_bars, "AAPL": aapl_bars}, snapshots=snapshots)
         with (
-            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
-            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("app.pipeline.detect_regime_and_multiplier") as mock_regime,
         ):
             mock_backfill.return_value = _FakeIndicatorState()
             mock_regime.return_value = ("RISK_ON", 1.0)
@@ -302,8 +302,8 @@ class TestPipelineCore:
         ]
         store = _FakeStore(bars={"SPY": spy_bars, "AAPL": aapl_bars}, snapshots=snapshots)
         with (
-            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
-            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("app.pipeline.detect_regime_and_multiplier") as mock_regime,
         ):
             mock_backfill.return_value = _FakeIndicatorState()
             mock_regime.return_value = ("RISK_ON", 1.0)
@@ -322,8 +322,8 @@ class TestPipelineCore:
         spy_bars = _make_bars(400, 100.0)
         store = _FakeStore(bars={"SPY": spy_bars})
         with (
-            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
-            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("app.pipeline.detect_regime_and_multiplier") as mock_regime,
         ):
             mock_backfill.return_value = _FakeIndicatorState()
             mock_regime.return_value = ("RISK_ON", 1.0)
@@ -344,8 +344,8 @@ class TestPipelineCore:
         aapl_bars = _make_bars(400, 150.0)
         store = _FakeStore(bars={"SPY": spy_bars, "AAPL": aapl_bars})
         with (
-            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
-            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("app.pipeline.detect_regime_and_multiplier") as mock_regime,
         ):
             mock_backfill.return_value = _FakeIndicatorState()
             mock_regime.return_value = ("RISK_OFF", 0.0)
@@ -366,9 +366,9 @@ class TestPipelineCore:
         aapl_bars = _make_bars(400, 150.0)
         store = _FakeStore(bars={"SPY": spy_bars, "AAPL": aapl_bars})
         with (
-            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
-            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
-            patch("alpha_quant.app.pipeline.decide_candidates") as mock_decide,
+            patch("app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("app.pipeline.decide_candidates") as mock_decide,
         ):
             mock_backfill.return_value = _FakeIndicatorState()
             mock_regime.return_value = ("RISK_ON", 1.0)
@@ -406,8 +406,8 @@ class TestPipelineCore:
             )
         ]
         with (
-            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
-            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("app.pipeline.detect_regime_and_multiplier") as mock_regime,
         ):
             mock_backfill.return_value = _FakeIndicatorState()
             mock_regime.return_value = ("RISK_ON", 1.0)
@@ -447,9 +447,9 @@ class TestPipelineCore:
             )
         ]
         with (
-            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
-            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
-            patch("alpha_quant.app.pipeline.check_invariants") as mock_ci,
+            patch("app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("app.pipeline.check_invariants") as mock_ci,
         ):
             mock_backfill.return_value = _FakeIndicatorState()
             mock_regime.return_value = ("RISK_ON", 1.0)
@@ -514,8 +514,8 @@ class TestDecideCandidates:
     def test_m7_earnings_blackout_blocks(self) -> None:
         from datetime import date
 
-        from alpha_quant.app._loop import MechanismData, decide_candidates
-        from alpha_quant.domain.models import EarningsEntry
+        from app._loop import MechanismData, decide_candidates
+        from domain.models import EarningsEntry
 
         mech_data = MechanismData(
             earnings={
@@ -526,8 +526,8 @@ class TestDecideCandidates:
         states = {"AAPL": _FakeIndicatorState()}
 
         with (
-            patch("alpha_quant.app._loop.score_candidate") as mock_score,
-            patch("alpha_quant.domain.loop_helpers.check_blackout") as mock_bo,
+            patch("app._loop.score_candidate") as mock_score,
+            patch("domain.loop_helpers.check_blackout") as mock_bo,
         ):
             mock_score.return_value = _FakeCandidate()
             mock_bo.return_value = "BLOCK"
@@ -543,9 +543,9 @@ class TestDecideCandidates:
     def test_m4_fundamental_blocks(self) -> None:
         from datetime import date
 
-        from alpha_quant.app._loop import MechanismData, decide_candidates
-        from alpha_quant.domain.fundamental import QualityVerdict
-        from alpha_quant.domain.models import EarningsEntry, FundamentalsSnapshot
+        from app._loop import MechanismData, decide_candidates
+        from domain.fundamental import QualityVerdict
+        from domain.models import EarningsEntry, FundamentalsSnapshot
 
         mech_data = MechanismData(
             fundamentals={"AAPL": FundamentalsSnapshot(symbol="AAPL", as_of_date=date(2026, 6, 11), market_cap=1e12)},
@@ -555,9 +555,9 @@ class TestDecideCandidates:
         states = {"AAPL": _FakeIndicatorState()}
 
         with (
-            patch("alpha_quant.app._loop.score_candidate") as mock_score,
-            patch("alpha_quant.domain.loop_helpers.evaluate_fundamental") as mock_fund,
-            patch("alpha_quant.domain.loop_helpers.check_blackout") as mock_bo,
+            patch("app._loop.score_candidate") as mock_score,
+            patch("domain.loop_helpers.evaluate_fundamental") as mock_fund,
+            patch("domain.loop_helpers.check_blackout") as mock_bo,
         ):
             mock_score.return_value = _FakeCandidate()
             mock_fund.return_value = QualityVerdict(passed=False, reason="low_quality")
@@ -574,10 +574,10 @@ class TestDecideCandidates:
     def test_m5_insider_blocks_on_negative_signal(self) -> None:
         from datetime import date
 
-        from alpha_quant.app._loop import MechanismData, decide_candidates
-        from alpha_quant.domain.fundamental import QualityVerdict
-        from alpha_quant.domain.insider_signal import InsiderVerdict
-        from alpha_quant.domain.models import EarningsEntry, FundamentalsSnapshot, InsiderTransaction
+        from app._loop import MechanismData, decide_candidates
+        from domain.fundamental import QualityVerdict
+        from domain.insider_signal import InsiderVerdict
+        from domain.models import EarningsEntry, FundamentalsSnapshot, InsiderTransaction
 
         mech_data = MechanismData(
             fundamentals={"AAPL": FundamentalsSnapshot(symbol="AAPL", as_of_date=date(2026, 6, 11), market_cap=1e12)},
@@ -588,10 +588,10 @@ class TestDecideCandidates:
         states = {"AAPL": _FakeIndicatorState()}
 
         with (
-            patch("alpha_quant.app._loop.score_candidate") as mock_score,
-            patch("alpha_quant.domain.loop_helpers.evaluate_fundamental") as mock_fund,
-            patch("alpha_quant.domain.loop_helpers.check_blackout") as mock_bo,
-            patch("alpha_quant.domain.loop_helpers.evaluate_insider") as mock_insider,
+            patch("app._loop.score_candidate") as mock_score,
+            patch("domain.loop_helpers.evaluate_fundamental") as mock_fund,
+            patch("domain.loop_helpers.check_blackout") as mock_bo,
+            patch("domain.loop_helpers.evaluate_insider") as mock_insider,
         ):
             mock_score.return_value = _FakeCandidate()
             mock_fund.return_value = QualityVerdict(passed=True)
@@ -609,9 +609,9 @@ class TestDecideCandidates:
     def test_m6_crowding_blocks(self) -> None:
         from datetime import date
 
-        from alpha_quant.app._loop import MechanismData, decide_candidates
-        from alpha_quant.domain.crowding import CrowdingVerdict
-        from alpha_quant.domain.models import EarningsEntry, MentionCount
+        from app._loop import MechanismData, decide_candidates
+        from domain.crowding import CrowdingVerdict
+        from domain.models import EarningsEntry, MentionCount
 
         mention_dates = [date(2026, 6, d) for d in range(1, 12)]
         mech_data = MechanismData(
@@ -626,9 +626,9 @@ class TestDecideCandidates:
         states = {"AAPL": _FakeIndicatorState()}
 
         with (
-            patch("alpha_quant.app._loop.score_candidate") as mock_score,
-            patch("alpha_quant.domain.loop_helpers.check_blackout") as mock_bo,
-            patch("alpha_quant.domain.loop_helpers.evaluate_crowding") as mock_crowd,
+            patch("app._loop.score_candidate") as mock_score,
+            patch("domain.loop_helpers.check_blackout") as mock_bo,
+            patch("domain.loop_helpers.evaluate_crowding") as mock_crowd,
         ):
             mock_score.return_value = _FakeCandidate()
             mock_bo.return_value = None
@@ -645,11 +645,11 @@ class TestDecideCandidates:
     def test_all_gates_pass_with_extra_scores(self) -> None:
         from datetime import date
 
-        from alpha_quant.app._loop import MechanismData, decide_candidates
-        from alpha_quant.domain.crowding import CrowdingVerdict
-        from alpha_quant.domain.fundamental import QualityVerdict
-        from alpha_quant.domain.insider_signal import InsiderVerdict
-        from alpha_quant.domain.models import EarningsEntry, FundamentalsSnapshot, InsiderTransaction, MentionCount
+        from app._loop import MechanismData, decide_candidates
+        from domain.crowding import CrowdingVerdict
+        from domain.fundamental import QualityVerdict
+        from domain.insider_signal import InsiderVerdict
+        from domain.models import EarningsEntry, FundamentalsSnapshot, InsiderTransaction, MentionCount
 
         mech_data = MechanismData(
             fundamentals={"AAPL": FundamentalsSnapshot(symbol="AAPL", as_of_date=date(2026, 6, 11), market_cap=1e12)},
@@ -663,11 +663,11 @@ class TestDecideCandidates:
         states = {"AAPL": _FakeIndicatorState()}
 
         with (
-            patch("alpha_quant.app._loop.score_candidate") as mock_score,
-            patch("alpha_quant.domain.loop_helpers.evaluate_fundamental") as mock_fund,
-            patch("alpha_quant.domain.loop_helpers.check_blackout") as mock_bo,
-            patch("alpha_quant.domain.loop_helpers.evaluate_insider") as mock_insider,
-            patch("alpha_quant.domain.loop_helpers.evaluate_crowding") as mock_crowd,
+            patch("app._loop.score_candidate") as mock_score,
+            patch("domain.loop_helpers.evaluate_fundamental") as mock_fund,
+            patch("domain.loop_helpers.check_blackout") as mock_bo,
+            patch("domain.loop_helpers.evaluate_insider") as mock_insider,
+            patch("domain.loop_helpers.evaluate_crowding") as mock_crowd,
         ):
             mock_score.return_value = _FakeCandidate()
             mock_fund.return_value = QualityVerdict(passed=True)
@@ -692,11 +692,11 @@ class TestShadowAblation:
         """NO_INSIDER produces different outcome than FULL when M5 blocks."""
         from datetime import date
 
-        from alpha_quant.app._loop import MechanismData, decide_candidates
-        from alpha_quant.domain.ablation import AblationConfig
-        from alpha_quant.domain.fundamental import QualityVerdict
-        from alpha_quant.domain.insider_signal import InsiderVerdict
-        from alpha_quant.domain.models import EarningsEntry, FundamentalsSnapshot, InsiderTransaction
+        from app._loop import MechanismData, decide_candidates
+        from domain.ablation import AblationConfig
+        from domain.fundamental import QualityVerdict
+        from domain.insider_signal import InsiderVerdict
+        from domain.models import EarningsEntry, FundamentalsSnapshot, InsiderTransaction
     
         mech_data = MechanismData(
             fundamentals={"AAPL": FundamentalsSnapshot(symbol="AAPL", as_of_date=date(2026, 6, 11), market_cap=1e12)},
@@ -708,10 +708,10 @@ class TestShadowAblation:
         no_insider = AblationConfig(disable_insider=True)
 
         with (
-            patch("alpha_quant.app._loop.score_candidate") as mock_score,
-            patch("alpha_quant.domain.loop_helpers.evaluate_fundamental") as mock_fund,
-            patch("alpha_quant.domain.loop_helpers.check_blackout") as mock_bo,
-            patch("alpha_quant.domain.loop_helpers.evaluate_insider") as mock_insider,
+            patch("app._loop.score_candidate") as mock_score,
+            patch("domain.loop_helpers.evaluate_fundamental") as mock_fund,
+            patch("domain.loop_helpers.check_blackout") as mock_bo,
+            patch("domain.loop_helpers.evaluate_insider") as mock_insider,
         ):
             mock_score.return_value = _FakeCandidate()
             mock_fund.return_value = QualityVerdict(passed=True)
@@ -740,10 +740,10 @@ class TestShadowAblation:
         """NO_CROWDING_VETO produces different outcome than FULL when M6 blocks."""
         from datetime import date
 
-        from alpha_quant.app._loop import MechanismData, decide_candidates
-        from alpha_quant.domain.ablation import AblationConfig
-        from alpha_quant.domain.crowding import CrowdingVerdict
-        from alpha_quant.domain.models import EarningsEntry, MentionCount
+        from app._loop import MechanismData, decide_candidates
+        from domain.ablation import AblationConfig
+        from domain.crowding import CrowdingVerdict
+        from domain.models import EarningsEntry, MentionCount
 
         mech_data = MechanismData(
             mentions={"AAPL": [MentionCount(symbol="AAPL", mention_date=date(2026, 6, 10), source="twitter", count=1000)]},
@@ -754,9 +754,9 @@ class TestShadowAblation:
         no_crowding = AblationConfig(disable_crowding_veto=True)
 
         with (
-            patch("alpha_quant.app._loop.score_candidate") as mock_score,
-            patch("alpha_quant.domain.loop_helpers.check_blackout") as mock_bo,
-            patch("alpha_quant.domain.loop_helpers.evaluate_crowding") as mock_crowd,
+            patch("app._loop.score_candidate") as mock_score,
+            patch("domain.loop_helpers.check_blackout") as mock_bo,
+            patch("domain.loop_helpers.evaluate_crowding") as mock_crowd,
         ):
             mock_score.return_value = _FakeCandidate()
             mock_bo.return_value = None
@@ -782,9 +782,9 @@ class TestShadowAblation:
 
     def test_pipeline_accepts_shadow_books(self) -> None:
         """Pipeline.run processes shadow books and persists their snapshots."""
-        from alpha_quant.app.pipeline import PipelineConfig, run as run_pipeline
-        from alpha_quant.domain.ablation import AblationConfig, ShadowBook
-        from alpha_quant.domain.fills import FillConfig
+        from app.pipeline import PipelineConfig, run as run_pipeline
+        from domain.ablation import AblationConfig, ShadowBook
+        from domain.fills import FillConfig
 
         spy_bars = _make_bars(400, 100.0)
         aapl_bars = _make_bars(400, 150.0)
@@ -793,9 +793,9 @@ class TestShadowAblation:
         shadow_book = ShadowBook("TEST_SHADOW", AblationConfig(disable_insider=True))
 
         with (
-            patch("alpha_quant.app.pipeline.backfill_indicator_state") as mock_backfill,
-            patch("alpha_quant.app.pipeline.detect_regime_and_multiplier") as mock_regime,
-            patch("alpha_quant.app.pipeline.decide_candidates") as mock_decide,
+            patch("app.pipeline.backfill_indicator_state") as mock_backfill,
+            patch("app.pipeline.detect_regime_and_multiplier") as mock_regime,
+            patch("app.pipeline.decide_candidates") as mock_decide,
         ):
             mock_backfill.return_value = _FakeIndicatorState()
             mock_regime.return_value = ("RISK_ON", 1.0)
@@ -815,9 +815,9 @@ class TestShadowAblation:
 
     def test_backtest_accepts_ablation_config(self) -> None:
         """Backtest config passes ablation through to decide_candidates."""
-        from alpha_quant.app.backtest import BacktestConfig, run_backtest
-        from alpha_quant.domain.ablation import AblationConfig
-        from alpha_quant.domain.fills import FillConfig
+        from app.backtest import BacktestConfig, run_backtest
+        from domain.ablation import AblationConfig
+        from domain.fills import FillConfig
 
         spy_bars = _make_bars(400, 100.0)
         aapl_bars = _make_bars(400, 150.0)
@@ -832,10 +832,10 @@ class TestShadowAblation:
         )
 
         with (
-            patch("alpha_quant.app.backtest.backfill_indicator_state") as mock_backfill,
-            patch("alpha_quant.app.backtest.update_indicator_state") as mock_update,
-            patch("alpha_quant.app.backtest.detect_regime_and_multiplier") as mock_regime,
-            patch("alpha_quant.app.backtest.decide_candidates") as mock_decide,
+            patch("app.backtest.backfill_indicator_state") as mock_backfill,
+            patch("app.backtest.update_indicator_state") as mock_update,
+            patch("app.backtest.detect_regime_and_multiplier") as mock_regime,
+            patch("app.backtest.decide_candidates") as mock_decide,
         ):
             mock_backfill.return_value = _FakeIndicatorState()
             mock_update.return_value = _FakeIndicatorState()

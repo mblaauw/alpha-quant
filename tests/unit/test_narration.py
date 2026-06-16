@@ -1,18 +1,18 @@
-"""Unit tests for narration context builder (alpha_quant.domain.narration)."""
+"""Unit tests for narration context builder (domain.narration)."""
 
 from datetime import date, datetime
 
 import pytest
 from pydantic import ValidationError
 
-from alpha_quant.domain.events import (
+from domain.events import (
     CandidateBlocked,
     CandidatePromoted,
     CandidateScored,
     SourceDegraded,
 )
-from alpha_quant.domain.models import Position
-from alpha_quant.domain.narration import PositionNarration, build
+from domain.models import Position
+from domain.narration import PositionNarration, build
 
 
 def _event(**kwargs: object) -> dict:

@@ -1,6 +1,6 @@
-"""Unit tests for M4 fundamental quality gate (alpha_quant.domain.fundamental)."""
+"""Unit tests for M4 fundamental quality gate (domain.fundamental)."""
 
-from alpha_quant.domain.fundamental import QualityVerdict, evaluate
+from domain.fundamental import QualityVerdict, evaluate
 from tests.conftest import make_earnings, make_fundamentals
 
 

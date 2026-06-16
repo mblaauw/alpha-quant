@@ -2,8 +2,8 @@
 
 from datetime import UTC, datetime
 
-from alpha_quant.app.event_log import EventLog
-from alpha_quant.domain.events import PipelineRunStarted
+from app.event_log import EventLog
+from domain.events import PipelineRunStarted
 
 
 class _FakeStore:

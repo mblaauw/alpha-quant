@@ -3,12 +3,12 @@
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from alpha_quant.app.store import CanonicalStore
-from alpha_quant.domain.events import CandidateBlocked, CandidatePromoted, CandidateScored
-from alpha_quant.domain.journal import generate_journal
-from alpha_quant.domain.models import PortfolioSnapshot, Position
-from alpha_quant.domain.narration import NarrationContext, PositionNarration
-from alpha_quant.domain.reporting import generate_monthly, generate_weekly
+from app.store import CanonicalStore
+from domain.events import CandidateBlocked, CandidatePromoted, CandidateScored
+from domain.journal import generate_journal
+from domain.models import PortfolioSnapshot, Position
+from domain.narration import NarrationContext, PositionNarration
+from domain.reporting import generate_monthly, generate_weekly
 
 store = CanonicalStore(base_path=Path("data"))
 

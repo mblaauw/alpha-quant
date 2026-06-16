@@ -3,9 +3,9 @@
 import time
 from datetime import date, timedelta
 
-from alpha_quant.domain.models import Bar, Candidate, IndicatorState
-from alpha_quant.domain.ranking import rank
-from alpha_quant.domain.technical import score
+from domain.models import Bar, Candidate, IndicatorState
+from domain.ranking import rank
+from domain.technical import score
 
 
 def _make_bars(count: int) -> list[Bar]:

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from alpha_quant.app.vault import Vault
+from app.vault import Vault
 
 
 def test_append_only_duplicate_returns_same_fetch_id(tmp_path: Path) -> None:

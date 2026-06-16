@@ -2,9 +2,9 @@
 
 from datetime import date, timedelta
 
-from alpha_quant.app.backtest import BacktestConfig, BacktestMetrics, run_backtest
-from alpha_quant.app.store import CanonicalStore
-from alpha_quant.domain.models import Bar
+from app.backtest import BacktestConfig, BacktestMetrics, run_backtest
+from app.store import CanonicalStore
+from domain.models import Bar
 
 
 def _make_bars(symbol: str, count: int, start_price: float = 100.0) -> list[Bar]:

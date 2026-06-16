@@ -1,11 +1,11 @@
-"""Unit tests for risk management (alpha_quant.domain.risk)."""
+"""Unit tests for risk management (domain.risk)."""
 
 from datetime import date
 
 import pytest
 
-from alpha_quant.domain.models import Bar, Position
-from alpha_quant.domain.risk import (
+from domain.models import Bar, Position
+from domain.risk import (
     RiskAction,
     RiskConfig,
     evaluate_daily_loss,

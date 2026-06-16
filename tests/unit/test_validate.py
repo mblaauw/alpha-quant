@@ -2,8 +2,8 @@
 
 from datetime import date, timedelta
 
-from alpha_quant.domain.models import Bar
-from alpha_quant.domain.validate import validate_bars
+from domain.models import Bar
+from domain.validate import validate_bars
 
 
 def _make_bars(count: int, base_vol: float = 1_000_000) -> list[Bar]:

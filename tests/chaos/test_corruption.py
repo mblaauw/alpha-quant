@@ -21,7 +21,7 @@ def _setup() -> None:
     env = os.environ.copy()
     env["ALPHA_QUANT_DEV"] = "1"
     subprocess.run(
-        [sys.executable, "-m", "alpha_quant", "run", "--mode", "fixture"],
+        [sys.executable, "-m", "app.cli", "run", "--mode", "fixture"],
         cwd=str(DATA_DIR),
         env=env,
         capture_output=True,
@@ -39,7 +39,7 @@ def _run_after_corruption() -> int:
     env = os.environ.copy()
     env["ALPHA_QUANT_DEV"] = "1"
     result = subprocess.run(
-        [sys.executable, "-m", "alpha_quant", "run", "--mode", "fixture"],
+        [sys.executable, "-m", "app.cli", "run", "--mode", "fixture"],
         cwd=str(DATA_DIR),
         env=env,
         capture_output=True,

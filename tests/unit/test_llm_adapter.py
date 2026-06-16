@@ -1,9 +1,9 @@
-"""Unit tests for LLM adapter (alpha_quant.adapters.real.llm_adapter)."""
+"""Unit tests for LLM adapter (adapters.real.llm_adapter)."""
 
 import httpx
 
-from alpha_quant.adapters.real.llm_adapter import OpenAILikeLLM
-from alpha_quant.ports.llm import LLMConfig
+from adapters.real.llm_adapter import OpenAILikeLLM
+from ports.llm import LLMConfig
 
 
 def _config(**kwargs: str | int) -> LLMConfig:

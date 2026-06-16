@@ -1,6 +1,6 @@
-"""Unit tests for source degradation fallback (alpha_quant.domain.degradation)."""
+"""Unit tests for source degradation fallback (domain.degradation)."""
 
-from alpha_quant.domain.degradation import (
+from domain.degradation import (
     DegradationStatus,
     blackout_window_days,
     m3_threshold_multiplier,

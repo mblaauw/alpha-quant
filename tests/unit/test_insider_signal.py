@@ -1,9 +1,9 @@
-"""Unit tests for M5 insider cluster signal (alpha_quant.domain.insider_signal)."""
+"""Unit tests for M5 insider cluster signal (domain.insider_signal)."""
 
 from datetime import date, timedelta
 
-from alpha_quant.domain.insider_signal import InsiderVerdict, evaluate
-from alpha_quant.domain.models import InsiderTransaction
+from domain.insider_signal import InsiderVerdict, evaluate
+from domain.models import InsiderTransaction
 
 
 def _tx(

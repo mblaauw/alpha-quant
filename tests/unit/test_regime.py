@@ -1,11 +1,11 @@
-"""Unit tests for M2 regime detection (alpha_quant.domain.regime)."""
+"""Unit tests for M2 regime detection (domain.regime)."""
 
 from datetime import date
 
 import pytest
 
-from alpha_quant.domain.models import IndicatorState
-from alpha_quant.domain.regime import REGIME_MULTIPLIERS, detect
+from domain.models import IndicatorState
+from domain.regime import REGIME_MULTIPLIERS, detect
 
 
 def _state(
