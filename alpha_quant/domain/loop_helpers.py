@@ -169,9 +169,11 @@ def _compute_z_score(
     recent = [m for m in mentions if cutoff < m.mention_date <= as_of_date]
     if len(recent) < 5:
         return None
-    counts = [float(m.count) for m in recent]
+    counts = [float(m.count) for m in recent if m.mention_date != as_of_date]
     today_counts = [m.count for m in recent if m.mention_date == as_of_date]
-    today = float(sum(today_counts)) / max(len(today_counts), 1)
+    if len(counts) < 5 or not today_counts:
+        return None
+    today = float(sum(today_counts)) / len(today_counts)
     mean = np.mean(counts)
     std = np.std(counts)
     if std < 1e-6:
