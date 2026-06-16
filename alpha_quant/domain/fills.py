@@ -149,7 +149,7 @@ def apply_corporate_action(
             return position
         return position.model_copy(
             update={
-                "quantity": int(position.quantity * ca.ratio),
+                "quantity": round(position.quantity * ca.ratio),
                 "avg_cost": round(position.avg_cost / ca.ratio, 6),
             }
         )
