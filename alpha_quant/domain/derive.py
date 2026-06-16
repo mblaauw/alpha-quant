@@ -35,7 +35,7 @@ def _empty_state(symbol: str, dt: date) -> dict[str, float]:
         "rsi": np.nan,
         "atr": np.nan,
         "processed_close": np.nan,
-        "bar_count": 0.0,
+        "bar_count": 0,
     }
 
 

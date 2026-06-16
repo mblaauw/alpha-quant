@@ -26,10 +26,12 @@ class SECConnector(BaseConnector):
         self,
         *,
         user_agent: str,
-        cache_path: str | Path = "sec_cache.sqlite",
+        cache_path: str | Path | None = None,
         vault: Vault | None = None,
     ) -> None:
-        self._cache_path = Path(cache_path)
+        self._cache_path = (
+            Path(cache_path).resolve() if cache_path else Path("sec_cache.sqlite").resolve()
+        )
         self._cache_conn = sqlite3.connect(str(self._cache_path))
         self._cache_conn.execute(
             "CREATE TABLE IF NOT EXISTS sec_cache ("

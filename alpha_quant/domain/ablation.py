@@ -308,12 +308,11 @@ def compute_spy_buy_and_hold(
 
     equity: float = initial_equity
     curve: list[float] = [equity]
-    for bar in bars_sorted:
+    for prev_bar, bar in zip(bars_sorted, bars_sorted[1:], strict=False):
         if bar.date == start_date:
             continue
-        prev = bars_sorted[bars_sorted.index(bar) - 1]
-        if prev.close > 0:
-            ret = (bar.close - prev.close) / prev.close
+        if prev_bar.close > 0:
+            ret = (bar.close - prev_bar.close) / prev_bar.close
             equity = round(equity * (1 + ret), 2)
         curve.append(equity)
 

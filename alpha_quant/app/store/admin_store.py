@@ -22,7 +22,7 @@ class AdminStoreMixin(AdminStore):
     def transaction(self) -> Generator[Self]:
         self._state_conn.execute("BEGIN TRANSACTION")
         try:
-            yield self  # type: ignore[misc]
+            yield self  # type: ignore[misc]  # Generator covariance limitation — Self narrows to concrete
         except Exception:
             self._state_conn.execute("ROLLBACK")
             raise
