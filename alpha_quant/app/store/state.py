@@ -102,7 +102,8 @@ class CanonicalStore(
             "  symbol VARCHAR NOT NULL,"
             "  quantity DOUBLE NOT NULL,"
             "  price DOUBLE NOT NULL,"
-            "  filled_at TIMESTAMP NOT NULL"
+            "  filled_at TIMESTAMP NOT NULL,"
+            "  fee DOUBLE"
             ")"
         )
         conn.execute(
