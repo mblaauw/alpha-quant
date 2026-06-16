@@ -93,7 +93,7 @@ class TestDashboardDBHelpers:
             "  equity_date DATE NOT NULL,"
             "  equity DOUBLE NOT NULL,"
             "  cash DOUBLE NOT NULL DEFAULT 0,"
-            "  nav DOUBLE NOT NULL DEFAULT 0,"
+            "  regime VARCHAR,"
             "  book VARCHAR NOT NULL DEFAULT 'PAPER',"
             "  PRIMARY KEY (equity_date, book)"
             ")"
