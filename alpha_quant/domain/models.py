@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -31,6 +31,9 @@ class Bar(BaseModel):
             raise ValueError(
                 f"low ({self.low}) <= open ({self.open}) <= high ({self.high}) violated"
             )
+        for field in ("open", "high", "low", "close", "volume"):
+            if getattr(self, field) < 0:
+                raise ValueError(f"{field} must be non-negative, got {getattr(self, field)}")
         return self
 
 
@@ -61,7 +64,7 @@ class TradingDay(BaseModel):
 
     date: date
     is_open: bool
-    session: str | None = None
+    session: Literal["premarket", "regular", "afterhours"] | None = None
 
 
 class FundamentalsSnapshot(BaseModel):

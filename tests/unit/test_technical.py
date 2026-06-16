@@ -99,20 +99,20 @@ class TestMomentumScore:
                 symbol="AAPL",
                 date=date(2026, 6, 9),
                 open=1.0,
-                high=1.0,
-                low=-2.0,
-                close=-1.0,
+                high=2.0,
+                low=0.0,
+                close=0.5,
                 volume=1_000_000,
             ),
             Bar(
                 symbol="AAPL",
-                date=date(2026, 6, 11),
-                open=100.0,
-                high=101.0,
-                low=99.0,
-                close=100.0,
+                date=date(2026, 6, 10),
+                open=0.5,
+                high=1.0,
+                low=0.0,
+                close=0.5,
                 volume=1_000_000,
             ),
         ]
-        result = momentum_score(bars, 100)
+        result = momentum_score(bars, close=0.0)
         assert result == 0.0

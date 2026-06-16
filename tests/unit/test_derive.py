@@ -286,9 +286,9 @@ class TestVerifyIntegrity:
                 symbol="TEST",
                 date=dt,
                 open=float(i),
-                high=float(i) + 0.5,
-                low=float(i) - 0.5,
-                close=float(i),
+                high=float(i) + 1.0,
+                low=float(i),
+                close=float(i) + 0.5,
                 volume=1_000_000,
             )
             for i in range(300)
