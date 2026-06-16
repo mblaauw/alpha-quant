@@ -32,6 +32,7 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
+
 RELATIVE_DATE_RE = re.compile(r"^(\d+)([dmy])\s*$")
 
 
@@ -1104,6 +1105,8 @@ def main(argv: list[str] | None = None) -> int:
     except ConfigError as e:
         _print_error("Configuration Error", str(e))
         return 1
+    except typer._click.exceptions.NoArgsIsHelpError:
+        return 0
 
 
 if __name__ == "__main__":
