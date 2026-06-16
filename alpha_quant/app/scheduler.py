@@ -143,6 +143,7 @@ def run_daily_pipeline(
 
     finally:
         store.complete_run(run_id, status=status)
+        store.close()
 
     if result is None:
         alert("CRITICAL", "Pipeline failed", f"Run {run_id} failed", macos_notify=True)

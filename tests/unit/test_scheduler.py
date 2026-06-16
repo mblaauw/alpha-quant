@@ -116,6 +116,9 @@ class _FakeStore:
     def save_portfolio_snapshot(self, snapshot: object) -> None:
         pass
 
+    def close(self) -> None:
+        pass
+
 
 def _mock_violation(check: str) -> object:
     from alpha_quant.domain.invariants import InvariantViolation

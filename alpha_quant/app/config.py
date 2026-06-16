@@ -1,4 +1,3 @@
-import os
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -231,23 +230,6 @@ def _resolve_config_path(path: str | None) -> str:
     raise ConfigError(msg)
 
 
-def _merge_env_overrides(data: dict[str, Any]) -> dict[str, Any]:
-    prefix = "ALPHA_QUANT_"
-    delimiter = "__"
-    result = {k: dict(v) if isinstance(v, dict) else v for k, v in data.items()}
-    for key, value in os.environ.items():
-        if not key.startswith(prefix):
-            continue
-        path = key[len(prefix) :].lower().split(delimiter)
-        target = result
-        for part in path[:-1]:
-            if part not in target:
-                target[part] = {}
-            target = target[part]
-        target[path[-1]] = value
-    return result
-
-
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     result = dict(base)
     for key, value in override.items():
@@ -281,9 +263,8 @@ def load_config(path: str | None = None) -> AppConfig:
             msg = f"Invalid TOML in {local_path}: {e}"
             raise ConfigError(msg, source=str(local_path)) from e
 
-    merged = _merge_env_overrides(data)
     try:
-        return AppConfig.model_validate(merged)
+        return AppConfig.model_validate(data)
     except Exception as e:
         errors = getattr(e, "errors", lambda: None)()
         if errors:

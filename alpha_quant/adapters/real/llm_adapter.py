@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import logging
 from typing import Any, override
 
 import httpx
+import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from alpha_quant.ports.llm import LLM, LLMConfig
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 _FALLBACK_EXPLAIN = "No explanation available at this time."
 _FALLBACK_CARD = "## {symbol}\n\nConcept card unavailable."
