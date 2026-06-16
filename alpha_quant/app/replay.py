@@ -290,6 +290,11 @@ def run_replay(
             state = indicator_states.get(sym)
             risk_actions = evaluate_risk_actions(pos, bar, state, risk_config, trade_date)
 
+            new_high = max(pos.high_since_entry or pos.entry_price or 0.0, bar.high)
+            if new_high > (pos.high_since_entry or 0.0):
+                pos = pos.model_copy(update={"high_since_entry": new_high})
+                positions[sym] = pos
+
             for action in risk_actions:
                 if action.action_type in ("stop", "trail_stop", "time_stop"):
                     oid = f"{sym}_exit_{trade_date.isoformat()}"
