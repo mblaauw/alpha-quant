@@ -38,7 +38,7 @@ The real advantage of the numpy incremental engine is not raw speed but **O(1) p
 ### Recommendation
 
 **Keep numpy.** The current implementation in `domain/derive.py` is:
-- ~100 lines of pure numpy
+- 523 lines of pure numpy (including incremental update, cold-start backfill, and corporate-action adjustment logic)
 - O(1) per-bar update for daily pipeline
 - Verified against brute-force recompute to 1e-6 accuracy
 - No external dependencies beyond numpy (already required)

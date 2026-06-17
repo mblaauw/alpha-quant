@@ -41,12 +41,19 @@ Chosen option: **Option A — Zstd-compressed JSON files in a date-partitioned d
 
 ```
 vault/
+  tiingo/
+    bars/
+      2026/06/11/...
+  sec/
+    2026/06/11/...
+  sec_fundamentals/
+    2026/06/11/...
   eodhd/
     eod/
       2026/
         06/
           11/
-            abc1234f.zst   # 2026-06-11 09:30 fetch
+            abc1234f0.zst   # 2026-06-11 09:30 fetch
             5678abcd.zst   # 2026-06-11 10:00 fetch
     fundamentals/
       2026/06/11/...
@@ -57,14 +64,12 @@ vault/
     2026/06/11/...
   reddit/
     2026/06/11/...
-  sec/
-    2026/06/11/...
 ```
 
 ### File Naming
 
 - Each fetch produces one `.zst` file
-- Filename is the first 8 hex chars of SHA256(content) — content-addressed
+- Filename is the first 16 hex chars of SHA256(content) — content-addressed
 - This guarantees file-level deduplication: re-fetching identical data produces the same filename
 
 ### Compression
@@ -81,20 +86,19 @@ The manifest (stored as a DuckDB database file `vault/manifest.db`) tracks every
 CREATE TABLE manifest (
   fetch_id VARCHAR PRIMARY KEY,
   source VARCHAR NOT NULL,
-  dataset VARCHAR NOT NULL,
-  symbol VARCHAR,
-  fetch_date DATE NOT NULL,
-  fetch_time TIMESTAMP NOT NULL,
-  path VARCHAR NOT NULL,
+  endpoint VARCHAR NOT NULL,
+  params VARCHAR NOT NULL,
+  ingest_ts TIMESTAMP NOT NULL,
   content_hash VARCHAR NOT NULL,
   byte_size BIGINT NOT NULL,
-  status VARCHAR NOT NULL DEFAULT 'ok'
+  compressed_size BIGINT NOT NULL,
+  dt DATE NOT NULL
 );
 ```
 
-- `fetch_id` = SHA256(source + endpoint + params + timestamp)[:16]
+- `fetch_id` = SHA256(source | endpoint | params | ingest_ts)[:16]
 - `content_hash` = SHA256(file content) (full 64-char hexdigest)
-- `status` = 'ok' | 'stale' | 'corrupt'
+- Dedup strategy: identical (`source`, `endpoint`, `content_hash`) triples are stored once regardless of fetch time
 
 ### Positive Consequences
 

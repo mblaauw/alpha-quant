@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-Alpha-Quant depends on five external data sources with varying reliability. A single source failure should not halt the entire system. Each mechanism has a defined fallback behavior when its data source is unavailable.
+Alpha-Quant depends on seven external data sources with varying reliability. A single source failure should not halt the entire system. Each mechanism has a defined fallback behavior when its data source is unavailable.
 
 DESIGN.md §3.2 specifies: "a source failing degrades, never blocks — pipeline runs with SOURCE_DEGRADED(source) event; mechanisms depending on it fall back. Only price staleness sets DATA_HALT."
 
@@ -32,9 +32,9 @@ DESIGN.md §3.2 specifies: "a source failing degrades, never blocks — pipeline
 Chosen option: **Option A — Degrade-don't-block**.
 
 Rationale:
-1. Three of five sources (OpenInsider, Reddit, SEC) are non-critical — their data enhances decisions but is not essential. Blocking the pipeline for these would be a poor tradeoff
-2. EODHD fundamentals and earnings calendar have defined fallbacks (pass-through with degraded event, widened blackout window)
-3. Only EODHD daily bars and Alpaca quotes are price data — staleness here prevents accurate portfolio valuation and risk measurement, so halt is correct
+1. Five of seven sources (OpenInsider, Reddit, SEC ticker map, SEC EDGAR fundamentals, Tiingo earnings) are non-critical — their data enhances decisions but is not essential. Blocking the pipeline for these would be a poor tradeoff
+2. Fundamentals (SEC EDGAR) and earnings calendar have defined fallbacks (pass-through with degraded event, widened blackout window)
+3. Only Tiingo daily bars and Alpaca quotes are price data — staleness here prevents accurate portfolio valuation and risk measurement, so halt is correct
 4. Degradation events are surfaced in the daily journal (DESIGN §12) — the user sees "Reddit source degraded today, M6 crowding veto disabled"
 5. This is the standard approach in production trading systems: survive through data issues, don't crash
 
@@ -49,7 +49,7 @@ Rationale:
 
 - More complex than fail-fast (each mechanism needs a fallback path)
 - Degradation must be monitored (alerting in P5.3 catches prolonged outages)
-- If EODHD (the primary source) degrades, the system still runs but with degraded data — the user might not notice without checking the journal
+- If Tiingo (the primary bar source) degrades, the system still runs but with degraded data — the user might not notice without checking the journal
 
 ## References
 

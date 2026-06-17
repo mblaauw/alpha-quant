@@ -10,4 +10,4 @@ The five components and their weights are: trend (31.25%), RSI (25%), MACD (18.7
 
 The composite is then used in the M8 ranking system, where it is combined with insider and momentum signals to produce a final ranking score. A Technical Score above 0.5 is required to pass the initial gate.
 
-**Key takeaway:** Six technical factors are weighted into a single 0–1 score. Trend and momentum carry the most weight.
+**Key takeaway:** Five technical factors are weighted into a single 0–1 score. Trend and RSI carry the most weight.
