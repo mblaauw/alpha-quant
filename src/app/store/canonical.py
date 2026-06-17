@@ -164,7 +164,15 @@ def _read_dataset(
         ).fetchall()
     except (duckdb.CatalogException, duckdb.IOException):  # fmt: skip
         return []
-    return [model_factory(*r) for r in result]
+
+    results: list[Any] = []
+    for r in result:
+        try:
+            results.append(model_factory(*r))
+        except Exception:
+            logger.warning("store_read_skip_row", dataset=dataset, symbol=symbol, row=str(r)[:200])
+            continue
+    return results
 
 
 def read_bars(
@@ -178,10 +186,11 @@ def read_bars(
         result = analytical.execute(
             f"""
             SELECT DISTINCT ON ({dedup_key})
-                   symbol, "{pcol}" AS date, open, high, low, close, volume, adj_close, fetch_id
+                   symbol, "{pcol}" AS date, open, high, low, close, volume,
+                   adj_close, fetch_id, adapter
             FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
             WHERE symbol = ? AND "{pcol}" >= ? AND "{pcol}" <= ?
-            ORDER BY {dedup_key} DESC
+            ORDER BY symbol, "{pcol}" DESC, adapter
             """,
             [symbol, start, end],
         ).fetchall()
@@ -199,6 +208,7 @@ def read_bars(
             volume=r[6],
             adj_close=r[7],
             fetch_id=r[8],
+            adapter=r[9],
         )
         for r in result
     ]
@@ -258,7 +268,8 @@ def read_fundamentals(
         symbol,
         'symbol, "{pcol}" AS as_of_date, market_cap, pe_ratio, eps_ttm,'
         " dividend_yield, sector, industry, operating_cash_flow,"
-        " total_liabilities, total_debt, total_equity, revenue, net_income, accruals, fetch_id",
+        " total_liabilities, total_debt, total_equity, revenue, net_income,"
+        " accruals, fetch_id, adapter",
         lambda *r: FundamentalsSnapshot(
             symbol=r[0],
             as_of_date=r[1],
@@ -276,6 +287,7 @@ def read_fundamentals(
             net_income=r[13],
             accruals=r[14],
             fetch_id=r[15],
+            adapter=r[16],
         ),
     )
 
@@ -289,7 +301,7 @@ def read_insider_transactions(
         "insider_transactions",
         symbol,
         'symbol, "{pcol}" AS filing_date, transaction_date, owner, title,'
-        " transaction_type, shares_traded, price, shares_held, fetch_id",
+        " transaction_type, shares_traded, price, shares_held, fetch_id, adapter",
         lambda *r: InsiderTransaction(
             symbol=r[0],
             filing_date=r[1],
@@ -301,6 +313,7 @@ def read_insider_transactions(
             price=r[7],
             shares_held=r[8],
             fetch_id=r[9],
+            adapter=r[10],
         ),
     )
 
@@ -313,8 +326,13 @@ def read_mentions(
         base,
         "mentions",
         symbol,
-        'symbol, "{pcol}" AS mention_date, source, count, fetch_id',
+        'symbol, "{pcol}" AS mention_date, source, count, fetch_id, adapter',
         lambda *r: MentionCount(
-            symbol=r[0], mention_date=r[1], source=r[2], count=r[3], fetch_id=r[4]
+            symbol=r[0],
+            mention_date=r[1],
+            source=r[2],
+            count=r[3],
+            fetch_id=r[4],
+            adapter=r[5],
         ),
     )

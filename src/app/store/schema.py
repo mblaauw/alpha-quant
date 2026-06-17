@@ -20,6 +20,7 @@ _CANONICAL_SCHEMAS: dict[str, list[tuple[str, pa.DataType]]] = {
         ("volume", pa.float64()),
         ("adj_close", pa.float64()),
         ("fetch_id", pa.string()),
+        ("adapter", pa.string()),
     ],
     "fundamentals": [
         ("symbol", pa.string()),
@@ -38,6 +39,7 @@ _CANONICAL_SCHEMAS: dict[str, list[tuple[str, pa.DataType]]] = {
         ("net_income", pa.float64()),
         ("accruals", pa.float64()),
         ("fetch_id", pa.string()),
+        ("adapter", pa.string()),
     ],
     "insider_transactions": [
         ("symbol", pa.string()),
@@ -50,6 +52,7 @@ _CANONICAL_SCHEMAS: dict[str, list[tuple[str, pa.DataType]]] = {
         ("price", pa.float64()),
         ("shares_held", pa.float64()),
         ("fetch_id", pa.string()),
+        ("adapter", pa.string()),
     ],
     "mentions": [
         ("symbol", pa.string()),
@@ -57,6 +60,7 @@ _CANONICAL_SCHEMAS: dict[str, list[tuple[str, pa.DataType]]] = {
         ("source", pa.string()),
         ("count", pa.int64()),
         ("fetch_id", pa.string()),
+        ("adapter", pa.string()),
     ],
     "corp_actions": [
         ("symbol", pa.string()),
@@ -96,10 +100,12 @@ def partition_col(model_name: str) -> str:
 
 def dedup_keys(dataset: str) -> str:
     mapping = {
-        "bars": "symbol, date",
-        "fundamentals": "symbol, as_of_date",
-        "insider_transactions": ("symbol, filing_date, transaction_date, transaction_type, owner"),
-        "mentions": "symbol, mention_date, source",
+        "bars": "symbol, date, adapter",
+        "fundamentals": "symbol, as_of_date, adapter",
+        "insider_transactions": (
+            "symbol, filing_date, transaction_date, transaction_type, owner, adapter"
+        ),
+        "mentions": "symbol, mention_date, source, adapter",
         "corp_actions": "symbol, effective_date, action_type",
         "earnings": "symbol, date",
     }
