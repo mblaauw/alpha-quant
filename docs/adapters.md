@@ -2,36 +2,36 @@
 
 ## Port → Implementation Matrix
 
-| Port | Interface | Real Adapter | Fake Adapter |
-|---|---|---|---|
-| **MarketData** | `daily_bars`, `latest_quote`, `trading_calendar` | TiingoConnector, AlpacaConnector (redundant) | FixtureMarketData |
-| **Fundamentals** | `snapshot`, `earnings_calendar` | EODHDConnector | FixtureFundamentals |
-| **InsiderFeed** | `cluster_transactions`, `recent_clusters` | OpenInsiderConnector | FixtureInsiderFeed |
-| **SentimentFeed** | `mention_counts`, `baseline` | RedditSentimentConnector | FixtureSentimentFeed |
-| **Clock** | `now`, `today`, `market_date` | SystemClock | VirtualClock |
-| **Broker** | `submit_order`, `cancel_order`, `portfolio`, `positions`, `fills` | AlpacaBroker | FakeBroker |
-| **EventSink** | `emit`, `query` | DuckDBEventSink / SqliteEventSink | FakeEventSink |
-| **LLM** | `explain`, `generate_card` | OpenAILikeLLM | CannedLLM |
-| **Store** (composite) | bar/order/position/event/indicator/journal/admin stores | *(none — CanonicalStore is app-layer)* | FixtureStore |
-| *(no port)* | `ticker_map`, `check_connection` | SECConnector | — |
+| Port                  | Interface                                                         | Real Adapter                                 | Fake Adapter         |
+|-----------------------|-------------------------------------------------------------------|----------------------------------------------|----------------------|
+| **MarketData**        | `daily_bars`, `latest_quote`, `trading_calendar`                  | TiingoConnector, AlpacaConnector (redundant) | FixtureMarketData    |
+| **Fundamentals**      | `snapshot`, `earnings_calendar`                                   | EODHDConnector                               | FixtureFundamentals  |
+| **InsiderFeed**       | `cluster_transactions`, `recent_clusters`                         | OpenInsiderConnector                         | FixtureInsiderFeed   |
+| **SentimentFeed**     | `mention_counts`, `baseline`                                      | RedditSentimentConnector                     | FixtureSentimentFeed |
+| **Clock**             | `now`, `today`, `market_date`                                     | SystemClock                                  | VirtualClock         |
+| **Broker**            | `submit_order`, `cancel_order`, `portfolio`, `positions`, `fills` | AlpacaBroker                                 | FakeBroker           |
+| **EventSink**         | `emit`, `query`                                                   | DuckDBEventSink / SqliteEventSink            | FakeEventSink        |
+| **LLM**               | `explain`, `generate_card`                                        | OpenAILikeLLM                                | CannedLLM            |
+| **Store** (composite) | bar/order/position/event/indicator/journal/admin stores           | *(none — CanonicalStore is app-layer)*       | FixtureStore         |
+| *(no port)*           | `ticker_map`, `check_connection`                                  | SECConnector                                 | —                    |
 
 ---
 
 ## Category: Bars (Daily OHLCV)
 
-| Adapter | Source | Auth | Adj Close | Status |
-|---|---|---|---|---|
-| **TiingoConnector** | `api.tiingo.com` | `?token=` | ✅ `adjClose` | **Active** — free tier, ~500-1000 calls/hr |
-| AlpacaConnector | `data.alpaca.markets` | key+secret | ❌ (close only) | **Redundant** — not wired in factory |
-| EODHDConnector | `eodhd.com/api` | `?api_token=` | ✅ `adjusted_close` | **Unused for bars** — used for fundamentals |
-| FixtureMarketData | `fixtures/v1/bars/*.parquet` | — | ✅ | **Test** — deterministic replay |
+| Adapter             | Source                       | Auth          | Adj Close          | Status                                      |
+|---------------------|------------------------------|---------------|--------------------|---------------------------------------------|
+| **TiingoConnector** | `api.tiingo.com`             | `?token=`     | ✅ `adjClose`       | **Active** — free tier, ~500-1000 calls/hr  |
+| AlpacaConnector     | `data.alpaca.markets`        | key+secret    | ❌ (close only)     | **Redundant** — not wired in factory        |
+| EODHDConnector      | `eodhd.com/api`              | `?api_token=` | ✅ `adjusted_close` | **Unused for bars** — used for fundamentals |
+| FixtureMarketData   | `fixtures/v1/bars/*.parquet` | —             | ✅                  | **Test** — deterministic replay             |
 
 ## Category: Fundamentals
 
-| Adapter | Source | Auth | Fields | Status |
-|---|---|---|---|---|
-| **EODHDConnector** | `eodhd.com/api` | `?api_token=` | mcap, PE, EPS, D/E, OCF, accruals, revenue, sector/industry | **Active** — needs valid API key |
-| FixtureFundamentals | `fixtures/v1/fundamentals/*.parquet` | — | Subset (mcap, PE, EPS, sector) | **Test** |
+| Adapter             | Source                               | Auth          | Fields                                                      | Status                           |
+|---------------------|--------------------------------------|---------------|-------------------------------------------------------------|----------------------------------|
+| **EODHDConnector**  | `eodhd.com/api`                      | `?api_token=` | mcap, PE, EPS, D/E, OCF, accruals, revenue, sector/industry | **Active** — needs valid API key |
+| FixtureFundamentals | `fixtures/v1/fundamentals/*.parquet` | —             | Subset (mcap, PE, EPS, sector)                              | **Test**                         |
 
 ## Category: Insider Transactions
 
