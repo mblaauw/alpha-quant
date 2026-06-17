@@ -21,6 +21,7 @@ from adapters.real.llm_adapter import OpenAILikeLLM
 from adapters.real.openinsider_connector import OpenInsiderConnector
 from adapters.real.reddit_sentiment_connector import RedditSentimentConnector
 from adapters.real.sec_connector import SECConnector
+from adapters.real.sec_fundamentals_connector import SECFundamentalsConnector
 from app.config import AppConfig
 from app.store import CanonicalStore
 from domain.models import EarningsEntry, FundamentalsSnapshot
@@ -103,6 +104,17 @@ def _build_eodhd(config: AppConfig, vault: Vault | None = None) -> EODHDConnecto
     )
 
 
+def _build_sec_edgar(config: AppConfig, vault: Vault | None = None) -> SECFundamentalsConnector:
+    sec_cik = create_sec_connector(config, vault)
+    return SECFundamentalsConnector(
+        sec_cik=sec_cik,
+        user_agent=config.connector.user_agent,
+        tokens_per_second=10.0,
+        max_burst=5.0,
+        vault=vault,
+    )
+
+
 def create_fundamentals(config: AppConfig, vault: Vault | None = None) -> Fundamentals:
     if config.data.mode != "live":
         return FixtureFundamentals(_fixture_path(config))
@@ -115,7 +127,8 @@ def create_fundamentals(config: AppConfig, vault: Vault | None = None) -> Fundam
             continue
         if name == "eodhd":
             enabled_adapters.append(_build_eodhd(config, vault))
-        # sec_edgar will be added in P2.4
+        if name == "sec_edgar":
+            enabled_adapters.append(_build_sec_edgar(config, vault))
 
     if not enabled_adapters:
         enabled_adapters.append(_build_eodhd(config, vault))
