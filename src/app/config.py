@@ -162,6 +162,32 @@ class ConnectorConfig(BaseModel):
     default_timeout_s: float = 30.0
 
 
+class SourceConfig(BaseModel):
+    """Enable/disable a single adapter source for a port."""
+
+    enabled: bool = False
+
+
+class PortAdapterConfig(BaseModel):
+    """Which adapter sources are available for a port, and which is primary."""
+
+    primary: str = ""
+    sources: dict[str, SourceConfig] = {}
+
+
+class AdaptersConfig(BaseModel):
+    """Config-driven adapter selection for each port.
+
+    Controls which real adapters are enabled per data stream.
+    When multiple adapters are enabled, all are stored tagged with `adapter`.
+    """
+
+    fundamentals: PortAdapterConfig = PortAdapterConfig()
+    market_data: PortAdapterConfig = PortAdapterConfig()
+    insider_feed: PortAdapterConfig = PortAdapterConfig()
+    sentiment_feed: PortAdapterConfig = PortAdapterConfig()
+
+
 class DashboardConfig(BaseModel):
     """Streamlit dashboard configuration — refresh interval, display options."""
 
@@ -225,6 +251,7 @@ class AppConfig(BaseSettings):
     eodhd: EODHDConfig
     alpaca: AlpacaConfig
     tiingo: TiingoConfig = TiingoConfig()
+    adapters: AdaptersConfig = AdaptersConfig()
     dashboard: DashboardConfig
 
 

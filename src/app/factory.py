@@ -23,6 +23,7 @@ from adapters.real.reddit_sentiment_connector import RedditSentimentConnector
 from adapters.real.sec_connector import SECConnector
 from app.config import AppConfig
 from app.store import CanonicalStore
+from domain.models import EarningsEntry, FundamentalsSnapshot
 from ports.broker import Broker
 from ports.clock import Clock
 from ports.event_sink import EventSink
@@ -36,6 +37,40 @@ from ports.store import Store
 
 if TYPE_CHECKING:
     from app.vault import Vault
+
+
+class CompositeFundamentals(Fundamentals):
+    """Wraps multiple Fundamentals adapters, delegates primary calls.
+
+    `.all` exposes all enabled adapters so ingest can save from every
+    source tagged with the adapter's source_name.
+    """
+
+    _primary_name: str
+
+    def __init__(self, adapters: list[Fundamentals], primary: str) -> None:
+        self._adapters = adapters
+        self._primary_name = primary
+
+    @property
+    def all(self) -> list[Fundamentals]:
+        return self._adapters
+
+    def _primary(self) -> Fundamentals:
+        for a in self._adapters:
+            if getattr(a, "_source_name", "") == self._primary_name:
+                return a
+        return self._adapters[0]
+
+    def snapshot(self, symbol: str) -> FundamentalsSnapshot:
+        snap = self._primary().snapshot(symbol)
+        if snap is not None:
+            snap = FundamentalsSnapshot(**snap.model_dump(), adapter=self._primary_name)
+        return snap  # pyright: ignore[reportReturnType]
+
+    def earnings_calendar(self, start: date, end: date) -> list[EarningsEntry]:
+        entries = self._primary().earnings_calendar(start, end)
+        return [EarningsEntry(**e.model_dump(), adapter=self._primary_name) for e in entries]
 
 
 def _fixture_path(config: AppConfig) -> Path:
@@ -57,17 +92,39 @@ def create_market_data(config: AppConfig, vault: Vault | None = None) -> MarketD
     return FixtureMarketData(_fixture_path(config))
 
 
+def _build_eodhd(config: AppConfig, vault: Vault | None = None) -> EODHDConnector:
+    return EODHDConnector(
+        api_token=config.eodhd.api_key.get_secret_value(),
+        base_url=config.eodhd.base_url,
+        tokens_per_second=config.connector.tokens_per_second,
+        max_burst=config.connector.max_burst,
+        user_agent=config.connector.user_agent,
+        vault=vault,
+    )
+
+
 def create_fundamentals(config: AppConfig, vault: Vault | None = None) -> Fundamentals:
-    if config.data.mode == "live":
-        return EODHDConnector(
-            api_token=config.eodhd.api_key.get_secret_value(),
-            base_url=config.eodhd.base_url,
-            tokens_per_second=config.connector.tokens_per_second,
-            max_burst=config.connector.max_burst,
-            user_agent=config.connector.user_agent,
-            vault=vault,
-        )
-    return FixtureFundamentals(_fixture_path(config))
+    if config.data.mode != "live":
+        return FixtureFundamentals(_fixture_path(config))
+
+    ac = config.adapters.fundamentals
+    enabled_adapters: list[Fundamentals] = []
+
+    for name, src in ac.sources.items():
+        if not src.enabled:
+            continue
+        if name == "eodhd":
+            enabled_adapters.append(_build_eodhd(config, vault))
+        # sec_edgar will be added in P2.4
+
+    if not enabled_adapters:
+        enabled_adapters.append(_build_eodhd(config, vault))
+
+    if len(enabled_adapters) == 1:
+        return enabled_adapters[0]
+
+    primary = ac.primary or str(getattr(enabled_adapters[0], "_source_name", ""))
+    return CompositeFundamentals(enabled_adapters, primary=primary)
 
 
 def create_insider_feed(config: AppConfig, vault: Vault | None = None) -> InsiderFeed:

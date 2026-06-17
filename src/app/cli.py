@@ -17,6 +17,8 @@ from rich.prompt import Confirm as RichConfirm
 from rich.table import Table
 
 from app.config import AppConfig, ConfigError, load_config, redact_config
+from domain.models import FundamentalsSnapshot
+from ports.fundamentals import Fundamentals
 
 __version__ = _version("alpha-quant")
 
@@ -608,14 +610,18 @@ def ingest(
                     totals["fundamentals"] += 1
                     sym_results.append("fundamentals=[dim]cached[/dim]")
                 else:
-                    snap = fundamentals.snapshot(symbol)
-                    if snap is not None:
-                        store.save_fundamentals(symbol, [snap])
-                        totals["fundamentals"] += 1
-                        sym_results.append("fundamentals=[green]OK[/green]")
-                    else:
-                        totals["fundamentals_fail"] += 1
-                        sym_results.append("fundamentals=[yellow]-[/yellow]")
+                    fund_adapters: list[Fundamentals] = getattr(fundamentals, "all", [fundamentals])
+                    for fa in fund_adapters:
+                        snap = fa.snapshot(symbol)
+                        if snap is not None:
+                            src_name = getattr(fa, "_source_name", "")
+                            snap = FundamentalsSnapshot(**snap.model_dump(), adapter=src_name)
+                            store.save_fundamentals(symbol, [snap])
+                            totals["fundamentals"] += 1
+                            sym_results.append(f"fundamentals=[green]{src_name or 'OK'}[/green]")
+                        else:
+                            totals["fundamentals_fail"] += 1
+                            sym_results.append("fundamentals=[yellow]-[/yellow]")
             except Exception:
                 totals["fundamentals_fail"] += 1
                 sym_results.append("fundamentals=[red]FAIL[/red]")
