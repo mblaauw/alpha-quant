@@ -150,6 +150,11 @@ class AlpacaConfig(BaseModel):
     base_url: str = "https://data.alpaca.markets"
 
 
+class TiingoConfig(BaseModel):
+    api_key: SecretStr = SecretStr("")
+    base_url: str = "https://api.tiingo.com"
+
+
 class ConnectorConfig(BaseModel):
     user_agent: str = "AlphaQuant/0.2.0 (research project; contact m@mblaauw.dev)"
     tokens_per_second: float = 10.0
@@ -219,6 +224,7 @@ class AppConfig(BaseSettings):
     connector: ConnectorConfig
     eodhd: EODHDConfig
     alpaca: AlpacaConfig
+    tiingo: TiingoConfig = TiingoConfig()
     dashboard: DashboardConfig
 
 

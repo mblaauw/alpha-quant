@@ -1152,7 +1152,7 @@ def sanity_check(
             msg = str(e)[:80]
             results.append((name, "[red]\u2717 FAIL[/red]", f"[red]{msg}[/red]", f"{elapsed:.1f}s"))
 
-    def check_alpaca() -> str:
+    def check_bars() -> str:
         md = create_market_data(config)
         today = date.today()
         bars = md.daily_bars(symbol, today - timedelta(days=10), today)
@@ -1180,7 +1180,7 @@ def sanity_check(
         mentions = sentiment.mention_counts(symbol)
         return f"{len(mentions)} mentions" if mentions else "[yellow]no mentions[/yellow]"
 
-    run_check("Alpaca Bars", check_alpaca)
+    run_check("Tiingo Bars", check_bars)
     run_check("EODHD Fundamentals", check_eodhd)
     run_check("OpenInsider", check_openinsider)
     run_check("Reddit Sentiment", check_reddit)

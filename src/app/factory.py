@@ -14,7 +14,6 @@ from adapters.fake.fixture_sentiment_feed import FixtureSentimentFeed
 from adapters.fake.fixture_store import FixtureStore
 from adapters.fake.virtual_clock import VirtualClock
 from adapters.real.alpaca_broker import AlpacaBroker
-from adapters.real.alpaca_connector import AlpacaConnector
 from adapters.real.clock import SystemClock
 from adapters.real.eodhd_connector import EODHDConnector
 from adapters.real.event_sink import DuckDBEventSink
@@ -45,10 +44,11 @@ def _fixture_path(config: AppConfig) -> Path:
 
 def create_market_data(config: AppConfig, vault: Vault | None = None) -> MarketData:
     if config.data.mode == "live":
-        return AlpacaConnector(
-            api_key=config.alpaca.api_key.get_secret_value(),
-            secret_key=config.alpaca.secret_key.get_secret_value(),
-            base_url=config.alpaca.base_url,
+        from adapters.real.tiingo_connector import TiingoConnector
+
+        return TiingoConnector(
+            api_token=config.tiingo.api_key.get_secret_value(),
+            base_url=config.tiingo.base_url,
             tokens_per_second=config.connector.tokens_per_second,
             max_burst=config.connector.max_burst,
             user_agent=config.connector.user_agent,
