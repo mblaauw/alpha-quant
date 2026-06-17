@@ -54,6 +54,18 @@ class FixtureStore(Store):
         self._bars[(symbol, bars[0].date if bars else date.today())] = bars
 
     @override
+    def latest_bar_date(self, symbol: str) -> date | None:
+        matching = [d for (sym, d) in self._bars if sym == symbol]
+        return max(matching) if matching else None
+
+    @override
+    def latest_fundamentals_date(self, symbol: str) -> date | None:
+        snaps = self._fundamentals.get(symbol)
+        if not snaps:
+            return None
+        return max(s.as_of_date for s in snaps)
+
+    @override
     def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
         return [
             b

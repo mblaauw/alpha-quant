@@ -588,27 +588,34 @@ def ingest(
             sym_results: list[str] = []
 
             try:
-                bars = market_data.daily_bars(symbol, lookback, today)
+                latest = store.latest_bar_date(symbol)
+                start = max(latest + timedelta(days=1), lookback) if latest else lookback
+                bars = market_data.daily_bars(symbol, start, today)
                 if bars:
                     store.save_bars(symbol, bars)
                     totals["bars"] += len(bars)
                     sym_results.append(f"bars={len(bars)}")
                 else:
                     totals["bars_fail"] += 1
-                    sym_results.append("bars=[red]0[/red]")
+                    sym_results.append("bars=[yellow]0[/yellow]")
             except Exception:
                 totals["bars_fail"] += 1
                 sym_results.append("bars=[red]FAIL[/red]")
 
             try:
-                snap = fundamentals.snapshot(symbol)
-                if snap is not None:
-                    store.save_fundamentals(symbol, [snap])
+                latest_fund = store.latest_fundamentals_date(symbol)
+                if latest_fund == today:
                     totals["fundamentals"] += 1
-                    sym_results.append("fundamentals=[green]OK[/green]")
+                    sym_results.append("fundamentals=[dim]cached[/dim]")
                 else:
-                    totals["fundamentals_fail"] += 1
-                    sym_results.append("fundamentals=[yellow]-[/yellow]")
+                    snap = fundamentals.snapshot(symbol)
+                    if snap is not None:
+                        store.save_fundamentals(symbol, [snap])
+                        totals["fundamentals"] += 1
+                        sym_results.append("fundamentals=[green]OK[/green]")
+                    else:
+                        totals["fundamentals_fail"] += 1
+                        sym_results.append("fundamentals=[yellow]-[/yellow]")
             except Exception:
                 totals["fundamentals_fail"] += 1
                 sym_results.append("fundamentals=[red]FAIL[/red]")

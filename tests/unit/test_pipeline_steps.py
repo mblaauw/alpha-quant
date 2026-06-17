@@ -39,6 +39,15 @@ class _FakeStore(Store):
     def save_bars(self, symbol: str, bars: list[Bar]) -> None:
         pass
 
+    def latest_bar_date(self, symbol: str) -> date | None:
+        bars = self._bars.get(symbol)
+        if not bars:
+            return None
+        return max(b.date for b in bars)
+
+    def latest_fundamentals_date(self, symbol: str) -> date | None:
+        return None
+
     def load_decisions(self, symbol: str, since: date) -> list:
         return []
 

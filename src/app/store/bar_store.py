@@ -7,6 +7,7 @@ from typing import Any, override
 import duckdb
 
 from app.store.canonical import (
+    latest_date,
     load_corp_actions,
     load_earnings,
     read_bars,
@@ -58,6 +59,14 @@ class BarStoreMixin(BarStore):
     @override
     def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
         return self._read_bars(symbol, start, end)
+
+    @override
+    def latest_bar_date(self, symbol: str) -> date | None:
+        return latest_date(self._analytical, self._base, "bars", symbol, "date")
+
+    @override
+    def latest_fundamentals_date(self, symbol: str) -> date | None:
+        return latest_date(self._analytical, self._base, "fundamentals", symbol, "as_of_date")
 
     @override
     def save_corp_actions(self, symbol: str, actions: list[CorporateAction]) -> None:

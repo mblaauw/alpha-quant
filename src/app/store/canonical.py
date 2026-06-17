@@ -27,6 +27,30 @@ from domain.models import (
 logger = structlog.get_logger()
 
 
+def latest_date(
+    analytical: duckdb.DuckDBPyConnection,
+    base: Path,
+    dataset: str,
+    symbol: str,
+    date_col: str,
+) -> date | None:
+    """Return the most recent date for a symbol in a partitioned Parquet dataset."""
+    data_path = str(base / "canonical" / dataset / "**" / "*.parquet")
+    hive_spec = f"hive_types={{'{date_col}': 'DATE'}}"
+    try:
+        row = analytical.execute(
+            f"""SELECT max("{date_col}") AS max_dt
+                FROM read_parquet('{data_path}', hive_partitioning=true, {hive_spec})
+                WHERE symbol = ?""",
+            [symbol],
+        ).fetchone()
+    except (duckdb.CatalogException, duckdb.IOException):  # fmt: skip
+        return None
+    if row is None or row[0] is None:
+        return None
+    return row[0]  # pyright: ignore[reportReturnType]
+
+
 def write_dataset(
     analytical: duckdb.DuckDBPyConnection,
     base: Path,

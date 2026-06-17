@@ -32,6 +32,14 @@ class BarStore(ABC):
     def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]: ...
 
     @abstractmethod
+    def latest_bar_date(self, symbol: str) -> date | None:
+        """Most recent bar date for a symbol, or None if no data exists."""
+
+    @abstractmethod
+    def latest_fundamentals_date(self, symbol: str) -> date | None:
+        """Most recent fundamentals as_of_date for a symbol, or None."""
+
+    @abstractmethod
     def save_corp_actions(self, symbol: str, actions: list[CorporateAction]) -> None: ...
 
     @abstractmethod
