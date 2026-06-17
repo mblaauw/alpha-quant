@@ -83,10 +83,12 @@ src/
 │   │   ├── base_connector.py    # shared HTTP: httpx, tenacity retry, token-bucket, vault
 │   │   ├── token_bucket.py      # thread-safe rate limiter
 │   │   ├── event_sink.py        # DuckDB + SQLite event sinks
-│   │   ├── eodhd_connector.py   # EODHD: bars, fundamentals, earnings
+│   │   ├── tiingo_connector.py  # Tiingo: daily bars, earnings calendar
+│   │   ├── eodhd_connector.py   # EODHD: bars, fundamentals, earnings (disabled fallback)
 │   │   ├── alpaca_connector.py  # Alpaca Data API: quotes, calendar, latest bar
 │   │   ├── alpaca_broker.py     # broker adapter (inactive in v1)
 │   │   ├── sec_connector.py     # SEC EDGAR: ticker → CIK mapping
+│   │   ├── sec_fundamentals_connector.py  # SEC EDGAR CompanyFacts: fundamentals snapshots
 │   │   ├── openinsider_connector.py  # OpenInsider HTML scraping
 │   │   ├── reddit_sentiment_connector.py  # Reddit public JSON
 │   │   └── llm_adapter.py       # OpenAI-compatible LLM client
@@ -103,7 +105,7 @@ src/
 │       └── fixture_store.py         # in-memory store for test isolation
 ├── app/                         # application wiring + infrastructure
 │   ├── __init__.py              # empty (re-exports handled at subpackage level)
-│   ├── cli.py                   # CLI entry point (argparse)
+│   ├── cli.py                   # CLI entry point (Typer + Rich)
 │   ├── _loop.py                 # shared decision-loop helpers
 │   ├── alerts.py                # alert generation
 │   ├── backtest.py              # historical backtest engine
@@ -164,7 +166,7 @@ src/
 
 ```toml
 [bootstrap]
-symbols = ["AAPL","MSFT","NVDA", "...47 more"]   # 50 initial, fully configurable
+symbols = ["AAPL","MSFT","NVDA", "...4 more"]   # 7 trading + SPY + ^VIX, fully configurable
 history_years = 3
 include_benchmarks = ["SPY", "^VIX"]
 
@@ -210,6 +212,21 @@ timeout_s = 30
 [education]
 level = "beginner"
 concept_repeat_limit = 3
+
+[tiingo]
+api_key = ""                          # Tiingo API key (free tier)
+
+[adapters.bars]
+provider = "tiingo"                   # Primary bar source
+
+[adapters.fundamentals]
+provider = "sec_edgar"                # Primary fundamentals source
+
+[adapters.fundamentals.sources.sec_edgar]
+priority = 1
+
+[adapters.fundamentals.sources.eodhd]
+priority = 2                          # Disabled fallback
 ```
 
 Parameter budget unchanged: **max 3 tunable parameters**, walk-forward only.
@@ -223,9 +240,9 @@ Parameter budget unchanged: **max 3 tunable parameters**, walk-forward only.
 ```
   SOURCES                RAW VAULT             CANONICAL STORE            DERIVED STATE
 ┌──────────┐   fetch   ┌─────────────┐ parse ┌──────────────────┐ derive ┌──────────────────┐
-│ EODHD    │──────────▶│ append-only │──────▶│ bars/      parquet│──────▶│ indicator_state  │
-│ Alpaca   │  httpx +  │ zstd blobs  │ pydan-│  (DuckDB queries) │ numpy │ month_end_closes │
-│ SEC      │  tenacity │ + manifest  │ tic   │ state/     DuckDB │ O(1)  │ regime_state     │
+│ Tiingo   │──────────▶│ append-only │──────▶│ bars/      parquet│──────▶│ indicator_state  │
+│ SEC Edg. │  httpx +  │ zstd blobs  │ pydan-│  (DuckDB queries) │ numpy │ month_end_closes │
+│ Alpaca   │  tenacity │ + manifest  │ tic   │ state/     DuckDB │ O(1)  │ regime_state     │
 │ OpenIns. │  + rate   │ (content-   │ models│  (per-conn.  tx)  │ incr. │ mention_baseline │
 │ Reddit   │  limiter  │  addressed) │       │                   │       │ (DuckDB)         │
 └──────────┘           └─────────────┘       └──────────────────┘       └────────┬─────────┘
@@ -243,10 +260,11 @@ Properties: re-parseable forever (vault keeps every raw byte), reproducible (eve
 One base class, five implementations. Shared machinery: `httpx` client, `tenacity` retry (exponential backoff + jitter, max 5), per-source token-bucket rate limiter, response → vault before any parsing, structured fetch log events.
 
 | Source | Endpoint(s) | Auth / etiquette | Rate budget | Cadence |
-|---|---|---|---|---|
-| **EODHD** | `/eod/{sym}`, `/fundamentals/{sym}`, `/calendar/earnings` | API key | plan-dependent; batch EOD endpoint for daily Δ | daily 17:30 ET |
+|---|---|---|---|---|---|
+| **Tiingo** (primary bars) | `/tiingo/daily/{sym}`, `/tiingo/daily/{sym}/prices` | API key | free tier: 500 symbols/day, 1000 req/hour | daily 17:30 ET |
+| **SEC EDGAR** (primary fundamentals) | `companyfacts/CIK{num}.json` per symbol | **mandatory descriptive User-Agent** per SEC fair-access policy | ≤10 req/s (we use 1) | daily |
 | **Alpaca Data** (informational only) | `alpaca-py` market-data: latest quotes/bars, trading calendar | key/secret | generous free tier (IEX feed) | decision time |
-| **SEC** | `company_tickers.json` | **mandatory descriptive User-Agent** per SEC fair-access policy | ≤10 req/s (we use 1) | weekly |
+| **SEC** (ticker mapping) | `company_tickers.json` | **mandatory descriptive User-Agent** per SEC fair-access policy | ≤10 req/s (we use 1) | weekly |
 | **OpenInsider** | screener HTML (latest cluster buys, by-date) | none — be polite: 1 req/3s, identify UA, cache aggressively | ~30 pages/day max | daily |
 | **Reddit public** | `https://www.reddit.com/r/{sub}/new.json` style public endpoints | UA required; unauthenticated ≈10 req/min | counts only, 2 subs | daily |
 
@@ -302,9 +320,9 @@ This is what reconciles full raw history with 200-day indicators: EMAs update fr
 
 ### 3.7 Bootstrap — 50 configurable symbols
 
-`alpha-quant bootstrap` reads `[bootstrap]` config: fetches `history_years` of daily bars, fundamentals snapshots, earnings dates, OpenInsider history for the 50 listed symbols + SPY + VIX proxy; writes vault → canonical → seeds indicator_state; then freezes a **fixture bundle** (parquet + manifest.json with content hashes, pinned as `fixture_version`).
+`alpha-quant bootstrap` reads `[bootstrap]` config: fetches `history_years` of daily bars, fundamentals snapshots, earnings dates, OpenInsider history for the 7 listed symbols + SPY + ^VIX; writes vault → canonical → seeds indicator_state; then freezes a **fixture bundle** (parquet + manifest.json with content hashes, pinned as `fixture_version`).
 
-The default 50 are curated for behavioral coverage, not preference: steady large-cap trenders, high-beta names, at least one meme-prone ticker, an earnings-gap case, a recent split, a delisting/rename (exercises SEC-map hygiene). *(Synthetic overlays for missing-bar, stale-feed, and z>3 mention spike scenarios deferred — see P3+ backlog.)* Swap the list in config at will; re-bootstrap regenerates everything deterministically.
+The default 7 trading symbols are curated for behavioral coverage, not preference: steady large-cap trenders, high-beta names, at least one meme-prone ticker, an earnings-gap case, a recent split, a delisting/rename (exercises SEC-map hygiene). *(Synthetic overlays for missing-bar, stale-feed, and z>3 mention spike scenarios deferred — see P3+ backlog.)* Swap the list in config at will; re-bootstrap regenerates everything deterministically.
 
 Development speeds: domain unit tests (ms) → full-DAG replay over fixtures (seconds–minutes for 3 simulated years) → real daily runs (only for connector/feed reality).
 
@@ -328,7 +346,7 @@ Development speeds: domain unit tests (ms) → full-DAG replay over fixtures (se
 | Logging | **structlog** (JSON lines) | events + logs share shape |
 | Testing | **pytest** | golden replay, integration tests, unit tests |
 | LLM client | **httpx** against OpenAI-compatible API | one adapter: OpenAI + OpenRouter |
-| Market data SDK | **alpaca-py** (data module only) | no trading module imported outside broker adapter — enforced by lint rule |
+| Market data SDK | **httpx** (Tiingo REST API) + **alpaca-py** (data module only) | Tiingo for daily bars; alpaca-py for quotes/calendar only |
 | Dashboard | **Streamlit** | reads DuckDB state store via Store port, zero coupling |
 
 ---

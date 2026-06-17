@@ -48,13 +48,13 @@ Six diagrams model the system at Levels 1–4 of the C4 model, rendered via Like
 
 ### 3.1 System Context (L1)
 
-The user (retail investor) interacts with Alpha-Quant via CLI and Streamlit dashboard. The system fetches data from 6 external sources: **EODHD** (primary bars, fundamentals, earnings), **Alpaca Data** (quotes, calendar — data only, no trading), **SEC EDGAR** (company ticker mapping), **OpenInsider** (insider transactions), **Reddit** (mention counts for crowding veto), and **LLM Provider** (OpenAI/OpenRouter for narration).
+The user (retail investor) interacts with Alpha-Quant via CLI and Streamlit dashboard. The system fetches data from 7 external sources: **Tiingo** (primary daily bars, earnings calendar), **SEC EDGAR** (company ticker mapping), **SEC EDGAR CompanyFacts** (fundamentals snapshots — OCF, D/E, accruals), **Alpaca Data** (quotes, calendar — data only, no trading), **OpenInsider** (insider transactions), **Reddit** (mention counts for crowding veto), and **LLM Provider** (OpenAI/OpenRouter for narration).
 
 ### 3.2 Container Diagram (L2)
 
 Alpha-Quant contains 10 containers and 2 internal data stores:
 
-- **CLI** — argparse-based entry point for all operations
+- **CLI** — Typer+Rich-based entry point for all operations
 - **Pipeline Engine** — APScheduler-driven daily orchestrator (17:30 ET)
 - **Data Layer** — Four zones: connectors → vault → canonical store → derived state
 - **Domain Core** — Pure functions: M1–M8, position sizing, risk management
@@ -69,7 +69,7 @@ Alpha-Quant contains 10 containers and 2 internal data stores:
 
 ### 3.3 Component Diagrams (L3)
 
-**Data Layer** (7 components): Connectors (5 implementations sharing httpx + tenacity), Raw Vault (append-only zstd), Normalizer (pydantic parsers), Canonical Writer (PyArrow), Derive Engine (numpy indicator recurrences), Validator (~15 predicate checks), Catalog (versioning/manifest).
+**Data Layer** (7 components): Connectors (7 implementations sharing httpx + tenacity), Raw Vault (append-only zstd), Normalizer (pydantic parsers), Canonical Writer (PyArrow), Derive Engine (numpy indicator recurrences), Validator (~15 predicate checks), Catalog (versioning/manifest).
 
 **Decision Engine** (10 components): M1 Universe, M2 Regime, M3 Technical, M4 Quality, M5 Insider, M6 Crowding, M7 Blackout, M8 Ranker, Position Sizer, Risk Evaluator. Gates are hard filters; scores feed the composite M8 rank.
 
@@ -98,9 +98,9 @@ Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamli
 | Logging | structlog (JSON) | Events + logs share shape |
 | Testing | pytest | Golden replay, integration tests, unit tests |
 | LLM client | Direct httpx (no SDK) | Single adapter for OpenAI + OpenRouter |
-| Market data | alpaca-py (data module only) | Trading module only imported in broker adapter |
+| Market data | Tiingo (bars, earnings) + SEC EDGAR (fundamentals) | Free tiers, reliable; EODHD kept as disabled fallback |
 | Dashboard | Streamlit | Read-only, zero pipeline coupling |
-| CLI | argparse (stdlib) | Zero additional deps |
+| CLI | Typer + Rich | Type-hint-driven commands, formatted tables/panels/progress |
 | Diagramming | LikeC4 | DSL-driven C4 diagrams, PNG export |
 
 ## 5. Architecture Decision Records
@@ -188,7 +188,7 @@ Every mechanism must show non-negative walk-forward Sharpe impact or be flagged 
 
 Single-machine, zero-server deployment on a developer workstation or headless server. The daily pipeline runs at **17:30 ET** via APScheduler (cron fallback) in 9 sequential steps:
 
-1. Ingest — EODHD delta, fundamentals, earnings, OpenInsider, Reddit, SEC map (weekly)
+1. Ingest — Tiingo daily bars, SEC EDGAR fundamentals snapshot, earnings calendar, OpenInsider, Reddit, SEC ticker map (weekly)
 2. Validate — gaps/staleness/splits → `DATA_HALT`?
 3. Derive — incremental indicator state, month-end calc
 4. Regime — M2 classification

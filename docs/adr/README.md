@@ -9,7 +9,7 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0001](./0001-use-python-3-14.md) | Use Python 3.14 as the Runtime | Accepted | 2026-06-10 |
 | [0002](./0002-use-uv-package-manager.md) | Use uv as the Package Manager | Accepted | 2026-06-10 |
 | [0003](./0003-use-ports-and-adapters.md) | Use Ports-and-Adapters (Hexagonal) Architecture | Accepted | 2026-06-10 |
-| [0004](./0004-use-argparse-for-cli.md) | Use argparse (stdlib) for the CLI | Accepted | 2026-06-10 |
+| [0004](./0004-use-argparse-for-cli.md) | Use argparse (stdlib) for the CLI | **Superseded** | 2026-06-10 |
 | [0005](./0005-use-pydantic-settings-toml.md) | Use pydantic-settings + TOML for Configuration | Accepted | 2026-06-10 |
 | [0006](./0006-use-duckdb-parquet-analytical-store.md) | Use DuckDB + Parquet for the Analytical Store | Accepted | 2026-06-10 |
 | [0007](./0007-use-sqlite-sqlalchemy-core-transactional.md) | Use SQLite WAL + SQLAlchemy Core for Transactional State | Superseded | 2026-06-10 |
@@ -17,7 +17,7 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0009](./0009-use-pessimistic-fill-model.md) | Use Custom Pessimistic Fill Model | Accepted | 2026-06-10 |
 | [0010](./0010-use-custom-event-driven-backtester.md) | Use Custom Event-Driven Backtester | Accepted | 2026-06-10 |
 | [0011](./0011-use-httpx-for-llm-integration.md) | Use Direct httpx (No SDK) for LLM Integration | Accepted | 2026-06-10 |
-| [0012](./0012-use-eodhd-as-primary-data-source.md) | Use EODHD as the Primary Market Data Source | Accepted | 2026-06-10 |
+| [0012](./0012-use-eodhd-as-primary-data-source.md) | Use EODHD as the Primary Market Data Source | **Deprecated** | 2026-06-10 |
 | [0013](./0013-use-structlog-structured-logging.md) | Use structlog with JSON Format for Structured Logging | Accepted | 2026-06-10 |
 | [0014](./0014-use-streamlit-for-dashboard.md) | Use Streamlit for the Read-Only Dashboard | Accepted | 2026-06-10 |
 | [0015](./0015-use-incremental-o1-indicators.md) | Use Incremental O(1) Indicator Engine | Accepted | 2026-06-10 |
