@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Superseded
+
+*Superseded by actual implementation using **Typer** (decorator-based, type-hint-driven) + **Rich** (formatted tables, panels, progress bars). The argparse decision was never implemented; the codebase uses Typer+Rich instead.*
 
 ## Date
 
@@ -47,6 +49,10 @@ Rationale:
 - More boilerplate than Click's decorators (but trivial for 12 subcommands)
 - Help text formatting is less polished than Click/Typer
 - No auto-completion (can be added separately with `argcomplete` if needed)
+
+### Actual Outcome
+
+The argparse decision was **never implemented**. The CLI was built with **Typer** (type-hint-driven, decorator-based command registration) + **Rich** (formatted tables, panels, progress bars, prompts). This was a pragmatic choice during early development — Typer's ergonomics accelerated CLI iteration, and Rich's formatting was needed for the status/report commands regardless. The project now has `typer` and `rich` as explicit dependencies.
 
 ## References
 

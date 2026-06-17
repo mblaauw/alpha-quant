@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Deprecated
+
+*Deprecated — EODHD has been replaced by **Tiingo** (daily OHLCV bars) and **SEC EDGAR** (fundamentals). EODHD remains available as a disabled fallback connector but is no longer the primary data source.*
 
 ## Date
 
@@ -59,3 +61,11 @@ Rationale:
 - RAD §4 (System Context — EODHD)
 - C4 System Context diagram: `docs/architecture/views/systemContext.png`
 - EODHD API documentation: https://eodhd.com/api
+
+## Replacement
+
+EODHD was replaced by **Tiingo** (daily OHLCV bars — free tier, reliable) and **SEC EDGAR CompanyFacts** (fundamentals — free, direct source). The system now has two primary data sources instead of one:
+- **Tiingo** — Daily bars (primary), earnings calendar
+- **SEC EDGAR** — Fundamentals snapshots (OCF, D/E, accruals) via `sec_fundamentals_connector.py`
+
+EODHD's `eodhd_connector.py` remains in the codebase as a disabled fallback but is no longer used in the default pipeline configuration. See ADR-0025 (SEC SQLite Cache) and the multi-adapter framework for the current adapter architecture.
