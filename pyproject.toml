@@ -1,6 +1,6 @@
 [project]
 name = "alpha-quant"
-version = "0.2.0"
+version = "0.3.0"
 description = "Deterministic, daily-cadence, long-only equity trading system"
 requires-python = ">=3.14"
 dependencies = [
