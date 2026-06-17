@@ -4,29 +4,35 @@
 
 | Category | Changes Applied | Files Affected |
 |----------|----------------|----------------|
-| `@override` decorator | 48 methods decorated | 16 files |
-| `match`/`case` string dispatch | 1 function rewritten | `app/store.py:80` |
-| `Self` return type | 1 annotation updated | `domain/models.py:148` |
+| `@override` decorator | 132 methods decorated | 28 files |
+| `match`/`case` string dispatch | 0 (not applied — no suitable dispatch chains exist) | — |
+| `Self` return type | 4 annotations updated | `domain/models.py` (4 methods) |
 | Generic[T] → `[T]` syntax | 0 (no generics exist) | — |
 
 ## Detail
 
-### 1. @override Decorator (+48 sites)
+### 1. @override Decorator (+132 sites)
 
 Every method that overrides a port interface ABC method now has `@override` from `typing`. This provides compile-time safety: if the parent port signature changes, `ty` will flag any override that doesn't match.
 
 Files updated:
 - `adapters/fake/` — virtual_clock, fake_event_sink, canned_llm, fixture_market_data, fixture_fundamentals, fixture_insider_feed, fixture_sentiment_feed, fixture_store
-- `adapters/real/` — clock, event_sink, eodhd_connector, alpaca_connector, openinsider_connector, reddit_sentiment_connector, sec_connector
-- `app/` — store.py (CanonicalStore)
+- `adapters/real/` — clock, event_sink, tiingo_connector, eodhd_connector, sec_fundamentals_connector, alpaca_connector, openinsider_connector, reddit_sentiment_connector, sec_connector
+- `app/` — store modules (CanonicalStore mixins)
 
-### 2. match/case String Dispatch (+1)
+### 2. match/case String Dispatch
 
-`_model_to_pylist()` in `app/store.py:80` — the 4-way `if` chain on `model_name` was replaced with `match/case`. This improves readability and makes exhaustiveness checking possible if the match becomes a function in the future.
+Not applied. The codebase was audited for dispatch chains suitable for `match/case` conversion, but the existing `if` chains in `app/store/` modules and elsewhere lacked the clear pattern structure where `match/case` provides a readability advantage.
 
-### 3. Self Return Type (+1)
+### 3. Self Return Type (+4)
 
-`Order._validate_fill_quantity()` in `domain/models.py:148` — changed return annotation from `-> Order` to `-> Self`. This is technically correct: the method returns `self`, not necessarily an `Order` instance.
+Four methods in `domain/models.py` use `Self` return type:
+- `DailyBar._validate_bar_relationships()` (line 26)
+- `Quote._validate_spread()` (line 54)
+- `Decision._validate_gate_consistency()` (line 170)
+- `Order._validate_fill_quantity()` (line 192)
+
+These change return annotations from `-> ModelName` to `-> Self`, which is technically correct since they return `self`.
 
 ### 4. Generic[T] → PEP 695 Syntax
 
