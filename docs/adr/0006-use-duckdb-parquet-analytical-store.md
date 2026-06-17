@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-Alpha-Quant needs to store and query analytical data: daily bars (OHLCV), fundamentals snapshots, insider transactions, and mention counts. Access patterns are columnar (scan a field across 50 symbols), date-partitioned, and append-mostly (new data daily).
+Alpha-Quant needs to store and query analytical data: daily bars (OHLCV), fundamentals snapshots, insider transactions, and mention counts. Access patterns are columnar (scan a field across 9 symbols), date-partitioned, and append-mostly (new data daily).
 
 DESIGN.md §3.4 specifies a split-store architecture: analytical data → Parquet/DuckDB, transactional state → DuckDB (per ADR-0021).
 
@@ -34,7 +34,7 @@ DESIGN.md §3.4 specifies a split-store architecture: analytical data → Parque
 Chosen option: **Option A — DuckDB + Parquet (date-partitioned)**.
 
 Rationale:
-1. DuckDB's columnar execution engine matches the access pattern perfectly: scanning 50 symbols × 1 field is a metadata-only operation on date-partitioned parquet
+1. DuckDB's columnar execution engine matches the access pattern perfectly: scanning 9 symbols × 1 field is a metadata-only operation on date-partitioned parquet
 2. Date-partitioned cleanup is a filesystem operation — `rm -rf canonical/bars/date=<old_date>/` is instant and safe
 3. Zero server: DuckDB is an embedded database (same process), no daemon to manage
 4. Parquet is the standard columnar format — the team already has PyArrow as a dependency
@@ -42,7 +42,7 @@ Rationale:
 
 ### Positive Consequences
 
-- Columnar queries on 50 symbols × 3 years of daily bars execute in milliseconds
+- Columnar queries on 9 symbols × 3 years of daily bars execute in milliseconds
 - Parquet cleanup is a filesystem operation — no heavy DELETE operations
 - Parquet files are usable by any tool (Polars, pandas, Tableau) — no lock-in
 - DuckDB reads parquet directly with zero ETL

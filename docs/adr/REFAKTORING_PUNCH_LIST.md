@@ -8,6 +8,7 @@
 ## P1 — High Priority
 
 ### P0.2: Composite score formula inconsistency — 3 different weighting formulas
+- **Status:** ✅ Done — consolidated to a single `compute_composite(scores, components)` in `domain/scoring.py` with defined weights (0.60/0.25/0.15). `ranking.py` and `loop_helpers.py` now use the shared function.
 - **Files:** `src/domain/ranking.py:63-73`, `src/domain/loop_helpers.py:131`, `src/domain/technical.py:39-46`
 - **Change:** Consolidate to a single `compute_composite(scores, components)` in `domain/scoring.py`. `ranking.py:_compute_composite` uses `0.60/0.25/0.15`, `loop_helpers.py:score_candidate` uses `0.70/0.30`, `technical.py:score` uses `0.3125/0.25/0.1875/0.125/0.125`. `rank()` recomputes composite overwriting the value set during scoring — final score depends on ordering of function calls.
 - **Effort:** Medium (2 files, ~30 lines)
@@ -58,6 +59,7 @@
 - **Status:** ✅ Done — 5 backtest integration tests added (PR #406)
 
 ### P1.19: Hardcoded event-type strings in dashboard (22 occurrences)
+- **Status:** ✅ Done — event classes imported from `domain.events`; hardcoded strings replaced with `event_type` defaults. Module-level constants extracted for repeated values.
 - **Files:** `src/app/dashboard.py` (lines 174, 256-259, 352, 396-399, 706-708)
 - **Change:** Import event classes from \`domain.events\` and use their `event_type` defaults instead of hardcoded strings. Extract repeated event strings to module-level constants.
 - **Effort:** Small (1 file, ~15 lines)

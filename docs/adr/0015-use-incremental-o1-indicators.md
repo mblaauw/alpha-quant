@@ -34,8 +34,8 @@ Chosen option: **Option A — Incremental O(1) state machine**.
 
 Rationale:
 1. Incremental state avoids scanning 200+ days of raw data to compute EMA200
-2. Performance: 50 symbols × 5 indicators = 250 O(1) updates per day, executed in < 1ms
-3. The indicator state is a single DuckDB row (~200 bytes per symbol) — 50 symbols = 10 KB of state
+2. Performance: 9 symbols × 5 indicators = 45 O(1) updates per day, executed in < 1ms
+3. The indicator state is a single DuckDB row (~200 bytes per symbol) — 9 symbols = 2 KB of state
 4. Cold start is a one-time bootstrap operation (DESIGN §3.7) that runs on project initialization
 5. Integrity check in CI catches any drift from the brute-force computation
 

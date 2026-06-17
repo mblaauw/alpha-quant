@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-Alpha-Quant operates in three execution realities (backtest, replay, paper trading) with five external data sources and an LLM provider. The domain logic (decision engine, risk management, fill model) must be pure, testable, and independent of infrastructure. The system must support swapping data sources (e.g., EODHD → fixture for replay, real → fake for CI).
+Alpha-Quant operates in three execution realities (backtest, replay, paper trading) with seven external data sources and an LLM provider. The domain logic (decision engine, risk management, fill model) must be pure, testable, and independent of infrastructure. The system must support swapping data sources (e.g., Tiingo → fixture for replay, real → fake for CI).
 
 The DESIGN.md §1 mandates: "domain/ imports nothing from adapters/ or data/. Every connector has a fixture-backed fake twin on the same port. The pipeline never knows which reality it runs in."
 
@@ -18,7 +18,7 @@ The DESIGN.md §1 mandates: "domain/ imports nothing from adapters/ or data/. Ev
 
 - Domain purity: trading logic must be testable without network calls or real data
 - Three execution realities: backtest, replay, paper — same domain code, different adapters
-- Five data sources: each must have a fake twin for deterministic testing
+- Seven data sources: each must have a fake twin for deterministic testing
 - LLM is explainer-only: the narration path must be independently testable from the decision path
 - Future-proofing: broker execution will be added later without touching domain code
 

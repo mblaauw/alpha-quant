@@ -37,7 +37,7 @@ Chosen option: **Option C — Python 3.14**.
 
 Rationale:
 1. All planned libraries have published 3.14 wheels (zero compilation needed at install time)
-2. 3.14's performance is sufficient — the daily pipeline processes ~50 symbols with O(1) indicator updates; total CPU time per run is < 1 minute
+2. 3.14's performance is sufficient — the daily pipeline processes 7 trading symbols + 2 benchmarks with O(1) indicator updates; total CPU time per run is < 1 minute
 3. 3.13's free-threaded (no-GIL) mode provides no benefit for a single-threaded pipeline
 4. `zstandard` (third-party) provides zstd compression — lightweight and well-maintained
 5. The actual development environment runs 3.14 — aligning `pyproject.toml` with reality avoids CI confusion

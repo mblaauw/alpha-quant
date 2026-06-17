@@ -38,7 +38,7 @@ Rationale:
 
 ### Positive Consequences
 
-- Logs are structured JSON: `{"event": "DATA_INGESTED", "run_id": "...", "source": "eodhd", "symbol_count": 50, "timestamp": "..."}`
+- Logs are structured JSON: `{"event": "DATA_INGESTED", "run_id": "...", "source": "tiingo", "symbol_count": 9, "timestamp": "..."}`
 - Development console output is human-readable (colors, key-value pairs)
 - Context is automatically propagated (no need to pass `run_id` to every log call)
 - The event log and debug log share the same data — no duplication
