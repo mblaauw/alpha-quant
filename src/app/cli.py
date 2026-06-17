@@ -520,7 +520,7 @@ def bootstrap(
 def ingest(
     ctx: typer.Context,
     days: int = typer.Option(  # noqa: B008
-        400,
+        200,
         "--days",
         "-d",
         help="Lookback days for historical data",
