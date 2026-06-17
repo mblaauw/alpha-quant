@@ -62,12 +62,13 @@ max_burst = 20.0
 default_timeout_s = 30.0
 
 [adapters.fundamentals]
-primary = "eodhd"
+primary = "sec_edgar"
 
-[adapters.fundamentals.sources.eodhd]
+[adapters.fundamentals.sources.sec_edgar]
 enabled = true
 
-# sec_edgar will be enabled once the SEC EDGAR adapter is implemented (P2.4)
+[adapters.fundamentals.sources.eodhd]
+enabled = false
 
 [dashboard]
 host = "localhost"
