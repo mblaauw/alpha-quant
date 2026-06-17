@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-The technical scoring mechanism (M3) requires EMA(20/50/200), RSI(14), ATR(14), MACD, and 12-1 momentum. These must be computed daily for 50+ symbols. The system design (§3.5) mandates O(1) incremental updates — compute the new value from the previous state and the new bar, without recomputing windows.
+The technical scoring mechanism (M3) requires EMA(20/50/200), RSI(14), ATR(14), MACD, and 12-1 momentum. These must be computed daily for 7+ trading symbols. The system design (§3.5) mandates O(1) incremental updates — compute the new value from the previous state and the new bar, without recomputing windows.
 
 DESIGN.md §3.8 specifies "numpy recurrences (own ~100 lines) — incremental O(1); window libs unnecessary."
 

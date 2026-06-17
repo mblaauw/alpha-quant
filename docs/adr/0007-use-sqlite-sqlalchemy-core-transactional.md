@@ -51,7 +51,7 @@ Rationale:
 
 - No concurrent write access (single-writer is fine for daily batch pipeline)
 - SQLite does not support GRANT/REVOKE (not needed for local single-user deployment)
-- Large databases (>10GB) require VACUUM (not expected for this scale — 50 symbols × daily data is ~100MB/year)
+- Large databases (>10GB) require VACUUM (not expected for this scale — 9 symbols × daily data is ~20MB/year)
 
 ## References
 

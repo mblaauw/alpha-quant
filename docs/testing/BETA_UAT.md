@@ -18,7 +18,7 @@
 | QA-5 | State continuity across repeated daily runs | ✅ | [#352](https://github.com/mblaauw/alpha-quant/issues/352) | 2 sequential fixture runs; positions persist; I1 invariant holds; equity curve tracked |
 | QA-6 | Risk, halt, and safety UAT scenarios | ✅ | [#353](https://github.com/mblaauw/alpha-quant/issues/353) | All 7 risk mechanisms verified; halt/resume works; 4 missing event types emitted now |
 | QA-7 | Determinism and release reproducibility | ✅ | [#354](https://github.com/mblaauw/alpha-quant/issues/354) | 3 consecutive bootstrap+golden runs produce identical SHA-256 (`8b85231f5e619754`) |
-| QA-8 | Docs and release metadata sanity check | ✅ | [#355](https://github.com/mblaauw/alpha-quant/issues/355) | README test count updated (519); CLI table updated (12 commands); version bumped to 0.2.0; stale ROADMAP refs fixed |
+| QA-8 | Docs and release metadata sanity check | ✅ | [#355](https://github.com/mblaauw/alpha-quant/issues/355) | README test count updated (550); CLI table updated (12 commands); version bumped to 0.2.0; stale ROADMAP refs fixed |
 | QA-9 | Backtest, paper, replay fill-model parity | ✅ | [#356](https://github.com/mblaauw/alpha-quant/issues/356) | 2 I8 violations fixed: pipeline entry now uses `fill_entry_order`; replay partial take now uses `fill_partial_take` |
 
 ## Test Output Summary
@@ -27,7 +27,7 @@
 $ make check     → All checks passed
 $ make format    → 99 files already formatted
 $ make type      → All checks passed
-$ make test      → 519 passed in 19.04s
+$ make test      → 550 passed in 18.03s (current)
 $ make golden    → sha256=8b85231f5e619754 (deterministic across 3 runs)
 ```
 

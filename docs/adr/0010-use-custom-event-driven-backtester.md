@@ -19,7 +19,7 @@ DESIGN.md §14 specifies: "No vectorbt for portfolio simulation (path-dependent 
 - Path-dependent portfolio simulation: positions, stops, cash, and sector limits persist across days
 - Same fill model as paper: backtest must use exactly the same `domain/fills.py` (I8)
 - Single-signal research can use vectorbt independently — not a replacement for the portfolio backtester
-- Performance: 10 years × 50 symbols must complete in < 60 seconds
+- Performance: 10 years × 9 symbols must complete in < 60 seconds
 - Walk-forward compatibility: the backtester must support walk-forward analysis with parameter grids
 
 ## Considered Options
@@ -36,7 +36,7 @@ Chosen option: **Option A — Custom event-driven backtester**.
 Rationale:
 1. Path-dependent simulation is a hard requirement — vectorized tools silently produce wrong results for compounded portfolios
 2. Same fill model guarantee (I8) is only achievable with a custom backtester — no existing framework can be patched to use `domain/fills.py` without invasive changes
-3. 10 years × 50 symbols in < 60 seconds is achievable with the daily-step loop (3650 days × 50 symbols = 182,500 iterations — trivial for Python)
+3. 10 years × 9 symbols in < 60 seconds is achievable with the daily-step loop (3650 days × 9 symbols = 32,850 iterations — trivial for Python)
 4. No framework coupling — the backtester is a thin loop over existing domain functions
 5. vectorbt remains available for single-signal research (e.g., "does a 50/200 SMA crossover generate alpha on SPY?")
 

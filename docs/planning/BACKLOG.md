@@ -20,7 +20,7 @@ conventions below are preserved for historical reference.
 
 ### Definition of Done (DoD)
 
-- [ ] Code compiles (ruff, mypy)
+- [ ] Code compiles (ruff, ty)
 - [ ] Tests pass (`pytest`)
 - [ ] New code has tests (unit + integration if applicable)
 - [ ] Event logged for all state mutations

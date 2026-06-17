@@ -50,8 +50,8 @@ Rationale:
 
 - Bootstrapping requires API keys (but only the developer who creates the fixture bundle needs them)
 - Fixture bundle is a binary artifact (parquet files) — it goes in the repo's `fixtures/` directory or GitHub Releases
-- Re-bootstrapping is required when the 50-symbol list changes (config change → re-bootstrap)
-- Fixture bundle size: ~50 symbols × 3 years × daily bars + fundamentals + insider data ≈ 5-10 MB (acceptable in repo or Releases)
+- Re-bootstrapping is required when the symbol list changes (config change → re-bootstrap)
+- Fixture bundle size: ~9 symbols × 200 days × daily bars + fundamentals + insider data ≈ 2-5 MB (acceptable in repo or Releases)
 
 ## References
 
