@@ -8,6 +8,16 @@ indicator_state = true
 staleness_halt_hours = 30
 fixture_version = "v1"
 
+[lake]
+mode = "fixture"
+config_path = "../alpha-lake/config/stack.toml"
+base_url = "http://localhost:8000"
+api_key_env = "ALPHA_LAKE_API_KEY"
+snapshot_id = ""
+price_mode = "split_adjusted"
+max_lookback_days = 1095
+fixture_version = "v1"
+
 [universe]
 min_price = 5.0
 min_adv_usd = 5_000_000

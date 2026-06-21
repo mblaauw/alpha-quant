@@ -12,11 +12,19 @@ from adapters.fake.fixture_insider_feed import FixtureInsiderFeed
 from adapters.fake.fixture_market_data import FixtureMarketData
 from adapters.fake.fixture_sentiment_feed import FixtureSentimentFeed
 from adapters.fake.fixture_store import FixtureStore
+from adapters.fake.lake_fixture import FixtureLakeGateway
 from adapters.fake.virtual_clock import VirtualClock
 from adapters.real.alpaca_broker import AlpacaBroker
 from adapters.real.clock import SystemClock
 from adapters.real.eodhd_connector import EODHDConnector
 from adapters.real.event_sink import DuckDBEventSink
+from adapters.real.lake_data import (
+    LakeFundamentals,
+    LakeInsiderFeed,
+    LakeMarketData,
+    LakeSentimentFeed,
+)
+from adapters.real.lake_inprocess import InProcessLakeGateway
 from adapters.real.llm_adapter import OpenAILikeLLM
 from adapters.real.openinsider_connector import OpenInsiderConnector
 from adapters.real.reddit_sentiment_connector import RedditSentimentConnector
@@ -30,6 +38,7 @@ from ports.clock import Clock
 from ports.event_sink import EventSink
 from ports.fundamentals import Fundamentals
 from ports.insider_feed import InsiderFeed
+from ports.lake import LakeGateway
 from ports.llm import LLM
 from ports.llm import LLMConfig as PortLLMConfig
 from ports.market_data import MarketData
@@ -78,7 +87,39 @@ def _fixture_path(config: AppConfig) -> Path:
     return Path("fixtures") / config.data.fixture_version
 
 
-def create_market_data(config: AppConfig, vault: Vault | None = None) -> MarketData:
+def _lake_fixture_path(config: AppConfig) -> Path:
+    return Path("fixtures") / config.lake.fixture_version
+
+
+def create_lake_gateway(config: AppConfig, clock: Clock) -> LakeGateway:
+    """Create the shared Alpha-Lake gateway for lake-backed data ports."""
+    _ = clock
+    if config.lake.mode == "fixture":
+        lake = FixtureLakeGateway(_lake_fixture_path(config))
+    elif config.lake.mode == "in_process":
+        lake = InProcessLakeGateway(
+            config_path=config.lake.config_path,
+            price_mode=config.lake.price_mode,
+        )
+    else:
+        msg = "RestLakeGateway is deferred until Alpha-Lake serves PIT panels over REST"
+        raise NotImplementedError(msg)
+
+    lake.pin_snapshot(config.lake.snapshot_id or None)
+    return lake
+
+
+def create_market_data(
+    config: AppConfig,
+    vault: Vault | None = None,
+    lake_gateway: LakeGateway | None = None,
+    clock: Clock | None = None,
+) -> MarketData:
+    if lake_gateway is not None:
+        if clock is None:
+            msg = "clock is required when creating lake-backed market data"
+            raise ValueError(msg)
+        return LakeMarketData(lake_gateway, clock, price_mode=config.lake.price_mode)
     if config.data.mode == "live":
         from adapters.real.tiingo_connector import TiingoConnector
 
@@ -115,7 +156,17 @@ def _build_sec_edgar(config: AppConfig, vault: Vault | None = None) -> SECFundam
     )
 
 
-def create_fundamentals(config: AppConfig, vault: Vault | None = None) -> Fundamentals:
+def create_fundamentals(
+    config: AppConfig,
+    vault: Vault | None = None,
+    lake_gateway: LakeGateway | None = None,
+    clock: Clock | None = None,
+) -> Fundamentals:
+    if lake_gateway is not None:
+        if clock is None:
+            msg = "clock is required when creating lake-backed fundamentals"
+            raise ValueError(msg)
+        return LakeFundamentals(lake_gateway, clock)
     if config.data.mode != "live":
         return FixtureFundamentals(_fixture_path(config))
 
@@ -140,7 +191,17 @@ def create_fundamentals(config: AppConfig, vault: Vault | None = None) -> Fundam
     return CompositeFundamentals(enabled_adapters, primary=primary)
 
 
-def create_insider_feed(config: AppConfig, vault: Vault | None = None) -> InsiderFeed:
+def create_insider_feed(
+    config: AppConfig,
+    vault: Vault | None = None,
+    lake_gateway: LakeGateway | None = None,
+    clock: Clock | None = None,
+) -> InsiderFeed:
+    if lake_gateway is not None:
+        if clock is None:
+            msg = "clock is required when creating lake-backed insider feed"
+            raise ValueError(msg)
+        return LakeInsiderFeed(lake_gateway, clock)
     if config.data.mode == "live":
         return OpenInsiderConnector(
             user_agent=config.connector.user_agent,
@@ -149,7 +210,17 @@ def create_insider_feed(config: AppConfig, vault: Vault | None = None) -> Inside
     return FixtureInsiderFeed(_fixture_path(config))
 
 
-def create_sentiment_feed(config: AppConfig, vault: Vault | None = None) -> SentimentFeed:
+def create_sentiment_feed(
+    config: AppConfig,
+    vault: Vault | None = None,
+    lake_gateway: LakeGateway | None = None,
+    clock: Clock | None = None,
+) -> SentimentFeed:
+    if lake_gateway is not None:
+        if clock is None:
+            msg = "clock is required when creating lake-backed sentiment feed"
+            raise ValueError(msg)
+        return LakeSentimentFeed(lake_gateway, clock)
     if config.data.mode == "live":
         return RedditSentimentConnector(
             symbols=config.bootstrap.symbols,

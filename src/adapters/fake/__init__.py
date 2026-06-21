@@ -5,6 +5,7 @@ from .fixture_insider_feed import FixtureInsiderFeed
 from .fixture_market_data import FixtureMarketData
 from .fixture_sentiment_feed import FixtureSentimentFeed
 from .fixture_store import FixtureStore
+from .lake_fixture import FixtureLakeGateway
 from .virtual_clock import VirtualClock
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "FixtureMarketData",
     "FixtureSentimentFeed",
     "FixtureStore",
+    "FixtureLakeGateway",
     "VirtualClock",
 ]
