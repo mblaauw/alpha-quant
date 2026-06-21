@@ -15,7 +15,6 @@ from app._loop import (
     ensure_spy,
     evaluate_risk_actions,
     get_date_bars,
-    load_all_bars,
     size_entry,
 )
 from domain.ablation import AblationConfig, compute_spy_buy_and_hold
@@ -23,6 +22,7 @@ from domain.constants import LOOKBACK_DAYS
 from domain.derive import backfill_indicator_state, update_indicator_state
 from domain.fills import FillConfig, fill_entry_order, fill_stop_loss
 from domain.models import (
+    Bar,
     Decision,
     Fill,
     IndicatorState,
@@ -36,6 +36,11 @@ from domain.risk import (
     evaluate_drawdown,
 )
 from domain.sizing import SizingConfig
+from ports.clock import Clock
+from ports.fundamentals import Fundamentals
+from ports.insider_feed import InsiderFeed
+from ports.market_data import MarketData
+from ports.sentiment_feed import SentimentFeed
 from ports.store import Store
 
 logger = structlog.get_logger()
@@ -157,8 +162,11 @@ def _compute_metrics(
     )
 
 
-def _trading_dates(store: Store, start: date, end: date) -> list[date]:
-    bars = store.load_bars("SPY", start, end)
+def _trading_dates(data_source: MarketData | Store, start: date, end: date) -> list[date]:
+    if isinstance(data_source, MarketData):
+        bars = data_source.daily_bars("SPY", start, end)
+    else:
+        bars = data_source.load_bars("SPY", start, end)
     seen: set[date] = set()
     result: list[date] = []
     for b in bars:
@@ -174,42 +182,90 @@ def run_backtest(
     fill_config: FillConfig | None = None,
     risk_config: RiskConfig | None = None,
     sizing_config: SizingConfig | None = None,
+    market_data: MarketData | None = None,
+    clock: Clock | None = None,
+    fundamentals: Fundamentals | None = None,
+    insider_feed: InsiderFeed | None = None,
+    sentiment_feed: SentimentFeed | None = None,
 ) -> BacktestResult:
     rc = risk_config or RiskConfig()
     sc = sizing_config or SizingConfig()
 
     lookback_start = date.fromordinal(config.start_date.toordinal() - LOOKBACK_DAYS)
     symbols = ensure_spy(config.symbols)
-    all_bars = load_all_bars(store, symbols, lookback_start, config.end_date)
 
+    # Load bars from market_data (lake-backed or fixture) when available
+    if market_data is not None:
+        all_bars: dict[str, list[Bar]] = {}
+        for symbol in symbols:
+            try:
+                bars = market_data.daily_bars(symbol, lookback_start, config.end_date)
+                if bars:
+                    all_bars[symbol] = bars
+            except Exception:
+                logger.warning("market_data_bar_load_failed", symbol=symbol)
+    else:
+        from app._loop import load_all_bars as _load_all_bars
+
+        all_bars = _load_all_bars(store, symbols, lookback_start, config.end_date)
+
+    # Build mechanism data from data ports (lake-backed or fixture) when available
     mech_data = MechanismData()
-    for symbol in config.symbols:
-        try:
-            fund = store.load_fundamentals(symbol)
-            if fund:
-                mech_data.fundamentals[symbol] = fund[0]
-        except Exception:
-            logger.warning("Failed to load fundamentals", symbol=symbol)
-        try:
-            txns = store.load_insider_transactions(symbol)
-            if txns:
-                mech_data.insider_txns[symbol] = txns
-        except Exception:
-            logger.warning("Failed to load insider_txns", symbol=symbol)
-        try:
-            earnings = store.load_earnings(symbol)
-            if earnings:
-                mech_data.earnings[symbol] = earnings
-        except Exception:
-            logger.warning("Failed to load earnings", symbol=symbol)
-        try:
-            mentions = store.load_mentions(symbol)
-            if mentions:
-                mech_data.mentions[symbol] = mentions
-        except Exception:
-            logger.warning("Failed to load mentions", symbol=symbol)
+    if fundamentals is not None:
+        for symbol in config.symbols:
+            try:
+                snap = fundamentals.snapshot(symbol)
+                if snap is not None:
+                    mech_data.fundamentals[symbol] = snap
+            except Exception:
+                logger.warning("Failed to load fundamentals", symbol=symbol)
+    if insider_feed is not None:
+        for symbol in config.symbols:
+            try:
+                txns = insider_feed.cluster_transactions(symbol)
+                if txns:
+                    mech_data.insider_txns[symbol] = txns
+            except Exception:
+                logger.warning("Failed to load insider_txns", symbol=symbol)
+    if sentiment_feed is not None:
+        for symbol in config.symbols:
+            try:
+                mentions = sentiment_feed.mention_counts(symbol, days=90)
+                if mentions:
+                    mech_data.mentions[symbol] = mentions
+            except Exception:
+                logger.warning("Failed to load mentions", symbol=symbol)
 
-    trading_dates = _trading_dates(store, config.start_date, config.end_date)
+    # Fall back to store when data ports are not provided
+    if fundamentals is None:
+        for symbol in config.symbols:
+            try:
+                fund = store.load_fundamentals(symbol)
+                if fund:
+                    mech_data.fundamentals[symbol] = fund[0]
+            except Exception:
+                logger.warning("Failed to load fundamentals from store", symbol=symbol)
+            try:
+                txns = store.load_insider_transactions(symbol)
+                if txns:
+                    mech_data.insider_txns[symbol] = txns
+            except Exception:
+                logger.warning("Failed to load insider_txns from store", symbol=symbol)
+            try:
+                earnings = store.load_earnings(symbol)
+                if earnings:
+                    mech_data.earnings[symbol] = earnings
+            except Exception:
+                logger.warning("Failed to load earnings from store", symbol=symbol)
+            try:
+                mentions = store.load_mentions(symbol)
+                if mentions:
+                    mech_data.mentions[symbol] = mentions
+            except Exception:
+                logger.warning("Failed to load mentions from store", symbol=symbol)
+
+    md = market_data or store
+    trading_dates = _trading_dates(md, config.start_date, config.end_date)
     if not trading_dates or not all_bars.get("SPY"):
         return BacktestResult(config=config)
 

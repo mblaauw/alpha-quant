@@ -54,6 +54,9 @@ class _FakeStore:
     def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
         return self._bars.get(symbol, [])
 
+    def daily_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
+        return [b for b in self._bars.get(symbol, []) if start <= b.date <= end]
+
     def load_positions(self) -> list[Position]:
         return self._positions
 
@@ -103,6 +106,7 @@ class TestPipelineCore:
         result = run(
             run_date=date(2026, 6, 11),
             store=store,
+            market_data=store,
             universe=["AAPL"],
         )
         assert isinstance(result, RunResult)
@@ -122,6 +126,7 @@ class TestPipelineCore:
             result = run(
                 run_date=date(2026, 6, 11),
                 store=store,
+                market_data=store,
                 universe=["SPY", "AAPL"],
             )
         assert isinstance(result, RunResult)
@@ -140,6 +145,7 @@ class TestPipelineCore:
             result = run(
                 run_date=date(2026, 6, 11),
                 store=store,
+                market_data=store,
                 universe=["SPY", "AAPL"],
                 risk_config=RiskConfig(),
             )
@@ -171,6 +177,7 @@ class TestPipelineCore:
             result = run(
                 run_date=date(2026, 6, 11),
                 store=store,
+                market_data=store,
                 universe=["SPY", "AAPL"],
                 risk_config=RiskConfig(),
             )
@@ -207,6 +214,7 @@ class TestPipelineCore:
             result = run(
                 run_date=date(2026, 6, 11),
                 store=store,
+                market_data=store,
                 universe=["AAPL"],
             )
         assert isinstance(result, RunResult)
@@ -235,12 +243,11 @@ class TestPipelineCore:
             mock_backfill.return_value = _FakeIndicatorState()
             mock_regime.return_value = ("RISK_ON", 1.0)
             mock_ensure.return_value = ["AAPL", "SPY"]
-            mock_ci.return_value = [
-                InvariantViolation(check="I1_test", detail="test")
-            ]
+            mock_ci.return_value = [InvariantViolation(check="I1_test", detail="test")]
             result = run(
                 run_date=date(2026, 6, 11),
                 store=store,
+                market_data=store,
                 universe=["AAPL"],
             )
         assert isinstance(result, RunResult)
@@ -263,6 +270,7 @@ class TestPipelineCore:
             result = run(
                 run_date=date(2026, 6, 11),
                 store=store,
+                market_data=store,
                 universe=["SPY", "AAPL"],
             )
         assert result.halted is True
@@ -284,13 +292,18 @@ class TestPipelineCore:
             result = run(
                 run_date=date(2026, 6, 11),
                 store=store,
+                market_data=store,
                 universe=["SPY", "AAPL"],
                 risk_config=RiskConfig(dd_ladder=[[0.1, 0.5]]),
                 prev_equity=100_000.0,
             )
         assert isinstance(result, RunResult)
-        dd_events = [e for e in result.events if getattr(e, "event_type", None) == "drawdown_ladder_tripped"]
-        assert len(dd_events) > 0, "DrawdownLadderTripped event should be emitted when equity drops 20%"
+        dd_events = [
+            e for e in result.events if getattr(e, "event_type", None) == "drawdown_ladder_tripped"
+        ]
+        assert len(dd_events) > 0, (
+            "DrawdownLadderTripped event should be emitted when equity drops 20%"
+        )
 
     def test_daily_halt_on_equity_drop(self) -> None:
         spy_bars = _make_bars(400, 100.0)
@@ -310,11 +323,14 @@ class TestPipelineCore:
             result = run(
                 run_date=date(2026, 6, 11),
                 store=store,
+                market_data=store,
                 universe=["SPY", "AAPL"],
                 risk_config=RiskConfig(daily_loss_halt_pct=0.01),
             )
         assert isinstance(result, RunResult)
-        halt_events = [e for e in result.events if hasattr(e, "action_type") and e.action_type == "daily_halt"]
+        halt_events = [
+            e for e in result.events if hasattr(e, "action_type") and e.action_type == "daily_halt"
+        ]
         assert len(halt_events) > 0, "daily_halt should emit when equity drops from 100K to 50K"
 
     def test_m1_missing_bars_skips_symbol(self) -> None:
@@ -330,6 +346,7 @@ class TestPipelineCore:
             result = run(
                 run_date=date(2026, 6, 11),
                 store=store,
+                market_data=store,
                 universe=["SPY", "AAPL"],
                 risk_config=RiskConfig(),
                 prev_equity=100_000.0,
@@ -352,6 +369,7 @@ class TestPipelineCore:
             result = run(
                 run_date=date(2026, 6, 11),
                 store=store,
+                market_data=store,
                 universe=["SPY", "AAPL"],
                 risk_config=RiskConfig(),
                 prev_equity=100_000.0,
@@ -374,11 +392,17 @@ class TestPipelineCore:
             mock_regime.return_value = ("RISK_ON", 1.0)
             blocked = _FakeCandidate()
             blocked.block_reason = "low_quality"
-            blocked.gate_results = {"fundamental": False, "insider": True, "crowding": True, "blackout": True}
+            blocked.gate_results = {
+                "fundamental": False,
+                "insider": True,
+                "crowding": True,
+                "blackout": True,
+            }
             mock_decide.return_value = [blocked]
             result = run(
                 run_date=date(2026, 6, 11),
                 store=store,
+                market_data=store,
                 universe=["SPY", "AAPL"],
                 risk_config=RiskConfig(),
                 prev_equity=100_000.0,
@@ -414,6 +438,7 @@ class TestPipelineCore:
             result = run(
                 run_date=date(2026, 6, 11),
                 store=store,
+                market_data=store,
                 universe=["SPY", "AAPL"],
                 risk_config=RiskConfig(stop_atr_mult=10.0),
                 prev_equity=100_000.0,
@@ -453,21 +478,19 @@ class TestPipelineCore:
         ):
             mock_backfill.return_value = _FakeIndicatorState()
             mock_regime.return_value = ("RISK_ON", 1.0)
-            mock_ci.return_value = [
-                InvariantViolation(check="I1_test", detail="test")
-            ]
+            mock_ci.return_value = [InvariantViolation(check="I1_test", detail="test")]
             result = run(
                 run_date=date(2026, 6, 11),
                 store=store,
+                market_data=store,
                 universe=["SPY", "AAPL"],
                 risk_config=RiskConfig(),
                 prev_equity=100_000.0,
             )
         assert isinstance(result, RunResult)
-        assert any(
-            getattr(e, "check", None) == "I1_test"
-            for e in result.events
-        ), "check_invariants violations should produce ConsistencyViolation events"
+        assert any(getattr(e, "check", None) == "I1_test" for e in result.events), (
+            "check_invariants violations should produce ConsistencyViolation events"
+        )
         mock_ci.assert_called_once()
 
 
@@ -494,7 +517,12 @@ class _FakeCandidate:
     block_reason: str | None = None
     composite_score: float = 0.8
     scores: dict[str, float] = {"technical": 0.8, "momentum": 0.3}
-    gate_results: dict[str, bool] = {"fundamental": True, "insider": True, "crowding": True, "blackout": True}
+    gate_results: dict[str, bool] = {
+        "fundamental": True,
+        "insider": True,
+        "crowding": True,
+        "blackout": True,
+    }
     regime: str = "RISK_ON"
     sector: str | None = None
 
@@ -522,7 +550,19 @@ class TestDecideCandidates:
                 "AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 6, 12), fiscal_quarter="Q2")],
             },
         )
-        bars = {"AAPL": [Bar(symbol="AAPL", date=date(2026, 6, 11), open=100, high=101, low=99, close=100, volume=1_000_000)]}
+        bars = {
+            "AAPL": [
+                Bar(
+                    symbol="AAPL",
+                    date=date(2026, 6, 11),
+                    open=100,
+                    high=101,
+                    low=99,
+                    close=100,
+                    volume=1_000_000,
+                )
+            ]
+        }
         states = {"AAPL": _FakeIndicatorState()}
 
         with (
@@ -548,10 +588,28 @@ class TestDecideCandidates:
         from domain.models import EarningsEntry, FundamentalsSnapshot
 
         mech_data = MechanismData(
-            fundamentals={"AAPL": FundamentalsSnapshot(symbol="AAPL", as_of_date=date(2026, 6, 11), market_cap=1e12)},
-            earnings={"AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]},
+            fundamentals={
+                "AAPL": FundamentalsSnapshot(
+                    symbol="AAPL", as_of_date=date(2026, 6, 11), market_cap=1e12
+                )
+            },
+            earnings={
+                "AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]
+            },
         )
-        bars = {"AAPL": [Bar(symbol="AAPL", date=date(2026, 6, 11), open=100, high=101, low=99, close=100, volume=1_000_000)]}
+        bars = {
+            "AAPL": [
+                Bar(
+                    symbol="AAPL",
+                    date=date(2026, 6, 11),
+                    open=100,
+                    high=101,
+                    low=99,
+                    close=100,
+                    volume=1_000_000,
+                )
+            ]
+        }
         states = {"AAPL": _FakeIndicatorState()}
 
         with (
@@ -580,11 +638,43 @@ class TestDecideCandidates:
         from domain.models import EarningsEntry, FundamentalsSnapshot, InsiderTransaction
 
         mech_data = MechanismData(
-            fundamentals={"AAPL": FundamentalsSnapshot(symbol="AAPL", as_of_date=date(2026, 6, 11), market_cap=1e12)},
-            insider_txns={"AAPL": [InsiderTransaction(symbol="AAPL", filing_date=date(2026, 6, 10), transaction_date=date(2026, 6, 8), owner="CEO", title="CEO", transaction_type="Sell", shares_traded=-10000, price=100, shares_held=50000)]},
-            earnings={"AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]},
+            fundamentals={
+                "AAPL": FundamentalsSnapshot(
+                    symbol="AAPL", as_of_date=date(2026, 6, 11), market_cap=1e12
+                )
+            },
+            insider_txns={
+                "AAPL": [
+                    InsiderTransaction(
+                        symbol="AAPL",
+                        filing_date=date(2026, 6, 10),
+                        transaction_date=date(2026, 6, 8),
+                        owner="CEO",
+                        title="CEO",
+                        transaction_type="Sell",
+                        shares_traded=-10000,
+                        price=100,
+                        shares_held=50000,
+                    )
+                ]
+            },
+            earnings={
+                "AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]
+            },
         )
-        bars = {"AAPL": [Bar(symbol="AAPL", date=date(2026, 6, 11), open=100, high=101, low=99, close=100, volume=1_000_000)]}
+        bars = {
+            "AAPL": [
+                Bar(
+                    symbol="AAPL",
+                    date=date(2026, 6, 11),
+                    open=100,
+                    high=101,
+                    low=99,
+                    close=100,
+                    volume=1_000_000,
+                )
+            ]
+        }
         states = {"AAPL": _FakeIndicatorState()}
 
         with (
@@ -616,13 +706,33 @@ class TestDecideCandidates:
         mention_dates = [date(2026, 6, d) for d in range(1, 12)]
         mech_data = MechanismData(
             mentions={
-                "AAPL": [MentionCount(symbol="AAPL", mention_date=d, source="twitter", count=500)
-                         for d in mention_dates] +
-                        [MentionCount(symbol="AAPL", mention_date=date(2026, 6, 11), source="twitter", count=5000)],
+                "AAPL": [
+                    MentionCount(symbol="AAPL", mention_date=d, source="twitter", count=500)
+                    for d in mention_dates
+                ]
+                + [
+                    MentionCount(
+                        symbol="AAPL", mention_date=date(2026, 6, 11), source="twitter", count=5000
+                    )
+                ],
             },
-            earnings={"AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]},
+            earnings={
+                "AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]
+            },
         )
-        bars = {"AAPL": [Bar(symbol="AAPL", date=date(2026, 6, 11), open=100, high=101, low=99, close=100, volume=1_000_000)]}
+        bars = {
+            "AAPL": [
+                Bar(
+                    symbol="AAPL",
+                    date=date(2026, 6, 11),
+                    open=100,
+                    high=101,
+                    low=99,
+                    close=100,
+                    volume=1_000_000,
+                )
+            ]
+        }
         states = {"AAPL": _FakeIndicatorState()}
 
         with (
@@ -632,7 +742,9 @@ class TestDecideCandidates:
         ):
             mock_score.return_value = _FakeCandidate()
             mock_bo.return_value = None
-            mock_crowd.return_value = CrowdingVerdict(blocked=True, reason="high_mentions", blocked_until=None)
+            mock_crowd.return_value = CrowdingVerdict(
+                blocked=True, reason="high_mentions", blocked_until=None
+            )
 
             result = decide_candidates(
                 ["AAPL"], bars, states, date(2026, 6, 11), "RISK_ON", mech_data
@@ -649,17 +761,58 @@ class TestDecideCandidates:
         from domain.crowding import CrowdingVerdict
         from domain.fundamental import QualityVerdict
         from domain.insider_signal import InsiderVerdict
-        from domain.models import EarningsEntry, FundamentalsSnapshot, InsiderTransaction, MentionCount
+        from domain.models import (
+            EarningsEntry,
+            FundamentalsSnapshot,
+            InsiderTransaction,
+            MentionCount,
+        )
 
         mech_data = MechanismData(
-            fundamentals={"AAPL": FundamentalsSnapshot(symbol="AAPL", as_of_date=date(2026, 6, 11), market_cap=1e12)},
-            insider_txns={"AAPL": [InsiderTransaction(symbol="AAPL", filing_date=date(2026, 6, 10), transaction_date=date(2026, 6, 8), owner="CEO", title="CEO", transaction_type="Buy", shares_traded=5000, price=100, shares_held=55000)]},
-            mentions={
-                "AAPL": [MentionCount(symbol="AAPL", mention_date=date(2026, 6, 10), source="twitter", count=50)],
+            fundamentals={
+                "AAPL": FundamentalsSnapshot(
+                    symbol="AAPL", as_of_date=date(2026, 6, 11), market_cap=1e12
+                )
             },
-            earnings={"AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]},
+            insider_txns={
+                "AAPL": [
+                    InsiderTransaction(
+                        symbol="AAPL",
+                        filing_date=date(2026, 6, 10),
+                        transaction_date=date(2026, 6, 8),
+                        owner="CEO",
+                        title="CEO",
+                        transaction_type="Buy",
+                        shares_traded=5000,
+                        price=100,
+                        shares_held=55000,
+                    )
+                ]
+            },
+            mentions={
+                "AAPL": [
+                    MentionCount(
+                        symbol="AAPL", mention_date=date(2026, 6, 10), source="twitter", count=50
+                    )
+                ],
+            },
+            earnings={
+                "AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]
+            },
         )
-        bars = {"AAPL": [Bar(symbol="AAPL", date=date(2026, 6, 11), open=100, high=101, low=99, close=100, volume=1_000_000)]}
+        bars = {
+            "AAPL": [
+                Bar(
+                    symbol="AAPL",
+                    date=date(2026, 6, 11),
+                    open=100,
+                    high=101,
+                    low=99,
+                    close=100,
+                    volume=1_000_000,
+                )
+            ]
+        }
         states = {"AAPL": _FakeIndicatorState()}
 
         with (
@@ -673,7 +826,9 @@ class TestDecideCandidates:
             mock_fund.return_value = QualityVerdict(passed=True)
             mock_bo.return_value = None
             mock_insider.return_value = InsiderVerdict(score=2.5, reason=None)
-            mock_crowd.return_value = CrowdingVerdict(blocked=False, blocked_until=None, reason=None)
+            mock_crowd.return_value = CrowdingVerdict(
+                blocked=False, blocked_until=None, reason=None
+            )
 
             result = decide_candidates(
                 ["AAPL"], bars, states, date(2026, 6, 11), "RISK_ON", mech_data
@@ -697,13 +852,45 @@ class TestShadowAblation:
         from domain.fundamental import QualityVerdict
         from domain.insider_signal import InsiderVerdict
         from domain.models import EarningsEntry, FundamentalsSnapshot, InsiderTransaction
-    
+
         mech_data = MechanismData(
-            fundamentals={"AAPL": FundamentalsSnapshot(symbol="AAPL", as_of_date=date(2026, 6, 11), market_cap=1e12)},
-            insider_txns={"AAPL": [InsiderTransaction(symbol="AAPL", filing_date=date(2026, 6, 10), transaction_date=date(2026, 6, 8), owner="CEO", title="CEO", transaction_type="Sell", shares_traded=-10000, price=100, shares_held=50000)]},
-            earnings={"AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]},
+            fundamentals={
+                "AAPL": FundamentalsSnapshot(
+                    symbol="AAPL", as_of_date=date(2026, 6, 11), market_cap=1e12
+                )
+            },
+            insider_txns={
+                "AAPL": [
+                    InsiderTransaction(
+                        symbol="AAPL",
+                        filing_date=date(2026, 6, 10),
+                        transaction_date=date(2026, 6, 8),
+                        owner="CEO",
+                        title="CEO",
+                        transaction_type="Sell",
+                        shares_traded=-10000,
+                        price=100,
+                        shares_held=50000,
+                    )
+                ]
+            },
+            earnings={
+                "AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]
+            },
         )
-        bars = {"AAPL": [Bar(symbol="AAPL", date=date(2026, 6, 11), open=100, high=101, low=99, close=100, volume=1_000_000)]}
+        bars = {
+            "AAPL": [
+                Bar(
+                    symbol="AAPL",
+                    date=date(2026, 6, 11),
+                    open=100,
+                    high=101,
+                    low=99,
+                    close=100,
+                    volume=1_000_000,
+                )
+            ]
+        }
         states = {"AAPL": _FakeIndicatorState()}
         no_insider = AblationConfig(disable_insider=True)
 
@@ -719,10 +906,20 @@ class TestShadowAblation:
             mock_insider.return_value = InsiderVerdict(score=-2.0, reason="insider_selling")
 
             full_result = decide_candidates(
-                ["AAPL"], bars, states, date(2026, 6, 11), "RISK_ON", mech_data,
+                ["AAPL"],
+                bars,
+                states,
+                date(2026, 6, 11),
+                "RISK_ON",
+                mech_data,
             )
             ablated_result = decide_candidates(
-                ["AAPL"], bars, states, date(2026, 6, 11), "RISK_ON", mech_data,
+                ["AAPL"],
+                bars,
+                states,
+                date(2026, 6, 11),
+                "RISK_ON",
+                mech_data,
                 ablation=no_insider,
             )
 
@@ -746,10 +943,30 @@ class TestShadowAblation:
         from domain.models import EarningsEntry, MentionCount
 
         mech_data = MechanismData(
-            mentions={"AAPL": [MentionCount(symbol="AAPL", mention_date=date(2026, 6, 10), source="twitter", count=1000)]},
-            earnings={"AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]},
+            mentions={
+                "AAPL": [
+                    MentionCount(
+                        symbol="AAPL", mention_date=date(2026, 6, 10), source="twitter", count=1000
+                    )
+                ]
+            },
+            earnings={
+                "AAPL": [EarningsEntry(symbol="AAPL", date=date(2026, 3, 1), fiscal_quarter="Q1")]
+            },
         )
-        bars = {"AAPL": [Bar(symbol="AAPL", date=date(2026, 6, 11), open=100, high=101, low=99, close=100, volume=1_000_000)]}
+        bars = {
+            "AAPL": [
+                Bar(
+                    symbol="AAPL",
+                    date=date(2026, 6, 11),
+                    open=100,
+                    high=101,
+                    low=99,
+                    close=100,
+                    volume=1_000_000,
+                )
+            ]
+        }
         states = {"AAPL": _FakeIndicatorState()}
         no_crowding = AblationConfig(disable_crowding_veto=True)
 
@@ -760,13 +977,25 @@ class TestShadowAblation:
         ):
             mock_score.return_value = _FakeCandidate()
             mock_bo.return_value = None
-            mock_crowd.return_value = CrowdingVerdict(blocked=True, reason="high_mentions", blocked_until=None)
+            mock_crowd.return_value = CrowdingVerdict(
+                blocked=True, reason="high_mentions", blocked_until=None
+            )
 
             full_result = decide_candidates(
-                ["AAPL"], bars, states, date(2026, 6, 11), "RISK_ON", mech_data,
+                ["AAPL"],
+                bars,
+                states,
+                date(2026, 6, 11),
+                "RISK_ON",
+                mech_data,
             )
             ablated_result = decide_candidates(
-                ["AAPL"], bars, states, date(2026, 6, 11), "RISK_ON", mech_data,
+                ["AAPL"],
+                bars,
+                states,
+                date(2026, 6, 11),
+                "RISK_ON",
+                mech_data,
                 ablation=no_crowding,
             )
 
@@ -804,6 +1033,7 @@ class TestShadowAblation:
             result = run_pipeline(
                 run_date=date(2026, 6, 11),
                 store=store,
+                market_data=store,
                 universe=["SPY", "AAPL"],
                 config=PipelineConfig(ablation=AblationConfig()),
                 fill_config=FillConfig(),

@@ -30,7 +30,6 @@ from domain.events import (
     CandidatePromoted,
     CandidateScored,
     ConsistencyViolation,
-    DataIngested,
     DataQuarantined,
     DomainEvent,
     DrawdownLadderTripped,
@@ -129,6 +128,7 @@ def run(
     risk_config: RiskConfig | None = None,
     sizing_config: SizingConfig | None = None,
     market_data: MarketData | None = None,
+    mechanism_data: MechanismData | None = None,
     prev_equity: float | None = None,
     prev_regime: str = "CAUTION",
     degradation: DegradationStatus | None = None,
@@ -160,47 +160,33 @@ def run(
     symbols = ensure_spy(universe)
 
     all_bars: dict[str, list[Bar]] = {}
-    with _time_step("bar_load", run_id, events, symbols_processed=len(symbols)):
-        for symbol in symbols:
-            bars: list[Bar] = []
-            try:
-                bars = store.load_bars(symbol, lookback_start, run_date)
-            except Exception:
-                logger.warning("store_bar_load_failed", symbol=symbol)
-            if not bars and market_data is not None:
+    if market_data is not None:
+        with _time_step("bar_load", run_id, events, symbols_processed=len(symbols)):
+            for symbol in symbols:
                 try:
                     bars = market_data.daily_bars(symbol, lookback_start, run_date)
-                    if bars:
-                        events.append(
-                            DataIngested(
-                                run_id=run_id,
-                                source="pipeline",
-                                connector="market_data",
-                                symbol=symbol,
-                                records=len(bars),
-                            )
-                        )
                 except Exception:
                     logger.exception("market_data_bar_load_failed", symbol=symbol)
-            if bars:
-                all_bars[symbol] = bars
-            else:
-                events.append(
-                    SourceDegraded(
-                        run_id=run_id,
-                        source="pipeline",
-                        source_name=symbol,
-                        fallback="skip",
+                    bars = []
+                if bars:
+                    all_bars[symbol] = bars
+                else:
+                    events.append(
+                        SourceDegraded(
+                            run_id=run_id,
+                            source="pipeline",
+                            source_name=symbol,
+                            fallback="skip",
+                        )
                     )
-                )
-                events.append(
-                    ErrorOccurred(
-                        run_id=run_id,
-                        source="pipeline",
-                        error="No bar data from store or market_data",
-                        context={"symbol": symbol, "operation": "bar_load"},
+                    events.append(
+                        ErrorOccurred(
+                            run_id=run_id,
+                            source="pipeline",
+                            error="No bar data from market_data",
+                            context={"symbol": symbol, "operation": "bar_load"},
+                        )
                     )
-                )
 
     if not all_bars.get("SPY"):
         duration = (datetime.now(UTC) - now).total_seconds()
@@ -480,33 +466,9 @@ def run(
     new_positions_count = len([p for p in store.load_positions() if p.quantity > 0])
     slots = cfg.max_positions - new_positions_count
 
-    # Load mechanism data (needed for main book and shadow books)
-    mech_data = MechanismData()
-    for symbol in universe:
-        try:
-            fund = store.load_fundamentals(symbol)
-            if fund:
-                mech_data.fundamentals[symbol] = fund[0]
-        except Exception:
-            logger.warning("Failed to load fundamentals", symbol=symbol)
-        try:
-            txns = store.load_insider_transactions(symbol)
-            if txns:
-                mech_data.insider_txns[symbol] = txns
-        except Exception:
-            logger.warning("Failed to load insider_txns", symbol=symbol)
-        try:
-            earnings = store.load_earnings(symbol)
-            if earnings:
-                mech_data.earnings[symbol] = earnings
-        except Exception:
-            logger.warning("Failed to load earnings", symbol=symbol)
-        try:
-            mentions = store.load_mentions(symbol)
-            if mentions:
-                mech_data.mentions[symbol] = mentions
-        except Exception:
-            logger.warning("Failed to load mentions", symbol=symbol)
+    # Use explicitly passed mechanism data (lake-backed or fixture)
+    # instead of loading from store — pipeline no longer reads source data from the store
+    mech_data = mechanism_data or MechanismData()
 
     gate_threshold = 0.5 * m3_threshold_multiplier(deg)
 

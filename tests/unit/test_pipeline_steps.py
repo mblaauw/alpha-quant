@@ -4,7 +4,7 @@ from datetime import date
 
 from app.pipeline_steps import derive_step, load_bars_step, validate_step
 from domain.models import Bar
-from ports.store import Store
+from ports.market_data import MarketData
 
 
 def _make_bars(count: int = 400, start_price: float = 100.0) -> list[Bar]:
@@ -26,148 +26,27 @@ def _make_bars(count: int = 400, start_price: float = 100.0) -> list[Bar]:
     return bars
 
 
-class _FakeStore(Store):
-    def __init__(
-        self,
-        bars: dict[str, list[Bar]] | None = None,
-    ) -> None:
-        self._bars = bars or {}
+class _FakeMarketData(MarketData):
+    def __init__(self, bars: dict[str, list[Bar]]) -> None:
+        self._bars = bars
 
-    def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
-        return self._bars.get(symbol, [])
+    def daily_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
+        return [b for b in self._bars.get(symbol, []) if start <= b.date <= end]
 
-    def save_bars(self, symbol: str, bars: list[Bar]) -> None:
-        pass
-
-    def latest_bar_date(self, symbol: str) -> date | None:
-        bars = self._bars.get(symbol)
-        if not bars:
-            return None
-        return max(b.date for b in bars)
-
-    def latest_fundamentals_date(self, symbol: str) -> date | None:
+    def latest_quote(self, symbol: str) -> object:
         return None
 
-    def load_decisions(self, symbol: str, since: date) -> list:
+    def trading_calendar(self, start: date, end: date) -> list[object]:
         return []
-
-    def save_decision(self, decision: object) -> None:
-        pass
-
-    def load_order(self, order_id: str) -> None:
-        return None
-
-    def save_order(self, order: object) -> None:
-        pass
-
-    def load_fills(self, order_id: str) -> list:
-        return []
-
-    def save_fill(self, fill: object) -> None:
-        pass
-
-    def load_positions(self) -> list:
-        return []
-
-    def save_position(self, position: object) -> None:
-        pass
-
-    def save_event(self, event: object) -> None:
-        pass
-
-    def load_events(self, event_type: str | None = None, since: date | None = None) -> list:
-        return []
-
-    def save_indicator_state(self, state: object) -> None:
-        pass
-
-    def load_indicator_state(self, symbol: str, dt: date) -> None:
-        return None
-
-    def save_corp_actions(self, symbol: str, actions: list) -> None:
-        pass
-
-    def load_corp_actions(self, symbol: str) -> list:
-        return []
-
-    def save_earnings(self, symbol: str, entries: list) -> None:
-        pass
-
-    def load_earnings(self, symbol: str) -> list:
-        return []
-
-    def load_fundamentals(self, symbol: str) -> list:
-        return []
-
-    def load_insider_transactions(self, symbol: str) -> list:
-        return []
-
-    def load_mentions(self, symbol: str) -> list:
-        return []
-
-    def save_fundamentals(self, symbol: str, snapshots: list) -> None:
-        pass
-
-    def save_insider_transactions(self, symbol: str, txns: list) -> None:
-        pass
-
-    def save_mentions(self, symbol: str, mentions: list) -> None:
-        pass
-
-    def save_portfolio_snapshot(self, snapshot: object) -> None:
-        pass
-
-    def load_latest_portfolio_snapshot(self, book: str = "PAPER") -> None:
-        return None
-
-    def load_portfolio_snapshots(self, book: str = "PAPER", limit: int = 500) -> list:
-        return []
-
-    def save_journal(self, entry: object) -> None:
-        pass
-
-    def load_journal(self, dt: date) -> None:
-        return None
-
-    def save_report(self, report: object) -> None:
-        pass
-
-    def load_report(self, dt: date, report_type: str) -> None:
-        return None
-
-    def add_quarantine(self, symbol: str, reason: str, severity: str = "QUARANTINE") -> None:
-        pass
-
-    def list_quarantine(self, cleared: bool = False) -> list:
-        return []
-
-    def clear_quarantine(self, symbol: str) -> None:
-        pass
-
-    def register_run(self, run_type: str, config_hash: str, fixture_version: str = "") -> str:
-        return "test-run-id"
-
-    def complete_run(self, run_id: str, status: str = "completed", manifest_hash: str = "") -> None:
-        pass
-
-    def list_runs(self, since_date: date | None = None) -> list:
-        return []
-
-    def transaction(self) -> object:
-        return self
-
-    def close(self) -> None:
-        pass
 
 
 class TestLoadBarsStep:
-    def test_spy_only_in_store(self) -> None:
-        store = _FakeStore(bars={"SPY": _make_bars(400)})
+    def test_spy_only_in_market_data(self) -> None:
+        md = _FakeMarketData({"SPY": _make_bars(400)})
         result = load_bars_step(
             run_date=date(2026, 6, 15),
             symbols=["SPY", "AAPL"],
-            store=store,
-            market_data=None,
+            market_data=md,
             lookback_days=400,
             run_id="test-1",
         )
@@ -175,13 +54,12 @@ class TestLoadBarsStep:
         assert "AAPL" not in result.all_bars
         assert any(e.event_type == "source_degraded" for e in result.events)
 
-    def test_both_symbols_in_store(self) -> None:
-        store = _FakeStore(bars={"SPY": _make_bars(400), "AAPL": _make_bars(400, 150.0)})
+    def test_both_symbols_in_market_data(self) -> None:
+        md = _FakeMarketData({"SPY": _make_bars(400), "AAPL": _make_bars(400, 150.0)})
         result = load_bars_step(
             run_date=date(2026, 6, 15),
             symbols=["SPY", "AAPL"],
-            store=store,
-            market_data=None,
+            market_data=md,
             lookback_days=400,
             run_id="test-2",
         )
@@ -190,12 +68,11 @@ class TestLoadBarsStep:
         assert len(result.prices) == 2
 
     def test_prices_populated(self) -> None:
-        store = _FakeStore(bars={"SPY": _make_bars(400)})
+        md = _FakeMarketData({"SPY": _make_bars(400)})
         result = load_bars_step(
             run_date=date(2026, 6, 15),
             symbols=["SPY"],
-            store=store,
-            market_data=None,
+            market_data=md,
             lookback_days=400,
             run_id="test-3",
         )
