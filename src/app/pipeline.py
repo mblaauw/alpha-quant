@@ -23,7 +23,12 @@ from domain.ablation import (
     AblationConfig,
     ShadowBook,
 )
-from domain.degradation import DegradationStatus, m3_threshold_multiplier
+from domain.degradation import (
+    DegradationStatus,
+    health_to_degradation,
+    is_price_stale,
+    m3_threshold_multiplier,
+)
 from domain.derive import backfill_indicator_state
 from domain.events import (
     CandidateBlocked,
@@ -66,6 +71,7 @@ from domain.risk import (
 )
 from domain.sizing import SizingConfig
 from domain.validate import validate_bars, validate_indicator_state
+from ports.lake import LakeGateway
 from ports.market_data import MarketData
 from ports.store import Store
 
@@ -129,6 +135,7 @@ def run(
     sizing_config: SizingConfig | None = None,
     market_data: MarketData | None = None,
     mechanism_data: MechanismData | None = None,
+    lake_gateway: LakeGateway | None = None,
     prev_equity: float | None = None,
     prev_regime: str = "CAUTION",
     degradation: DegradationStatus | None = None,
@@ -138,7 +145,15 @@ def run(
     fc = fill_config or FillConfig()
     rc = risk_config or RiskConfig()
     sc = sizing_config or SizingConfig()
+
+    # Derive degradation from lake health if no explicit degradation passed
     deg = degradation or DegradationStatus()
+    if degradation is None and lake_gateway is not None:
+        try:
+            health = lake_gateway.dataset_health()
+            deg = health_to_degradation(health)
+        except Exception:
+            logger.warning("lake_health_check_failed")
 
     run_id = cfg.run_id or uuid.uuid4().hex[:16]
     events: list[DomainEvent] = []
@@ -210,6 +225,24 @@ def run(
 
     # --- 2. Validate bars ---
     with _time_step("validate", run_id, events, symbols_processed=len(all_bars)):
+        # Lake health price-staleness check (halts if bars dataset is stale)
+        if lake_gateway is not None:
+            try:
+                health = lake_gateway.dataset_health()
+                if is_price_stale(health, staleness_hours=30):
+                    halted = True
+                    write_halt(reason="price_data_stale", run_id=run_id)
+                    events.append(
+                        StalenessHaltSet(
+                            run_id=run_id,
+                            source="pipeline",
+                            symbol="*",
+                            hours_since_last=0.0,
+                        )
+                    )
+            except Exception:
+                logger.warning("lake_price_staleness_check_failed")
+
         for symbol, bars in all_bars.items():
             if not bars:
                 continue
