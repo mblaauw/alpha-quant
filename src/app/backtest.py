@@ -125,7 +125,7 @@ def _compute_metrics(
     sharpe = float(np.mean(daily_returns) / np.std(daily_returns) * af)
     downside = daily_returns[daily_returns < 0]
     down_std = np.std(downside) if len(downside) > 0 else np.std(daily_returns)
-    sortino = float(np.mean(daily_returns) / down_std * af)
+    sortino = 0.0 if down_std < 1e-10 else float(np.mean(daily_returns) / down_std * af)
 
     spy_r = spy_c = spy_d = spy_sh = None
     if spy_curve and len(spy_curve) >= 2:
@@ -162,11 +162,8 @@ def _compute_metrics(
     )
 
 
-def _trading_dates(data_source: MarketData | Store, start: date, end: date) -> list[date]:
-    if isinstance(data_source, MarketData):
-        bars = data_source.daily_bars("SPY", start, end)
-    else:
-        bars = data_source.load_bars("SPY", start, end)
+def _trading_dates(market_data: MarketData, start: date, end: date) -> list[date]:
+    bars = market_data.daily_bars("SPY", start, end)
     seen: set[date] = set()
     result: list[date] = []
     for b in bars:
@@ -194,22 +191,21 @@ def run_backtest(
     lookback_start = date.fromordinal(config.start_date.toordinal() - LOOKBACK_DAYS)
     symbols = ensure_spy(config.symbols)
 
-    # Load bars from market_data (lake-backed or fixture) when available
-    if market_data is not None:
-        all_bars: dict[str, list[Bar]] = {}
-        for symbol in symbols:
-            try:
-                bars = market_data.daily_bars(symbol, lookback_start, config.end_date)
-                if bars:
-                    all_bars[symbol] = bars
-            except Exception:
-                logger.warning("market_data_bar_load_failed", symbol=symbol)
-    else:
-        from app._loop import load_all_bars as _load_all_bars
+    if market_data is None:
+        msg = "market_data is required for backtest bar loading"
+        raise ValueError(msg)
 
-        all_bars = _load_all_bars(store, symbols, lookback_start, config.end_date)
+    # Load bars from market_data (lake-backed or fixture)
+    all_bars: dict[str, list[Bar]] = {}
+    for symbol in symbols:
+        try:
+            bars = market_data.daily_bars(symbol, lookback_start, config.end_date)
+            if bars:
+                all_bars[symbol] = bars
+        except Exception:
+            logger.warning("market_data_bar_load_failed", symbol=symbol)
 
-    # Build mechanism data from data ports (lake-backed or fixture) when available
+    # Build mechanism data from data ports (lake-backed or fixture)
     mech_data = MechanismData()
     if fundamentals is not None:
         for symbol in config.symbols:
@@ -236,36 +232,7 @@ def run_backtest(
             except Exception:
                 logger.warning("Failed to load mentions", symbol=symbol)
 
-    # Fall back to store when data ports are not provided
-    if fundamentals is None:
-        for symbol in config.symbols:
-            try:
-                fund = store.load_fundamentals(symbol)
-                if fund:
-                    mech_data.fundamentals[symbol] = fund[0]
-            except Exception:
-                logger.warning("Failed to load fundamentals from store", symbol=symbol)
-            try:
-                txns = store.load_insider_transactions(symbol)
-                if txns:
-                    mech_data.insider_txns[symbol] = txns
-            except Exception:
-                logger.warning("Failed to load insider_txns from store", symbol=symbol)
-            try:
-                earnings = store.load_earnings(symbol)
-                if earnings:
-                    mech_data.earnings[symbol] = earnings
-            except Exception:
-                logger.warning("Failed to load earnings from store", symbol=symbol)
-            try:
-                mentions = store.load_mentions(symbol)
-                if mentions:
-                    mech_data.mentions[symbol] = mentions
-            except Exception:
-                logger.warning("Failed to load mentions from store", symbol=symbol)
-
-    md = market_data or store
-    trading_dates = _trading_dates(md, config.start_date, config.end_date)
+    trading_dates = _trading_dates(market_data, config.start_date, config.end_date)
     if not trading_dates or not all_bars.get("SPY"):
         return BacktestResult(config=config)
 

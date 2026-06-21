@@ -6,68 +6,14 @@ from typing import Self
 from domain.events import DomainEvent
 from domain.journal import JournalEntry
 from domain.models import (
-    Bar,
-    CorporateAction,
     Decision,
-    EarningsEntry,
     Fill,
-    FundamentalsSnapshot,
     IndicatorState,
-    InsiderTransaction,
-    MentionCount,
     Order,
     PortfolioSnapshot,
     Position,
 )
 from domain.reporting import ReportEntry
-
-
-class BarStore(ABC):
-    """Bar data read/write interface."""
-
-    @abstractmethod
-    def save_bars(self, symbol: str, bars: list[Bar]) -> None: ...
-
-    @abstractmethod
-    def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]: ...
-
-    @abstractmethod
-    def latest_bar_date(self, symbol: str) -> date | None:
-        """Most recent bar date for a symbol, or None if no data exists."""
-
-    @abstractmethod
-    def latest_fundamentals_date(self, symbol: str) -> date | None:
-        """Most recent fundamentals as_of_date for a symbol, or None."""
-
-    @abstractmethod
-    def save_corp_actions(self, symbol: str, actions: list[CorporateAction]) -> None: ...
-
-    @abstractmethod
-    def load_corp_actions(self, symbol: str) -> list[CorporateAction]: ...
-
-    @abstractmethod
-    def save_earnings(self, symbol: str, entries: list[EarningsEntry]) -> None: ...
-
-    @abstractmethod
-    def load_earnings(self, symbol: str) -> list[EarningsEntry]: ...
-
-    @abstractmethod
-    def load_fundamentals(self, symbol: str) -> list[FundamentalsSnapshot]: ...
-
-    @abstractmethod
-    def load_insider_transactions(self, symbol: str) -> list[InsiderTransaction]: ...
-
-    @abstractmethod
-    def load_mentions(self, symbol: str) -> list[MentionCount]: ...
-
-    @abstractmethod
-    def save_fundamentals(self, symbol: str, snapshots: list[FundamentalsSnapshot]) -> None: ...
-
-    @abstractmethod
-    def save_insider_transactions(self, symbol: str, txns: list[InsiderTransaction]) -> None: ...
-
-    @abstractmethod
-    def save_mentions(self, symbol: str, mentions: list[MentionCount]) -> None: ...
 
 
 class DecisionStore(ABC):
@@ -188,7 +134,6 @@ class AdminStore(ABC):
 
 
 class Store(
-    BarStore,
     DecisionStore,
     OrderStore,
     PositionStore,

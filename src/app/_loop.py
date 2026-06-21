@@ -19,7 +19,6 @@ from domain.loop_helpers import (  # noqa: F401 — re-export for consumers
 from domain.models import Bar, Candidate, IndicatorState
 from domain.regime import REGIME_MULTIPLIERS
 from domain.regime import detect as detect_regime
-from ports.store import Store
 
 
 def ensure_spy(symbols: list[str]) -> list[str]:
@@ -27,20 +26,6 @@ def ensure_spy(symbols: list[str]) -> list[str]:
     if "SPY" not in syms:
         syms.append("SPY")
     return syms
-
-
-def load_all_bars(
-    store: Store,
-    symbols: list[str],
-    start: date,
-    end: date,
-) -> dict[str, list[Bar]]:
-    all_bars: dict[str, list[Bar]] = {}
-    for symbol in symbols:
-        bars = store.load_bars(symbol, start, end)
-        if bars:
-            all_bars[symbol] = bars
-    return all_bars
 
 
 def detect_regime_and_multiplier(

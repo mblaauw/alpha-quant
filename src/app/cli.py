@@ -17,8 +17,6 @@ from rich.prompt import Confirm as RichConfirm
 from rich.table import Table
 
 from app.config import AppConfig, ConfigError, load_config, redact_config
-from domain.models import FundamentalsSnapshot
-from ports.fundamentals import Fundamentals
 
 __version__ = _version("alpha-quant")
 
@@ -552,181 +550,23 @@ def bootstrap(
     )
 
 
-# ── Ingest ──────────────────────────────────────────────────────────────────────────────
+# ── Ingest (deprecated) ─────────────────────────────────────────────────────────────────
 
 
-@app.command(rich_help_panel="Data")
+@app.command(rich_help_panel="Data", hidden=True)
 def ingest(
     ctx: typer.Context,
     days: int = typer.Option(  # noqa: B008
         200,
         "--days",
         "-d",
-        help="Lookback days for historical data",
+        help="Lookback days for historical data (deprecated)",
     ),
 ) -> None:
-    """Fetch live data from APIs into the canonical store.
-
-    Downloads daily bars, fundamentals snapshots, insider transactions, and
-    social sentiment for all universe symbols. Run this before alpha-quant run.
-    """
-    from datetime import date, timedelta
-    from pathlib import Path
-
-    from app.factory import (
-        create_fundamentals,
-        create_insider_feed,
-        create_market_data,
-        create_sentiment_feed,
-    )
-    from app.store import CanonicalStore
-    from app.vault import Vault
-
-    config = _load_config_cached(ctx)
-    config.data.mode = "live"
-
-    vault = Vault(base_path=Path("vault"))
-    market_data = create_market_data(config, vault)
-    fundamentals = create_fundamentals(config, vault)
-    insider = create_insider_feed(config, vault)
-    sentiment = create_sentiment_feed(config, vault)
-
-    store = CanonicalStore(base_path=Path("data"))
-    universe = config.bootstrap.symbols + config.bootstrap.include_benchmarks
-
-    today = date.today()
-    lookback = today - timedelta(days=days)
-    results: dict[str, list[str]] = {}
-
-    progress = Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-        console=console,
-    )
-
-    totals = {
-        "bars": 0,
-        "fundamentals": 0,
-        "insider": 0,
-        "mentions": 0,
-        "bars_fail": 0,
-        "fundamentals_fail": 0,
-        "insider_fail": 0,
-        "mentions_fail": 0,
-    }
-
-    with progress:
-        ingest_task = progress.add_task(
-            f"[cyan]Ingesting {len(universe)} symbols...",
-            total=len(universe),
-        )
-
-        for symbol in universe:
-            sym_results: list[str] = []
-
-            try:
-                latest = store.latest_bar_date(symbol)
-                start = max(latest + timedelta(days=1), lookback) if latest else lookback
-                bars = market_data.daily_bars(symbol, start, today)
-                if bars:
-                    store.save_bars(symbol, bars)
-                    totals["bars"] += len(bars)
-                    sym_results.append(f"bars={len(bars)}")
-                else:
-                    totals["bars_fail"] += 1
-                    sym_results.append("bars=[yellow]0[/yellow]")
-            except Exception:
-                totals["bars_fail"] += 1
-                sym_results.append("bars=[red]FAIL[/red]")
-
-            try:
-                latest_fund = store.latest_fundamentals_date(symbol)
-                if latest_fund == today:
-                    totals["fundamentals"] += 1
-                    sym_results.append("fundamentals=[dim]cached[/dim]")
-                else:
-                    fund_adapters: list[Fundamentals] = getattr(fundamentals, "all", [fundamentals])
-                    for fa in fund_adapters:
-                        snap = fa.snapshot(symbol)
-                        if snap is not None:
-                            src_name = getattr(fa, "_source_name", "")
-                            snap = FundamentalsSnapshot(**snap.model_dump(), adapter=src_name)
-                            store.save_fundamentals(symbol, [snap])
-                            totals["fundamentals"] += 1
-                            sym_results.append(f"fundamentals=[green]{src_name or 'OK'}[/green]")
-                        else:
-                            totals["fundamentals_fail"] += 1
-                            sym_results.append("fundamentals=[yellow]-[/yellow]")
-            except Exception:
-                totals["fundamentals_fail"] += 1
-                sym_results.append("fundamentals=[red]FAIL[/red]")
-
-            try:
-                txns = insider.cluster_transactions(symbol)
-                if txns:
-                    store.save_insider_transactions(symbol, txns)
-                    totals["insider"] += len(txns)
-                    sym_results.append(f"insider={len(txns)}")
-                else:
-                    totals["insider_fail"] += 1
-                    sym_results.append("insider=[yellow]0[/yellow]")
-            except Exception:
-                totals["insider_fail"] += 1
-                sym_results.append("insider=[red]FAIL[/red]")
-
-            try:
-                mentions = sentiment.mention_counts(symbol)
-                if mentions:
-                    store.save_mentions(symbol, mentions)
-                    totals["mentions"] += len(mentions)
-                    sym_results.append(f"mentions={len(mentions)}")
-                else:
-                    totals["mentions_fail"] += 1
-                    sym_results.append("mentions=[yellow]0[/yellow]")
-            except Exception:
-                totals["mentions_fail"] += 1
-                sym_results.append("mentions=[red]FAIL[/red]")
-
-            results[symbol] = sym_results
-            progress.console.print(f"  [cyan]{symbol}[/cyan]  {'  '.join(sym_results)}")
-            progress.advance(ingest_task)
-
-    source_table = Table(title="Ingest Summary", border_style="cyan")
-    source_table.add_column("Source", style="bold")
-    source_table.add_column("OK", style="green")
-    source_table.add_column("Failed")
-    source_table.add_column("Records")
-
-    def fmt(n: int) -> str:
-        return f"[red]{n}[/red]" if n > 0 else f"[green]{n}[/green]"
-
-    source_table.add_row(
-        "Bars",
-        fmt(len(universe) - totals["bars_fail"]),
-        fmt(totals["bars_fail"]),
-        str(totals["bars"]),
-    )
-    source_table.add_row(
-        "Fundamentals",
-        fmt(len(universe) - totals["fundamentals_fail"]),
-        fmt(totals["fundamentals_fail"]),
-        str(totals["fundamentals"]),
-    )
-    source_table.add_row(
-        "Insider",
-        fmt(len(universe) - totals["insider_fail"]),
-        fmt(totals["insider_fail"]),
-        str(totals["insider"]),
-    )
-    source_table.add_row(
-        "Sentiment",
-        fmt(len(universe) - totals["mentions_fail"]),
-        fmt(totals["mentions_fail"]),
-        str(totals["mentions"]),
-    )
-    console.print(source_table)
+    """[deprecated] All source-data reads now go through Alpha-Lake."""
+    _ = ctx, days
+    console.print("[yellow]`alpha-quant ingest` is deprecated.[/yellow]")
+    console.print("All source-data reads now go through Alpha-Lake. See #567 for removal.")
 
 
 # ── Journal ─────────────────────────────────────────────────────────────────────────────

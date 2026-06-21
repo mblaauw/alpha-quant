@@ -8,15 +8,9 @@ from typing import Self, override
 from domain.events import DomainEvent
 from domain.journal import JournalEntry
 from domain.models import (
-    Bar,
-    CorporateAction,
     Decision,
-    EarningsEntry,
     Fill,
-    FundamentalsSnapshot,
     IndicatorState,
-    InsiderTransaction,
-    MentionCount,
     Order,
     PortfolioSnapshot,
     Position,
@@ -27,10 +21,6 @@ from ports.store import Store
 
 class FixtureStore(Store):
     def __init__(self) -> None:
-        self._bars: dict[tuple[str, date], list[Bar]] = {}
-        self._fundamentals: dict[str, list[FundamentalsSnapshot]] = {}
-        self._insider_tx: dict[str, list[InsiderTransaction]] = {}
-        self._mentions: dict[str, list[MentionCount]] = {}
         self._orders: dict[str, Order] = {}
         self._fills: dict[str, list[Fill]] = {}
         self._positions: list[Position] = []
@@ -40,40 +30,12 @@ class FixtureStore(Store):
         self._reports: dict[tuple[date, str], ReportEntry] = {}
         self._decisions: dict[str, list[Decision]] = {}
         self._indicator_states: dict[tuple[str, date], IndicatorState] = {}
-        self._corp_actions: dict[str, list[CorporateAction]] = {}
-        self._earnings: dict[str, list[EarningsEntry]] = {}
         self._quarantine: list[dict[str, object]] = []
         self._runs: dict[str, str] = {}
 
     @contextmanager
     def transaction(self) -> Generator[Self]:
         yield self
-
-    @override
-    def save_bars(self, symbol: str, bars: list[Bar]) -> None:
-        self._bars[(symbol, bars[0].date if bars else date.today())] = bars
-
-    @override
-    def latest_bar_date(self, symbol: str) -> date | None:
-        matching = [d for (sym, d) in self._bars if sym == symbol]
-        return max(matching) if matching else None
-
-    @override
-    def latest_fundamentals_date(self, symbol: str) -> date | None:
-        snaps = self._fundamentals.get(symbol)
-        if not snaps:
-            return None
-        return max(s.as_of_date for s in snaps)
-
-    @override
-    def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
-        return [
-            b
-            for (sym, _), bars in self._bars.items()
-            if sym == symbol
-            for b in bars
-            if start <= b.date <= end
-        ]
 
     @override
     def save_decision(self, decision: Decision) -> None:
@@ -135,46 +97,6 @@ class FixtureStore(Store):
     @override
     def load_indicator_state(self, symbol: str, dt: date) -> IndicatorState | None:
         return self._indicator_states.get((symbol, dt))
-
-    @override
-    def save_corp_actions(self, symbol: str, actions: list[CorporateAction]) -> None:
-        self._corp_actions[symbol] = actions
-
-    @override
-    def load_corp_actions(self, symbol: str) -> list[CorporateAction]:
-        return self._corp_actions.get(symbol, [])
-
-    @override
-    def save_earnings(self, symbol: str, entries: list[EarningsEntry]) -> None:
-        self._earnings[symbol] = entries
-
-    @override
-    def load_earnings(self, symbol: str) -> list[EarningsEntry]:
-        return self._earnings.get(symbol, [])
-
-    @override
-    def load_fundamentals(self, symbol: str) -> list[FundamentalsSnapshot]:
-        return self._fundamentals.get(symbol, [])
-
-    @override
-    def load_insider_transactions(self, symbol: str) -> list[InsiderTransaction]:
-        return self._insider_tx.get(symbol, [])
-
-    @override
-    def load_mentions(self, symbol: str) -> list[MentionCount]:
-        return self._mentions.get(symbol, [])
-
-    @override
-    def save_fundamentals(self, symbol: str, snapshots: list[FundamentalsSnapshot]) -> None:
-        self._fundamentals[symbol] = snapshots
-
-    @override
-    def save_insider_transactions(self, symbol: str, txns: list[InsiderTransaction]) -> None:
-        self._insider_tx[symbol] = txns
-
-    @override
-    def save_mentions(self, symbol: str, mentions: list[MentionCount]) -> None:
-        self._mentions[symbol] = mentions
 
     @override
     def save_portfolio_snapshot(self, snapshot: PortfolioSnapshot) -> None:

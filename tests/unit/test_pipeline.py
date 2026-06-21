@@ -51,9 +51,6 @@ class _FakeStore:
         self.saved_events: list[object] = []
         self._snapshots = snapshots or []
 
-    def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
-        return self._bars.get(symbol, [])
-
     def daily_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
         return [b for b in self._bars.get(symbol, []) if start <= b.date <= end]
 
@@ -1075,6 +1072,7 @@ class TestShadowAblation:
             result = run_backtest(
                 config=bt_config,
                 store=store,
+                market_data=store,
                 fill_config=FillConfig(),
             )
 

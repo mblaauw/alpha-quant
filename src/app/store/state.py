@@ -12,7 +12,6 @@ import duckdb
 import structlog
 
 from app.store.admin_store import AdminStoreMixin
-from app.store.bar_store import BarStoreMixin
 from app.store.decision_store import DecisionStoreMixin
 from app.store.event_store import EventStoreMixin
 from app.store.indicator_store import IndicatorStoreMixin
@@ -26,7 +25,6 @@ logger = structlog.get_logger()
 
 class CanonicalStore(
     Store,
-    BarStoreMixin,
     DecisionStoreMixin,
     OrderStoreMixin,
     PositionStoreMixin,
@@ -40,9 +38,6 @@ class CanonicalStore(
     def __init__(self, base_path: str | Path) -> None:
         self._base = Path(base_path)
         self._base.mkdir(parents=True, exist_ok=True)
-
-        self._analytical = duckdb.connect()
-        self._analytical.execute("SET threads TO 1")
 
         self._state_path = self._base / "state.db"
         self._state_conn = duckdb.connect(str(self._state_path))
