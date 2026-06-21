@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
 from app.config import AppConfig
 from app.fixtures import freeze_bundle
-from app.vault import Vault
 from domain.models import (
     Bar,
     EarningsEntry,
@@ -108,17 +107,18 @@ def _generate_mentions(symbol: str, ref_date: date | None = None) -> list[Mentio
 
 def run_bootstrap(
     config: AppConfig,
-    vault_base: Path,
     fixture_base: Path,
-    fixture_only: bool = False,
+    vault_base: Path | None = None,
+    fixture_only: bool = True,
     ref_date: date | None = None,
 ) -> dict[str, Any]:
+    _ = vault_base, fixture_only
     cfg = config.bootstrap
     today = ref_date or date.today()
     start = date(today.year - cfg.history_years, today.month, today.day)
 
     all_symbols = list(cfg.symbols) + list(cfg.include_benchmarks)
-    result: dict[str, Any] = {"symbols": all_symbols, "fixture_only": fixture_only}
+    result: dict[str, Any] = {"symbols": all_symbols, "fixture_only": True}
 
     all_bars: dict[str, list[Bar]] = {}
     all_fundamentals: dict[str, FundamentalsSnapshot] = {}
@@ -133,17 +133,6 @@ def run_bootstrap(
         all_earnings.extend(_generate_earnings(symbol, cfg.history_years, ref_date=today))
         all_insider[symbol] = _generate_insider_tx(symbol, ref_date=today)
         all_mentions[symbol] = _generate_mentions(symbol, ref_date=today)
-
-        if not fixture_only:
-            vault = Vault(vault_base)
-            for bar in bars:
-                vault.store(
-                    source="eodhd",
-                    endpoint="bars",
-                    params=symbol,
-                    data=bar.model_dump_json().encode(),
-                    ingest_ts=datetime.combine(bar.date, datetime.min.time()).replace(tzinfo=UTC),
-                )
 
     bundle = freeze_bundle(
         output_dir=fixture_base,

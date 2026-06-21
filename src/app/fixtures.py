@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import hashlib
 import json
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +22,116 @@ def _hash_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
 
 
+def _available_at(dt: date) -> datetime:
+    return datetime.combine(dt, time.max, tzinfo=UTC) + timedelta(days=1)
+
+
+def _bars_table(bars: dict[str, list[Bar]]) -> pa.Table:
+    rows: list[dict[str, Any]] = []
+    for symbol, entries in bars.items():
+        for b in entries:
+            rows.append(
+                {
+                    "symbol": symbol,
+                    "effective_date": b.date,
+                    "available_at": _available_at(b.date),
+                    "open": b.open,
+                    "high": b.high,
+                    "low": b.low,
+                    "close": b.close,
+                    "volume": b.volume,
+                    "adj_close": b.adj_close,
+                    "source_fetch_id": b.fetch_id,
+                }
+            )
+    return pa.Table.from_pylist(rows)
+
+
+def _fundamentals_table(fundamentals: dict[str, FundamentalsSnapshot]) -> pa.Table:
+    rows: list[dict[str, Any]] = []
+    for symbol, entry in fundamentals.items():
+        rows.append(
+            {
+                "symbol": symbol,
+                "effective_date": entry.as_of_date,
+                "available_at": _available_at(entry.as_of_date),
+                "market_cap": entry.market_cap,
+                "pe_ratio": entry.pe_ratio,
+                "eps_ttm": entry.eps_ttm,
+                "dividend_yield": entry.dividend_yield,
+                "sector": entry.sector,
+                "industry": entry.industry,
+                "operating_cash_flow": entry.operating_cash_flow,
+                "total_liabilities": entry.total_liabilities,
+                "total_debt": entry.total_debt,
+                "total_equity": entry.total_equity,
+                "revenue": entry.revenue,
+                "net_income": entry.net_income,
+                "accruals": entry.accruals,
+                "source_fetch_id": entry.fetch_id,
+            }
+        )
+    return pa.Table.from_pylist(rows)
+
+
+def _earnings_table(earnings: list[EarningsEntry]) -> pa.Table:
+    rows: list[dict[str, Any]] = []
+    for entry in earnings:
+        rows.append(
+            {
+                "symbol": entry.symbol,
+                "effective_date": entry.date,
+                "report_date": entry.date,
+                "available_at": _available_at(entry.date),
+                "eps_estimate": entry.eps_estimate,
+                "eps_actual": entry.eps_actual,
+                "revenue_estimate": entry.revenue_estimate,
+                "revenue_actual": entry.revenue_actual,
+                "source_fetch_id": entry.fetch_id,
+            }
+        )
+    return pa.Table.from_pylist(rows)
+
+
+def _insider_table(insider_tx: dict[str, list[InsiderTransaction]]) -> pa.Table:
+    rows: list[dict[str, Any]] = []
+    for symbol, txns in insider_tx.items():
+        for t in txns:
+            rows.append(
+                {
+                    "symbol": symbol,
+                    "effective_date": t.filing_date or t.transaction_date,
+                    "available_at": _available_at(
+                        t.filing_date or t.transaction_date or date.today()
+                    ),
+                    "owner": t.owner,
+                    "transaction_type": t.transaction_type,
+                    "shares_traded": t.shares_traded,
+                    "price": t.price,
+                    "shares_held": t.shares_held,
+                    "source_fetch_id": t.fetch_id,
+                }
+            )
+    return pa.Table.from_pylist(rows)
+
+
+def _mentions_table(mentions: dict[str, list[MentionCount]]) -> pa.Table:
+    rows: list[dict[str, Any]] = []
+    for symbol, entries in mentions.items():
+        for m in entries:
+            rows.append(
+                {
+                    "symbol": symbol,
+                    "effective_date": m.mention_date,
+                    "available_at": _available_at(m.mention_date),
+                    "mention_count": m.count,
+                    "source_id": m.source,
+                    "source_fetch_id": m.fetch_id,
+                }
+            )
+    return pa.Table.from_pylist(rows)
+
+
 def freeze_bundle(
     output_dir: Path,
     bars: dict[str, list[Bar]],
@@ -28,35 +141,25 @@ def freeze_bundle(
     mentions: dict[str, list[MentionCount]],
     version: str = "v1",
 ) -> Path:
-    bundle = output_dir / "fixtures" / version
+    bundle = output_dir / "fixtures" / version / "lake"
     bundle.mkdir(parents=True, exist_ok=True)
 
-    bars_dir = bundle / "bars"
-    bars_dir.mkdir(exist_ok=True)
-    for symbol, entries in bars.items():
-        _write_table(bars_dir / f"{symbol}.parquet", _bars_to_table(entries))
-
-    fundamentals_dir = bundle / "fundamentals"
-    fundamentals_dir.mkdir(exist_ok=True)
-    for symbol, entry in fundamentals.items():
-        _write_table(
-            fundamentals_dir / f"{symbol}.parquet",
-            _fundamentals_to_table(entry),
-        )
-
-    insider_dir = bundle / "insider_tx"
-    insider_dir.mkdir(exist_ok=True)
-    for symbol, entries in insider_tx.items():
-        _write_table(insider_dir / f"{symbol}.parquet", _tx_to_table(entries))
-
-    mentions_dir = bundle / "mentions"
-    mentions_dir.mkdir(exist_ok=True)
-    for symbol, entries in mentions.items():
-        _write_table(mentions_dir / f"{symbol}.parquet", _mentions_to_table(entries))
+    pq.write_table(_bars_table(bars), bundle / "bars.parquet", compression="zstd")
+    pq.write_table(
+        _fundamentals_table(fundamentals), bundle / "fundamentals.parquet", compression="zstd"
+    )
+    pq.write_table(
+        _earnings_table(earnings), bundle / "earnings_calendar.parquet", compression="zstd"
+    )
+    pq.write_table(_insider_table(insider_tx), bundle / "insider_tx.parquet", compression="zstd")
+    pq.write_table(
+        _mentions_table(mentions), bundle / "attention_metrics.parquet", compression="zstd"
+    )
 
     manifest: dict[str, Any] = {
         "version": version,
         "symbols": list(bars.keys()),
+        "snapshot_id": hashlib.sha256(str(datetime.now(UTC)).encode()).hexdigest()[:16],
         "files": {},
     }
     for p in sorted(bundle.rglob("*.parquet")):
@@ -66,66 +169,3 @@ def freeze_bundle(
     manifest_path = bundle / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2))
     return bundle
-
-
-def _write_table(path: Path, table: pa.Table) -> None:
-    pq.write_table(table, path, compression="zstd")
-
-
-def _bars_to_table(bars: list[Bar]) -> pa.Table:
-    return pa.table(
-        {
-            "symbol": [b.symbol for b in bars],
-            "date": [b.date.isoformat() for b in bars],
-            "open": [b.open for b in bars],
-            "high": [b.high for b in bars],
-            "low": [b.low for b in bars],
-            "close": [b.close for b in bars],
-            "volume": [b.volume for b in bars],
-            "adj_close": [b.adj_close for b in bars],
-        }
-    )
-
-
-def _fundamentals_to_table(entry: FundamentalsSnapshot) -> pa.Table:
-    return pa.table(
-        {
-            "symbol": [entry.symbol],
-            "as_of_date": [entry.as_of_date.isoformat()],
-            "market_cap": [entry.market_cap],
-            "pe_ratio": [entry.pe_ratio],
-            "eps_ttm": [entry.eps_ttm],
-            "dividend_yield": [entry.dividend_yield],
-            "sector": [entry.sector],
-            "industry": [entry.industry],
-        }
-    )
-
-
-def _tx_to_table(tx: list[InsiderTransaction]) -> pa.Table:
-    return pa.table(
-        {
-            "symbol": [t.symbol for t in tx],
-            "filing_date": [t.filing_date.isoformat() if t.filing_date else None for t in tx],
-            "transaction_date": [
-                t.transaction_date.isoformat() if t.transaction_date else None for t in tx
-            ],
-            "owner": [t.owner for t in tx],
-            "title": [t.title for t in tx],
-            "transaction_type": [t.transaction_type for t in tx],
-            "shares_traded": [t.shares_traded for t in tx],
-            "price": [t.price for t in tx],
-            "shares_held": [t.shares_held for t in tx],
-        }
-    )
-
-
-def _mentions_to_table(mentions: list[MentionCount]) -> pa.Table:
-    return pa.table(
-        {
-            "symbol": [m.symbol for m in mentions],
-            "date": [m.mention_date.isoformat() for m in mentions],
-            "source": [m.source for m in mentions],
-            "count": [m.count for m in mentions],
-        }
-    )
