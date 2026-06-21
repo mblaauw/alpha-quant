@@ -225,13 +225,9 @@ def make_fill(
 
 @dataclass
 class FakeStore:
-    bars: dict[str, list[Bar]] | None = None
     positions: list[Position] | None = None
     _saved_events: list[object] | None = None
     _saved_positions: list[Position] | None = None
-
-    def load_bars(self, symbol: str, start: date, end: date) -> list[Bar]:
-        return (self.bars or {}).get(symbol, [])
 
     def load_positions(self) -> list[Position]:
         return self.positions or []
