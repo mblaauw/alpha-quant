@@ -6,8 +6,10 @@
 #
 # Example:
 #
-# [eodhd]
-# api_key = "your-eodhd-api-key"
+# [lake]
+# mode = "in_process"
+# config_path = "../alpha-lake/config/stack.toml"
+# snapshot_id = ""  # pin for reproducible replay/backtest reads
 #
 # [alpaca]
 # api_key = "your-alpaca-api-key"

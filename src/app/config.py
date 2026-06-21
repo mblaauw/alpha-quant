@@ -46,6 +46,33 @@ class DataConfig(BaseModel):
         return v
 
 
+class LakeConfig(BaseModel):
+    """Alpha-Lake data-plane configuration."""
+
+    mode: str = "fixture"
+    config_path: str = "../alpha-lake/config/stack.toml"
+    base_url: str = "http://localhost:8000"
+    api_key_env: str = "ALPHA_LAKE_API_KEY"
+    snapshot_id: str = ""
+    price_mode: str = "split_adjusted"
+    max_lookback_days: int = 1095
+    fixture_version: str = "v1"
+
+    @field_validator("mode")
+    @classmethod
+    def _mode_valid(cls, v: str) -> str:
+        if v not in ("in_process", "rest", "fixture"):
+            raise ValueError("mode must be 'in_process', 'rest', or 'fixture'")
+        return v
+
+    @field_validator("max_lookback_days")
+    @classmethod
+    def _max_lookback_days_bounds(cls, v: int) -> int:
+        if not 1 <= v <= 3650:
+            raise ValueError("max_lookback_days must be between 1 and 3650")
+        return v
+
+
 class UniverseConfig(BaseModel):
     min_price: float = 5.0
     min_adv_usd: float = 5_000_000
@@ -240,6 +267,7 @@ class AppConfig(BaseSettings):
 
     bootstrap: BootstrapConfig
     data: DataConfig
+    lake: LakeConfig = LakeConfig()
     universe: UniverseConfig
     portfolio: PortfolioConfig
     paper: PaperConfig

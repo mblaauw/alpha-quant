@@ -1,12 +1,24 @@
+from datetime import date
+from pathlib import Path
+
 import httpx
+import pytest
 
 from adapters.fake.fixture_fundamentals import FixtureFundamentals
 from adapters.fake.fixture_insider_feed import FixtureInsiderFeed
 from adapters.fake.fixture_market_data import FixtureMarketData
 from adapters.fake.fixture_sentiment_feed import FixtureSentimentFeed
+from adapters.fake.lake_fixture import FixtureLakeGateway
 from adapters.fake.virtual_clock import VirtualClock
 from adapters.real.base_connector import BaseConnector
 from adapters.real.clock import SystemClock
+from adapters.real.lake_data import (
+    LakeFundamentals,
+    LakeInsiderFeed,
+    LakeMarketData,
+    LakeSentimentFeed,
+)
+from adapters.real.lake_inprocess import InProcessLakeGateway
 from adapters.real.openinsider_connector import OpenInsiderConnector
 from adapters.real.reddit_sentiment_connector import RedditSentimentConnector
 from adapters.real.sec_connector import SECConnector
@@ -15,6 +27,7 @@ from app.factory import (
     create_clock,
     create_fundamentals,
     create_insider_feed,
+    create_lake_gateway,
     create_market_data,
     create_sec_connector,
     create_sentiment_feed,
@@ -66,11 +79,25 @@ class TestCreateMarketData:
         md = create_market_data(_fixture_config())
         assert isinstance(md, FixtureMarketData)
 
+    def test_lake_gateway_returns_lake_market_data(self) -> None:
+        config = _fixture_config()
+        clock = VirtualClock(date(2026, 1, 2))
+        lake = FixtureLakeGateway(Path("fixtures/v1"))
+        md = create_market_data(config, lake_gateway=lake, clock=clock)
+        assert isinstance(md, LakeMarketData)
+
 
 class TestCreateFundamentals:
     def test_fixture_mode_returns_fixture_fundamentals(self) -> None:
         fd = create_fundamentals(_fixture_config())
         assert isinstance(fd, FixtureFundamentals)
+
+    def test_lake_gateway_returns_lake_fundamentals(self) -> None:
+        config = _fixture_config()
+        clock = VirtualClock(date(2026, 1, 2))
+        lake = FixtureLakeGateway(Path("fixtures/v1"))
+        fd = create_fundamentals(config, lake_gateway=lake, clock=clock)
+        assert isinstance(fd, LakeFundamentals)
 
 
 class TestCreateInsiderFeed:
@@ -83,6 +110,13 @@ class TestCreateInsiderFeed:
         assert isinstance(ins, OpenInsiderConnector)
         ins.close()
 
+    def test_lake_gateway_returns_lake_insider_feed(self) -> None:
+        config = _fixture_config()
+        clock = VirtualClock(date(2026, 1, 2))
+        lake = FixtureLakeGateway(Path("fixtures/v1"))
+        ins = create_insider_feed(config, lake_gateway=lake, clock=clock)
+        assert isinstance(ins, LakeInsiderFeed)
+
 
 class TestCreateSentimentFeed:
     def test_fixture_mode_returns_fixture_sentiment_feed(self) -> None:
@@ -93,6 +127,56 @@ class TestCreateSentimentFeed:
         sf = create_sentiment_feed(_live_config())
         assert isinstance(sf, RedditSentimentConnector)
         sf.close()
+
+    def test_lake_gateway_returns_lake_sentiment_feed(self) -> None:
+        config = _fixture_config()
+        clock = VirtualClock(date(2026, 1, 2))
+        lake = FixtureLakeGateway(Path("fixtures/v1"))
+        sf = create_sentiment_feed(config, lake_gateway=lake, clock=clock)
+        assert isinstance(sf, LakeSentimentFeed)
+
+
+class TestCreateLakeGateway:
+    def test_fixture_mode_returns_fixture_lake_gateway(self) -> None:
+        config = _fixture_config()
+        clock = VirtualClock(date(2026, 1, 2))
+        lake = create_lake_gateway(config, clock)
+        assert isinstance(lake, FixtureLakeGateway)
+
+    def test_rest_mode_is_deferred(self) -> None:
+        config = AppConfig.model_validate(
+            {
+                **_fixture_config().model_dump(mode="json"),
+                "lake": {"mode": "rest"},
+            }
+        )
+        clock = VirtualClock(date(2026, 1, 2))
+        with pytest.raises(NotImplementedError, match="RestLakeGateway is deferred"):
+            create_lake_gateway(config, clock)
+
+    def test_in_process_mode_uses_configured_adapter(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        captured: dict[str, str] = {}
+
+        def fake_init(self: InProcessLakeGateway, config_path: str, price_mode: str) -> None:
+            _ = self
+            captured["config_path"] = config_path
+            captured["price_mode"] = price_mode
+
+        monkeypatch.setattr(InProcessLakeGateway, "__init__", fake_init)
+        config = AppConfig.model_validate(
+            {
+                **_fixture_config().model_dump(mode="json"),
+                "lake": {
+                    "mode": "in_process",
+                    "config_path": "../alpha-lake/config/test.toml",
+                    "price_mode": "raw",
+                },
+            }
+        )
+        clock = VirtualClock(date(2026, 1, 2))
+        lake = create_lake_gateway(config, clock)
+        assert isinstance(lake, InProcessLakeGateway)
+        assert captured == {"config_path": "../alpha-lake/config/test.toml", "price_mode": "raw"}
 
 
 class TestCreateSECConnector:
