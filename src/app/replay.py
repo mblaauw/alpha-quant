@@ -4,10 +4,16 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-import pyarrow.parquet as pq
 import structlog
 
-from adapters.fake.fixture_store import FixtureStore
+from adapters.fake.lake_fixture import FixtureLakeGateway
+from adapters.fake.virtual_clock import VirtualClock
+from adapters.real.lake_data import (
+    LakeFundamentals,
+    LakeInsiderFeed,
+    LakeMarketData,
+    LakeSentimentFeed,
+)
 from app._loop import (
     compute_atr,
     decide_candidates,
@@ -15,7 +21,6 @@ from app._loop import (
     ensure_spy,
     evaluate_risk_actions,
     get_date_bars,
-    load_all_bars,
     size_entry,
 )
 from app.catalog import compute_manifest_hash
@@ -27,10 +32,7 @@ from domain.models import (
     Bar,
     Decision,
     Fill,
-    FundamentalsSnapshot,
     IndicatorState,
-    InsiderTransaction,
-    MentionCount,
     Order,
     Position,
 )
@@ -43,129 +45,6 @@ logger = structlog.get_logger()
 
 def _make_id(seed: str) -> str:
     return hashlib.sha256(seed.encode()).hexdigest()[:16]
-
-
-def _load_parquet_bars(path: Path) -> list[Bar]:
-    table = pq.read_table(path)
-    bars: list[Bar] = []
-    for i in range(len(table)):
-        bars.append(
-            Bar(
-                symbol=str(table.column("symbol")[i]),
-                date=date.fromisoformat(str(table.column("date")[i])),
-                open=float(table.column("open")[i]),
-                high=float(table.column("high")[i]),
-                low=float(table.column("low")[i]),
-                close=float(table.column("close")[i]),
-                volume=float(table.column("volume")[i]),
-                adj_close=(
-                    float(table.column("adj_close")[i].as_py())
-                    if (
-                        table.schema.get_field_index("adj_close") >= 0
-                        and table.column("adj_close")[i].as_py() is not None
-                    )
-                    else None
-                ),
-            )
-        )
-    return bars
-
-
-def _col_opt(table, col):
-    v = table.column(col)[0]
-    return str(v) if v is not None else None
-
-
-def _float_col_opt(table, col):
-    v = table.column(col)[0]
-    return float(v) if v is not None else None
-
-
-def _load_parquet_fundamentals(path: Path) -> FundamentalsSnapshot:
-    table = pq.read_table(path)
-    return FundamentalsSnapshot(
-        symbol=str(table.column("symbol")[0]),
-        as_of_date=date.fromisoformat(str(table.column("as_of_date")[0])),
-        market_cap=_float_col_opt(table, "market_cap"),
-        pe_ratio=_float_col_opt(table, "pe_ratio"),
-        eps_ttm=_float_col_opt(table, "eps_ttm"),
-        dividend_yield=_float_col_opt(table, "dividend_yield"),
-        sector=_col_opt(table, "sector"),
-        industry=_col_opt(table, "industry"),
-    )
-
-
-def _load_parquet_insider(path: Path) -> list[InsiderTransaction]:
-    table = pq.read_table(path)
-    txns: list[InsiderTransaction] = []
-    for i in range(len(table)):
-        filing = table.column("filing_date")[i]
-        trans = table.column("transaction_date")[i]
-        txns.append(
-            InsiderTransaction(
-                symbol=str(table.column("symbol")[i]),
-                filing_date=date.fromisoformat(str(filing)) if filing else None,
-                transaction_date=date.fromisoformat(str(trans)) if trans else None,
-                owner=str(table.column("owner")[i]) if table.column("owner")[i] else "",
-                title=str(table.column("title")[i]) if table.column("title")[i] else "",
-                transaction_type=str(table.column("transaction_type")[i]),
-                shares_traded=float(table.column("shares_traded")[i]),
-                price=float(table.column("price")[i]),
-                shares_held=float(table.column("shares_held")[i]),
-            )
-        )
-    return txns
-
-
-def _load_parquet_mentions(path: Path) -> list[MentionCount]:
-    table = pq.read_table(path)
-    mentions: list[MentionCount] = []
-    for i in range(len(table)):
-        mentions.append(
-            MentionCount(
-                symbol=str(table.column("symbol")[i]),
-                mention_date=date.fromisoformat(str(table.column("date")[i])),
-                source=str(table.column("source")[i]),
-                count=int(table.column("count")[i]),
-            )
-        )
-    return mentions
-
-
-def _load_fixtures(
-    fixture_path: Path,
-    symbols: list[str],
-) -> dict[str, Any]:
-    data: dict[str, Any] = {"bars": {}, "fundamentals": {}, "insider": {}, "mentions": {}}
-    for sym in symbols:
-        bar_path = fixture_path / "bars" / f"{sym}.parquet"
-        if bar_path.exists():
-            data["bars"][sym] = _load_parquet_bars(bar_path)
-        fund_path = fixture_path / "fundamentals" / f"{sym}.parquet"
-        if fund_path.exists():
-            data["fundamentals"][sym] = _load_parquet_fundamentals(fund_path)
-        ins_path = fixture_path / "insider_tx" / f"{sym}.parquet"
-        if ins_path.exists():
-            data["insider"][sym] = _load_parquet_insider(ins_path)
-        ment_path = fixture_path / "mentions" / f"{sym}.parquet"
-        if ment_path.exists():
-            data["mentions"][sym] = _load_parquet_mentions(ment_path)
-    return data
-
-
-def _populate_store(store: FixtureStore, fixture_data: dict[str, Any]) -> None:
-    for sym, bars in fixture_data["bars"].items():
-        if bars:
-            store.save_bars(sym, bars)
-    for sym, snap in fixture_data["fundamentals"].items():
-        if snap is not None:
-            store.save_fundamentals(sym, [snap])
-    for sym, txns in fixture_data["insider"].items():
-        if txns:
-            store.save_insider_transactions(sym, txns)
-    for sym, mentions in fixture_data["mentions"].items():
-        if mentions:
-            store.save_mentions(sym, mentions)
 
 
 def _trading_dates(bars: dict[str, list[Bar]], start: date, end: date) -> list[date]:
@@ -198,46 +77,51 @@ def run_replay(
     fp = Path(fixture_path) if fixture_path else Path("fixtures/v1")
 
     symbols = list(config.bootstrap.symbols) + list(config.bootstrap.include_benchmarks)
-    fixture_data = _load_fixtures(fp, symbols)
 
-    fstore = FixtureStore()
-    _populate_store(fstore, fixture_data)
+    # Use FixtureLakeGateway + VirtualClock for deterministic PIT replay
+    lake = FixtureLakeGateway(fp)
+    clock = VirtualClock(f_end)
+    market_data = LakeMarketData(lake, clock)
+    fundamentals = LakeFundamentals(lake, clock)
+    insider_feed = LakeInsiderFeed(lake, clock)
+    sentiment_feed = LakeSentimentFeed(lake, clock)
 
     lookback_start = date.fromordinal(f_start.toordinal() - LOOKBACK_DAYS)
-    fb_keys = list(fixture_data["bars"].keys())
-    all_bars = load_all_bars(fstore, ensure_spy(fb_keys), lookback_start, f_end)
+    all_bars: dict[str, list[Bar]] = {}
+    for sym in ensure_spy(symbols):
+        try:
+            bars = market_data.daily_bars(sym, lookback_start, f_end)
+            if bars:
+                all_bars[sym] = bars
+        except Exception:
+            logger.warning("Failed to load bars for replay", symbol=sym)
 
     fill_config = FillConfig()
     risk_config = RiskConfig()
     sizing_config = SizingConfig()
 
-    mech_data: Any = None
-    mech_fundamentals: dict[str, FundamentalsSnapshot | None] = {}
+    mech_fundamentals: dict[str, Any] = {}
+    mech_insider: dict[str, Any] = {}
+    mech_mentions: dict[str, Any] = {}
     for sym in symbols:
         try:
-            fund = fstore.load_fundamentals(sym)
-            if fund:
-                mech_fundamentals[sym] = fund[0]
+            snap = fundamentals.snapshot(sym)
+            if snap is not None:
+                mech_fundamentals[sym] = snap
         except Exception:
-            logger.warning("Failed to load fundamentals", symbol=sym)
-
-    mech_insider: dict[str, list[InsiderTransaction]] = {}
-    for sym in symbols:
+            logger.warning("Failed to load fundamentals for replay", symbol=sym)
         try:
-            txns = fstore.load_insider_transactions(sym)
+            txns = insider_feed.cluster_transactions(sym)
             if txns:
-                mech_insider[sym] = list(txns)
+                mech_insider[sym] = txns
         except Exception:
-            logger.warning("Failed to load insider_txns", symbol=sym)
-
-    mech_mentions: dict[str, list[MentionCount]] = {}
-    for sym in symbols:
+            logger.warning("Failed to load insider_txns for replay", symbol=sym)
         try:
-            mentions = fstore.load_mentions(sym)
+            mentions = sentiment_feed.mention_counts(sym, days=365)
             if mentions:
-                mech_mentions[sym] = list(mentions)
+                mech_mentions[sym] = mentions
         except Exception:
-            logger.warning("Failed to load mentions", symbol=sym)
+            logger.warning("Failed to load mentions for replay", symbol=sym)
 
     from app._loop import MechanismData
 
@@ -247,7 +131,7 @@ def run_replay(
         mentions=mech_mentions,
     )
 
-    trading_dates = _trading_dates(fixture_data["bars"], f_start, f_end)
+    trading_dates = _trading_dates(all_bars, f_start, f_end)
     indicator_states: dict[str, IndicatorState] = {}
 
     cash: float = getattr(config.paper, "starting_equity", 100_000.0)
@@ -353,7 +237,7 @@ def run_replay(
             regime, regime_mult = detect_regime_and_multiplier(spy_state)
 
             all_considered = decide_candidates(
-                list(fixture_data["bars"].keys()),
+                list(all_bars.keys()),
                 all_bars,
                 indicator_states,
                 trade_date,
@@ -466,7 +350,7 @@ def run_replay(
             "config_hash": config_hash,
         },
         "symbols": {
-            "total": len(ensure_spy(list(fixture_data["bars"].keys()))),
+            "total": len(ensure_spy(list(all_bars.keys()))),
         },
         "decisions": [
             {

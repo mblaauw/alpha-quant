@@ -171,10 +171,12 @@ def run(
     from datetime import date
     from pathlib import Path
 
+    from app._loop import MechanismData
     from app.factory import (
         create_clock,
         create_fundamentals,
         create_insider_feed,
+        create_lake_gateway,
         create_market_data,
         create_sentiment_feed,
     )
@@ -199,10 +201,11 @@ def run(
         vault = Vault(base_path=Path("vault"))
 
     clock = create_clock(config)
-    market_data = create_market_data(config, vault)
-    fundamentals = create_fundamentals(config, vault)
-    insider = create_insider_feed(config, vault)
-    sentiment = create_sentiment_feed(config, vault)
+    lake_gateway = create_lake_gateway(config, clock)
+    market_data = create_market_data(config, vault, lake_gateway=lake_gateway, clock=clock)
+    fundamentals = create_fundamentals(config, vault, lake_gateway=lake_gateway, clock=clock)
+    insider = create_insider_feed(config, vault, lake_gateway=lake_gateway, clock=clock)
+    sentiment = create_sentiment_feed(config, vault, lake_gateway=lake_gateway, clock=clock)
 
     adapter_names = [
         type(market_data).__name__,
@@ -218,6 +221,19 @@ def run(
             ("Adapters", ", ".join(adapter_names)),
         ],
     )
+
+    # Build mechanism data from lake-backed (or fixture) data ports
+    mech_data = MechanismData()
+    for sym in config.bootstrap.symbols:
+        snap = fundamentals.snapshot(sym)
+        if snap is not None:
+            mech_data.fundamentals[sym] = snap
+        txns = insider.cluster_transactions(sym)
+        if txns:
+            mech_data.insider_txns[sym] = txns
+        mentions = sentiment.mention_counts(sym, days=90)
+        if mentions:
+            mech_data.mentions[sym] = mentions
 
     store = CanonicalStore(base_path=Path("data"))
     cfg_redacted = redact_config(config)
@@ -257,6 +273,7 @@ def run(
         risk_config=risk_config,
         sizing_config=sizing_config,
         market_data=market_data,
+        mechanism_data=mech_data,
         prev_equity=prev_equity,
         prev_regime=prev_regime,
     )
@@ -389,6 +406,14 @@ def backtest(
     from pathlib import Path
 
     from app.backtest import BacktestConfig, run_backtest
+    from app.factory import (
+        create_clock,
+        create_fundamentals,
+        create_insider_feed,
+        create_lake_gateway,
+        create_market_data,
+        create_sentiment_feed,
+    )
     from app.store import CanonicalStore
     from domain.fills import FillConfig
     from domain.risk import RiskConfig as DomainRiskConfig
@@ -420,6 +445,13 @@ def backtest(
         symbols=config.bootstrap.symbols + config.bootstrap.include_benchmarks,
     )
 
+    clock = create_clock(config)
+    lake_gateway = create_lake_gateway(config, clock)
+    market_data = create_market_data(config, lake_gateway=lake_gateway, clock=clock)
+    fundamentals = create_fundamentals(config, lake_gateway=lake_gateway, clock=clock)
+    insider = create_insider_feed(config, lake_gateway=lake_gateway, clock=clock)
+    sentiment = create_sentiment_feed(config, lake_gateway=lake_gateway, clock=clock)
+
     with console.status(f"[cyan]Backtesting {fd} \u2192 {td}...", spinner="dots"):
         result = run_backtest(
             config=bt_config,
@@ -427,6 +459,11 @@ def backtest(
             fill_config=fill_config,
             risk_config=risk_config,
             sizing_config=sizing_config,
+            market_data=market_data,
+            clock=clock,
+            fundamentals=fundamentals,
+            insider_feed=insider,
+            sentiment_feed=sentiment,
         )
 
     metrics = result.metrics

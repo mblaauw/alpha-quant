@@ -21,7 +21,6 @@ from app.step_models import (
 )
 from domain.derive import backfill_indicator_state
 from domain.events import (
-    DataIngested,
     DataQuarantined,
     DomainEvent,
     ErrorOccurred,
@@ -35,7 +34,6 @@ from domain.models import (
 )
 from domain.validate import validate_bars
 from ports.market_data import MarketData
-from ports.store import Store
 
 logger = structlog.get_logger()
 
@@ -43,38 +41,22 @@ logger = structlog.get_logger()
 def load_bars_step(
     run_date: date,
     symbols: list[str],
-    store: Store,
-    market_data: MarketData | None,
+    market_data: MarketData,
     lookback_days: int,
     run_id: str,
 ) -> LoadBarsResult:
-    """Load bars from store or market_data for all symbols."""
+    """Load bars from market_data (lake-backed or fixture) for all symbols."""
     lookback_start = date.fromordinal(run_date.toordinal() - lookback_days)
     all_bars: dict[str, list[Bar]] = {}
     prices: dict[str, float] = {}
     events: list[DomainEvent] = []
 
     for symbol in symbols:
-        bars: list[Bar] = []
         try:
-            bars = store.load_bars(symbol, lookback_start, run_date)
+            bars = market_data.daily_bars(symbol, lookback_start, run_date)
         except Exception:
-            logger.warning("store_bar_load_failed", symbol=symbol)
-        if not bars and market_data is not None:
-            try:
-                bars = market_data.daily_bars(symbol, lookback_start, run_date)
-                if bars:
-                    events.append(
-                        DataIngested(
-                            run_id=run_id,
-                            source="pipeline",
-                            connector="market_data",
-                            symbol=symbol,
-                            records=len(bars),
-                        )
-                    )
-            except Exception:
-                logger.exception("market_data_bar_load_failed", symbol=symbol)
+            logger.exception("market_data_bar_load_failed", symbol=symbol)
+            bars = []
         if bars:
             all_bars[symbol] = bars
             prices[symbol] = bars[-1].close
@@ -91,7 +73,7 @@ def load_bars_step(
                 ErrorOccurred(
                     run_id=run_id,
                     source="pipeline",
-                    error="No bar data from store or market_data",
+                    error="No bar data from market_data",
                     context={"symbol": symbol, "operation": "bar_load"},
                 )
             )
