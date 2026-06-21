@@ -38,10 +38,20 @@ class FixtureLakeGateway(LakeGateway):
         if manifest.exists():
             return json.loads(manifest.read_text())
         datasets = sorted(path.stem for path in self._root.glob("*.parquet"))
+        info: dict[str, object] = {}
+        for name in datasets:
+            rows = self._rows(name)
+            info[name] = {
+                "status": "ok" if rows else "empty",
+                "row_count": len(rows),
+                "latest_available_at": (
+                    max(self._available_at(r) for r in rows).isoformat() if rows else None
+                ),
+            }
         return {
             "status": "ok" if datasets else "empty",
             "snapshot_id": self._snapshot_id,
-            "datasets": datasets,
+            "datasets": info,
         }
 
     @override

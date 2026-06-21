@@ -272,6 +272,7 @@ def run(
         sizing_config=sizing_config,
         market_data=market_data,
         mechanism_data=mech_data,
+        lake_gateway=lake_gateway,
         prev_equity=prev_equity,
         prev_regime=prev_regime,
     )
