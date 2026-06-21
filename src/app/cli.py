@@ -492,21 +492,10 @@ def backtest(
 @app.command(rich_help_panel="Data")
 def bootstrap(
     ctx: typer.Context,
-    fixture_only: bool = typer.Option(  # noqa: B008
-        False,
-        "--fixture-only",
-        help="Skip API fetch, regenerate fixture bundle from existing vault",
-    ),
-    vault: str | None = typer.Option(  # noqa: B008
-        None,
-        "--vault",
-        help="Vault directory path (default: ./vault)",
-    ),
 ) -> None:
-    """Fetch and freeze a fixture bundle for development.
+    """Generate a deterministic lake-shaped fixture bundle.
 
-    Downloads historical data for all configured symbols, then freezes a
-    deterministic fixture bundle used by replay and run --mode fixture.
+    Used by replay and run --mode fixture.
     """
     import time
     from pathlib import Path
@@ -524,16 +513,11 @@ def bootstrap(
         console=console,
         transient=True,
     ) as progress:
-        if fixture_only:
-            progress.add_task("[cyan]Freezing fixture bundle from vault...", total=1)
-        else:
-            progress.add_task("[cyan]Fetching data and freezing fixture bundle...", total=1)
+        progress.add_task("[cyan]Generating deterministic fixture bundle...", total=1)
 
         result = run_bootstrap(
             config=config,
-            vault_base=Path(vault or "vault"),
             fixture_base=Path("."),
-            fixture_only=fixture_only,
         )
 
     elapsed = time.perf_counter() - t0
