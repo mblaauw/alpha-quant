@@ -1,17 +1,19 @@
+from __future__ import annotations
+
 from datetime import date
 from pathlib import Path
 
-import httpx
 import pytest
 
-from adapters.fake.fixture_fundamentals import FixtureFundamentals
-from adapters.fake.fixture_insider_feed import FixtureInsiderFeed
-from adapters.fake.fixture_market_data import FixtureMarketData
-from adapters.fake.fixture_sentiment_feed import FixtureSentimentFeed
+from adapters.fake.canned_llm import CannedLLM
+from adapters.fake.fake_broker import FakeBroker
+from adapters.fake.fake_event_sink import FakeEventSink
+from adapters.fake.fixture_store import FixtureStore
 from adapters.fake.lake_fixture import FixtureLakeGateway
 from adapters.fake.virtual_clock import VirtualClock
-from adapters.real.base_connector import BaseConnector
+from adapters.real.alpaca_broker import AlpacaBroker
 from adapters.real.clock import SystemClock
+from adapters.real.event_sink import DuckDBEventSink
 from adapters.real.lake_data import (
     LakeFundamentals,
     LakeInsiderFeed,
@@ -19,19 +21,21 @@ from adapters.real.lake_data import (
     LakeSentimentFeed,
 )
 from adapters.real.lake_inprocess import InProcessLakeGateway
-from adapters.real.openinsider_connector import OpenInsiderConnector
-from adapters.real.reddit_sentiment_connector import RedditSentimentConnector
-from adapters.real.sec_connector import SECConnector
+from adapters.real.llm_adapter import OpenAILikeLLM
 from app.config import AppConfig
 from app.factory import (
+    create_broker,
     create_clock,
+    create_event_sink,
     create_fundamentals,
     create_insider_feed,
     create_lake_gateway,
+    create_llm,
     create_market_data,
-    create_sec_connector,
     create_sentiment_feed,
+    create_store,
 )
+from app.store import CanonicalStore
 
 
 def _fixture_config() -> AppConfig:
@@ -74,68 +78,6 @@ def _live_config() -> AppConfig:
     )
 
 
-class TestCreateMarketData:
-    def test_fixture_mode_returns_fixture_market_data(self) -> None:
-        md = create_market_data(_fixture_config())
-        assert isinstance(md, FixtureMarketData)
-
-    def test_lake_gateway_returns_lake_market_data(self) -> None:
-        config = _fixture_config()
-        clock = VirtualClock(date(2026, 1, 2))
-        lake = FixtureLakeGateway(Path("fixtures/v1"))
-        md = create_market_data(config, lake_gateway=lake, clock=clock)
-        assert isinstance(md, LakeMarketData)
-
-
-class TestCreateFundamentals:
-    def test_fixture_mode_returns_fixture_fundamentals(self) -> None:
-        fd = create_fundamentals(_fixture_config())
-        assert isinstance(fd, FixtureFundamentals)
-
-    def test_lake_gateway_returns_lake_fundamentals(self) -> None:
-        config = _fixture_config()
-        clock = VirtualClock(date(2026, 1, 2))
-        lake = FixtureLakeGateway(Path("fixtures/v1"))
-        fd = create_fundamentals(config, lake_gateway=lake, clock=clock)
-        assert isinstance(fd, LakeFundamentals)
-
-
-class TestCreateInsiderFeed:
-    def test_fixture_mode_returns_fixture_insider_feed(self) -> None:
-        ins = create_insider_feed(_fixture_config())
-        assert isinstance(ins, FixtureInsiderFeed)
-
-    def test_live_mode_returns_openinsider_connector(self) -> None:
-        ins = create_insider_feed(_live_config())
-        assert isinstance(ins, OpenInsiderConnector)
-        ins.close()
-
-    def test_lake_gateway_returns_lake_insider_feed(self) -> None:
-        config = _fixture_config()
-        clock = VirtualClock(date(2026, 1, 2))
-        lake = FixtureLakeGateway(Path("fixtures/v1"))
-        ins = create_insider_feed(config, lake_gateway=lake, clock=clock)
-        assert isinstance(ins, LakeInsiderFeed)
-
-
-class TestCreateSentimentFeed:
-    def test_fixture_mode_returns_fixture_sentiment_feed(self) -> None:
-        sf = create_sentiment_feed(_fixture_config())
-        assert isinstance(sf, FixtureSentimentFeed)
-
-    def test_live_mode_returns_reddit_sentiment_connector(self) -> None:
-        sf = create_sentiment_feed(_live_config())
-        assert isinstance(sf, RedditSentimentConnector)
-        sf.close()
-
-    def test_lake_gateway_returns_lake_sentiment_feed(self) -> None:
-        config = _fixture_config()
-        clock = VirtualClock(date(2026, 1, 2))
-        lake = FixtureLakeGateway(Path("fixtures/v1"))
-        sf = create_sentiment_feed(config, lake_gateway=lake, clock=clock)
-        assert isinstance(sf, LakeSentimentFeed)
-
-
 class TestCreateLakeGateway:
     def test_fixture_mode_returns_fixture_lake_gateway(self) -> None:
         config = _fixture_config()
@@ -155,7 +97,7 @@ class TestCreateLakeGateway:
             create_lake_gateway(config, clock)
 
     def test_in_process_mode_uses_configured_adapter(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        captured: dict[str, str] = {}
+        captured: dict[str, object] = {}
 
         def fake_init(self: InProcessLakeGateway, config_path: str, price_mode: str) -> None:
             _ = self
@@ -176,14 +118,67 @@ class TestCreateLakeGateway:
         clock = VirtualClock(date(2026, 1, 2))
         lake = create_lake_gateway(config, clock)
         assert isinstance(lake, InProcessLakeGateway)
-        assert captured == {"config_path": "../alpha-lake/config/test.toml", "price_mode": "raw"}
+        assert captured == {
+            "config_path": "../alpha-lake/config/test.toml",
+            "price_mode": "raw",
+        }
 
 
-class TestCreateSECConnector:
-    def test_always_returns_sec_connector(self) -> None:
-        sec = create_sec_connector(_fixture_config())
-        assert isinstance(sec, SECConnector)
-        sec.close()
+class TestCreateMarketData:
+    def test_returns_lake_market_data(self) -> None:
+        config = _fixture_config()
+        clock = VirtualClock(date(2026, 1, 2))
+        lake = FixtureLakeGateway(Path("fixtures/v1"))
+        md = create_market_data(config, lake_gateway=lake, clock=clock)
+        assert isinstance(md, LakeMarketData)
+
+
+class TestCreateFundamentals:
+    def test_returns_lake_fundamentals(self) -> None:
+        config = _fixture_config()
+        clock = VirtualClock(date(2026, 1, 2))
+        lake = FixtureLakeGateway(Path("fixtures/v1"))
+        fd = create_fundamentals(config, lake_gateway=lake, clock=clock)
+        assert isinstance(fd, LakeFundamentals)
+
+
+class TestCreateInsiderFeed:
+    def test_returns_lake_insider_feed(self) -> None:
+        config = _fixture_config()
+        clock = VirtualClock(date(2026, 1, 2))
+        lake = FixtureLakeGateway(Path("fixtures/v1"))
+        ins = create_insider_feed(config, lake_gateway=lake, clock=clock)
+        assert isinstance(ins, LakeInsiderFeed)
+
+
+class TestCreateSentimentFeed:
+    def test_returns_lake_sentiment_feed(self) -> None:
+        config = _fixture_config()
+        clock = VirtualClock(date(2026, 1, 2))
+        lake = FixtureLakeGateway(Path("fixtures/v1"))
+        sf = create_sentiment_feed(config, lake_gateway=lake, clock=clock)
+        assert isinstance(sf, LakeSentimentFeed)
+
+
+class TestCreateEventSink:
+    def test_fixture_mode_returns_fake_event_sink(self) -> None:
+        sink = create_event_sink(_fixture_config())
+        assert isinstance(sink, FakeEventSink)
+
+    def test_live_mode_returns_duckdb_event_sink(self) -> None:
+        sink = create_event_sink(_live_config())
+        assert isinstance(sink, DuckDBEventSink)
+        sink.close()
+
+
+class TestCreateStore:
+    def test_fixture_mode_returns_fixture_store(self) -> None:
+        store = create_store(_fixture_config())
+        assert isinstance(store, FixtureStore)
+
+    def test_live_mode_returns_canonical_store(self) -> None:
+        store = create_store(_live_config())
+        assert isinstance(store, CanonicalStore)
 
 
 class TestCreateClock:
@@ -196,61 +191,21 @@ class TestCreateClock:
         assert isinstance(clock, SystemClock)
 
 
-class TestBaseConnectorCheckConnection:
-    def test_returns_true_on_2xx(self) -> None:
-        def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(200)
+class TestCreateLLM:
+    def test_fixture_mode_returns_canned_llm(self) -> None:
+        llm = create_llm(_fixture_config())
+        assert isinstance(llm, CannedLLM)
 
-        client = httpx.Client(transport=httpx.MockTransport(handler))
-        conn = BaseConnector(source_name="test", base_url="http://example.com")
-        conn._client = client
-        assert conn.check_connection() is True
-        conn.close()
-
-    def test_returns_true_on_4xx(self) -> None:
-        def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(404)
-
-        client = httpx.Client(transport=httpx.MockTransport(handler))
-        conn = BaseConnector(source_name="test", base_url="http://example.com")
-        conn._client = client
-        assert conn.check_connection() is True
-        conn.close()
-
-    def test_returns_false_on_5xx(self) -> None:
-        def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(503)
-
-        client = httpx.Client(transport=httpx.MockTransport(handler))
-        conn = BaseConnector(source_name="test", base_url="http://example.com")
-        conn._client = client
-        assert conn.check_connection() is False
-        conn.close()
-
-    def test_returns_false_on_request_error(self) -> None:
-        def handler(request: httpx.Request) -> httpx.Response:
-            raise httpx.RequestError("Connection refused")
-
-        client = httpx.Client(transport=httpx.MockTransport(handler))
-        conn = BaseConnector(source_name="test", base_url="http://example.com")
-        conn._client = client
-        assert conn.check_connection() is False
-        conn.close()
+    def test_live_mode_returns_openai_like_llm(self) -> None:
+        llm = create_llm(_live_config())
+        assert isinstance(llm, OpenAILikeLLM)
 
 
-class TestSECConnectorCheckConnection:
-    def test_hits_sec_tickers_url(self) -> None:
-        urls: list[str] = []
+class TestCreateBroker:
+    def test_fixture_mode_returns_fake_broker(self) -> None:
+        broker = create_broker(_fixture_config())
+        assert isinstance(broker, FakeBroker)
 
-        def handler(request: httpx.Request) -> httpx.Response:
-            urls.append(str(request.url))
-            return httpx.Response(200)
-
-        client = httpx.Client(transport=httpx.MockTransport(handler))
-        sec = SECConnector(user_agent="test", cache_path=":memory:", vault=None)
-        sec._client = client
-        try:
-            assert sec.check_connection() is True
-            assert any("company_tickers.json" in u for u in urls)
-        finally:
-            sec.close()
+    def test_live_mode_returns_alpaca_broker(self) -> None:
+        broker = create_broker(_live_config())
+        assert isinstance(broker, AlpacaBroker)
