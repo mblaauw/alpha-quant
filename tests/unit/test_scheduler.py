@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from contextlib import ExitStack
 from datetime import date, datetime
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from app.scheduler import run_daily_pipeline
 
@@ -35,9 +36,6 @@ def _mock_config() -> object:
         dd_ladder = [[0.10, 0.5], [0.15, 0.0]]
         daily_loss_halt_pct = 0.03
 
-    class _FakeConnector:
-        pass
-
     config = type(
         "FakeConfig",
         (),
@@ -47,7 +45,17 @@ def _mock_config() -> object:
             "portfolio": _FakePortfolio(),
             "paper": _FakePaper(),
             "risk": _FakeRisk(),
-            "connector": _FakeConnector(),
+            "lake": type(
+                "_FakeLake",
+                (),
+                {
+                    "mode": "fixture",
+                    "fixture_version": "v1",
+                    "config_path": "",
+                    "price_mode": "split_adjusted",
+                    "snapshot_id": "",
+                },
+            )(),
             "model_dump": lambda self, **kwargs: {
                 "data": {"mode": "live", "fixture_version": "v1"},
                 "bootstrap": {"symbols": ["AAPL"], "include_benchmarks": ["SPY"]},
@@ -120,6 +128,19 @@ class _FakeStore:
         pass
 
 
+def _apply_factory_mocks(stack: ExitStack) -> None:
+    """Enter all factory patch contexts into the given ExitStack."""
+    for target in [
+        "app.scheduler.create_clock",
+        "app.scheduler.create_lake_gateway",
+        "app.scheduler.create_market_data",
+        "app.scheduler.create_fundamentals",
+        "app.scheduler.create_insider_feed",
+        "app.scheduler.create_sentiment_feed",
+    ]:
+        stack.enter_context(patch(target, return_value=MagicMock()))
+
+
 def _mock_violation(check: str) -> object:
     from domain.invariants import InvariantViolation
 
@@ -187,14 +208,14 @@ class TestRunDailyPipeline:
     def test_runs_pipeline_on_market_day(self) -> None:
         fake_store = _FakeStore(existing_runs=[])
         mock_result = _mock_run_result(decisions=3, fills=2, events=10)
-        with (
-            patch("app.scheduler.is_market_day", return_value=True),
-            patch("app.scheduler.is_halted", return_value=False),
-            patch("app.scheduler.load_config", return_value=_mock_config()),
-            patch("app.scheduler.CanonicalStore", return_value=fake_store),
-            patch("app.scheduler.run_pipeline", return_value=mock_result),
-            patch("app.scheduler.alert"),
-        ):
+        with ExitStack() as stack:
+            stack.enter_context(patch("app.scheduler.is_market_day", return_value=True))
+            stack.enter_context(patch("app.scheduler.is_halted", return_value=False))
+            stack.enter_context(patch("app.scheduler.load_config", return_value=_mock_config()))
+            stack.enter_context(patch("app.scheduler.CanonicalStore", return_value=fake_store))
+            stack.enter_context(patch("app.scheduler.run_pipeline", return_value=mock_result))
+            stack.enter_context(patch("app.scheduler.alert"))
+            _apply_factory_mocks(stack)
             result = run_daily_pipeline()
         assert result["status"] == "completed"
         assert result["run_id"] == "test-run-id"
@@ -208,14 +229,14 @@ class TestRunDailyPipeline:
     def test_reports_halted_status(self) -> None:
         fake_store = _FakeStore(existing_runs=[])
         mock_result = _mock_run_result(halted=True)
-        with (
-            patch("app.scheduler.is_market_day", return_value=True),
-            patch("app.scheduler.is_halted", return_value=False),
-            patch("app.scheduler.load_config", return_value=_mock_config()),
-            patch("app.scheduler.CanonicalStore", return_value=fake_store),
-            patch("app.scheduler.run_pipeline", return_value=mock_result),
-            patch("app.scheduler.alert"),
-        ):
+        with ExitStack() as stack:
+            stack.enter_context(patch("app.scheduler.is_market_day", return_value=True))
+            stack.enter_context(patch("app.scheduler.is_halted", return_value=False))
+            stack.enter_context(patch("app.scheduler.load_config", return_value=_mock_config()))
+            stack.enter_context(patch("app.scheduler.CanonicalStore", return_value=fake_store))
+            stack.enter_context(patch("app.scheduler.run_pipeline", return_value=mock_result))
+            stack.enter_context(patch("app.scheduler.alert"))
+            _apply_factory_mocks(stack)
             result = run_daily_pipeline()
         assert result["status"] == "halted"
         assert fake_store.completed_status == "halted"
@@ -223,14 +244,14 @@ class TestRunDailyPipeline:
     def test_reports_violations_status(self) -> None:
         fake_store = _FakeStore(existing_runs=[])
         mock_result = _mock_run_result(violations=[_mock_violation("I5")])
-        with (
-            patch("app.scheduler.is_market_day", return_value=True),
-            patch("app.scheduler.is_halted", return_value=False),
-            patch("app.scheduler.load_config", return_value=_mock_config()),
-            patch("app.scheduler.CanonicalStore", return_value=fake_store),
-            patch("app.scheduler.run_pipeline", return_value=mock_result),
-            patch("app.scheduler.alert"),
-        ):
+        with ExitStack() as stack:
+            stack.enter_context(patch("app.scheduler.is_market_day", return_value=True))
+            stack.enter_context(patch("app.scheduler.is_halted", return_value=False))
+            stack.enter_context(patch("app.scheduler.load_config", return_value=_mock_config()))
+            stack.enter_context(patch("app.scheduler.CanonicalStore", return_value=fake_store))
+            stack.enter_context(patch("app.scheduler.run_pipeline", return_value=mock_result))
+            stack.enter_context(patch("app.scheduler.alert"))
+            _apply_factory_mocks(stack)
             result = run_daily_pipeline()
         assert result["status"] == "violations"
         assert result["violations"] == 1
@@ -238,14 +259,16 @@ class TestRunDailyPipeline:
 
     def test_records_failed_run_on_exception(self) -> None:
         fake_store = _FakeStore(existing_runs=[])
-        with (
-            patch("app.scheduler.is_market_day", return_value=True),
-            patch("app.scheduler.is_halted", return_value=False),
-            patch("app.scheduler.load_config", return_value=_mock_config()),
-            patch("app.scheduler.CanonicalStore", return_value=fake_store),
-            patch("app.scheduler.run_pipeline", side_effect=RuntimeError("boom")),
-            patch("app.scheduler.alert"),
-        ):
+        with ExitStack() as stack:
+            stack.enter_context(patch("app.scheduler.is_market_day", return_value=True))
+            stack.enter_context(patch("app.scheduler.is_halted", return_value=False))
+            stack.enter_context(patch("app.scheduler.load_config", return_value=_mock_config()))
+            stack.enter_context(patch("app.scheduler.CanonicalStore", return_value=fake_store))
+            stack.enter_context(
+                patch("app.scheduler.run_pipeline", side_effect=RuntimeError("boom"))
+            )
+            stack.enter_context(patch("app.scheduler.alert"))
+            _apply_factory_mocks(stack)
             result = run_daily_pipeline()
         assert result["status"] == "failed"
         assert fake_store.completed_status == "failed"

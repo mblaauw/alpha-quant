@@ -10,8 +10,17 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from app._loop import MechanismData
 from app.alerts import alert
 from app.config import load_config, redact_config
+from app.factory import (
+    create_clock,
+    create_fundamentals,
+    create_insider_feed,
+    create_lake_gateway,
+    create_market_data,
+    create_sentiment_feed,
+)
 from app.halt import is_halted
 from app.pipeline import PipelineConfig, persist_run_result
 from app.pipeline import run as run_pipeline
@@ -86,6 +95,30 @@ def run_daily_pipeline(
     prev_equity = prev.equity if prev else None
     prev_regime = prev.regime if prev else "CAUTION"
 
+    # Build lake-backed data ports
+    clock = create_clock(config)
+    lake_gateway = create_lake_gateway(config, clock)
+    market_data = create_market_data(config, lake_gateway, clock)
+    fundamentals = create_fundamentals(config, lake_gateway, clock)
+    insider = create_insider_feed(config, lake_gateway, clock)
+    sentiment = create_sentiment_feed(config, lake_gateway, clock)
+
+    # Build mechanism data from lake-backed ports
+    mech_data = MechanismData()
+    for sym in universe:
+        try:
+            snap = fundamentals.snapshot(sym)
+            if snap is not None:
+                mech_data.fundamentals[sym] = snap
+            txns = insider.cluster_transactions(sym)
+            if txns:
+                mech_data.insider_txns[sym] = txns
+            mentions = sentiment.mention_counts(sym, days=90)
+            if mentions:
+                mech_data.mentions[sym] = mentions
+        except Exception:
+            logger.warning("failed_to_load_mechanism_data", symbol=sym)
+
     logger.info(
         "pipeline_start",
         run_id=run_id,
@@ -123,6 +156,9 @@ def run_daily_pipeline(
             fill_config=fill_config,
             risk_config=risk_config,
             sizing_config=sizing_config,
+            market_data=market_data,
+            mechanism_data=mech_data,
+            lake_gateway=lake_gateway,
             prev_equity=prev_equity,
             prev_regime=prev_regime,
             shadow_books=_SHADOW_BOOKS,
