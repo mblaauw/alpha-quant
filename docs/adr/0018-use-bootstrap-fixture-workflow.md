@@ -53,6 +53,10 @@ Rationale:
 - Re-bootstrapping is required when the symbol list changes (config change → re-bootstrap)
 - Fixture bundle size: ~9 symbols × 200 days × daily bars + fundamentals + insider data ≈ 2-5 MB (acceptable in repo or Releases)
 
+## Amendment (2026-06-21)
+
+Fixture workflow now generates lake-shaped bundles consumed by FixtureLakeGateway.
+
 ## References
 
 - DESIGN.md §3.7 (Bootstrap), §4 (Clock virtualization and replay)

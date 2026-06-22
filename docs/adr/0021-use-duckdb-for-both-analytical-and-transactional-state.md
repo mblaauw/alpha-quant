@@ -58,6 +58,10 @@ Rationale:
 
 - (None identified at this time)
 
+## Amendment (2026-06-21)
+
+DuckDB remains for transactional Alpha-Quant state only; analytical role removed.
+
 ## References
 
 - ADR-0006 (DuckDB + Parquet for analytical store) — still active

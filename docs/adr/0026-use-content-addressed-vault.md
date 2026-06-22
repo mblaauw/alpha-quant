@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Superseded
+
+*Superseded by ADR-0032 (Alpha-Lake as the sole data plane). The content-addressed vault is retired; all source data is ingested and managed through Alpha-Lake.*
 
 ## Date
 

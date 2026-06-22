@@ -52,6 +52,10 @@ Rationale:
 - The golden replay is a coarse check (hash of entire output) — a regression in one symbol's fill is detected, but debugging requires examining the diff
 - Golden replay does not replace unit tests for edge cases and property-based testing
 
+## Amendment (2026-06-21)
+
+Golden replay pins a lake snapshot_id for deterministic comparison.
+
 ## References
 
 - DESIGN.md §4 (Clock virtualization and replay), §16 (Invariant I7)

@@ -51,6 +51,10 @@ Dependency pruning was deferred until now because during active development (P0�
 
 - (none — apscheduler retained as main dependency)
 
+## Amendment (2026-06-21)
+
+Records removal of connector/vault dependencies (selectolax, eodhd, tiingo, etc.)
+
 ## References
 
 - ADR-0007 (SQLite + SQLAlchemy) — superseded by ADR-0021

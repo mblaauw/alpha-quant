@@ -21,7 +21,7 @@ Deterministic, daily-cadence, long-only equity paper-trading engine
 
 ## Overview
 
-Alpha-Quant is a deterministic, daily-cadence, long-only equity paper-trading system built on a ports-and-adapters (hexagonal) architecture. It evaluates US equities through a multi-mechanism decision engine (M1–M8), runs a conservative fill model shared across backtest and paper modes, and generates structured trading decisions with LLM-narrated daily journals.
+Alpha-Quant is a deterministic, daily-cadence, long-only equity paper-trading system built on a ports-and-adapters (hexagonal) architecture. All market, fundamental, insider, and sentiment data is sourced through **Alpha-Lake** (a separate data-plane system) via the `LakeGateway` port. The engine evaluates US equities through a multi-mechanism decision engine (M1–M8), runs a conservative fill model shared across backtest and paper modes, and generates structured trading decisions with LLM-narrated daily journals.
 
 **Who is this for?** Quantitative researchers and algorithmic traders who want to prototype, backtest, and paper-trade systematic equity strategies without a broker dependency. The system is designed for research transparency — every mechanism has an ablation counterpart for walk-forward validation, and the core domain logic is pure Python with zero I/O.
 
@@ -51,9 +51,8 @@ cd alpha-quant
 # Install
 uv sync
 
-# Configure (create local config with your API keys)
+# Configure (create local config)
 cp config.local.toml.example config.local.toml
-# Edit config.local.toml — API keys never leave your machine
 
 # Bootstrap fixtures
 uv run alpha-quant bootstrap
@@ -98,14 +97,27 @@ Alpha-Quant follows a **ports-and-adapters (hexagonal) architecture** where the 
 
 > Each mechanism's runtime path is verified by pipeline behavioral tests (550 tests). See [BETA-DA-8](https://github.com/mblaauw/alpha-quant/issues/334).
 
+## Data Plane
+
+All market data flows through **Alpha-Lake**, a separate data-plane system accessed via the `LakeGateway` port (`ports/lake.py`). Every read is a point-in-time (PIT) query clock-driven by `as_of` — the pipeline never ingests raw data directly.
+
+| Adapter | File | Mode | Description |
+|---------|------|------|-------------|
+| **InProcessLakeGateway** | `adapters/real/lake_inprocess.py` | in_process | Imports `alpha_lake` library in-process; connects to DuckDB catalog |
+| **FixtureLakeGateway** | `adapters/fake/lake_fixture.py` | fixture | Reads fixture Parquet with PIT visibility for deterministic replay |
+| **RestLakeGateway** | *(deferred)* | rest | Raises `NotImplementedError` — planned for lake REST serving |
+
+The `LakeMarketData`, `LakeFundamentals`, `LakeInsiderFeed`, and `LakeSentimentFeed` wrappers (`adapters/real/lake_data.py`) implement the individual domain port interfaces by delegating to `LakeGateway`.
+
+Degradation is derived from `LakeGateway.dataset_health()` — per-dataset staleness and availability determine which mechanisms degrade and whether price staleness triggers a halt.
+
 ## CLI Commands
 
 | Command | Status | Description |
 |---------|--------|-------------|
 | `alpha-quant bootstrap` | ✅ Ready | Generate deterministic fixture data for development |
 | `alpha-quant replay` | ✅ Ready | Full-DAG golden replay over fixture data |
-| `alpha-quant ingest` | ✅ Ready | Fetch live data from APIs into canonical store (store-only source) |
-| `alpha-quant run` | ✅ Ready | Daily pipeline — reads canonical store (store-only; ingest separately) |
+| `alpha-quant run` | ✅ Ready | Daily pipeline — PIT reads from Alpha-Lake, drives full decision DAG |
 | `alpha-quant backtest` | ✅ Ready | Event-driven backtester (single fill model) |
 | `alpha-quant journal` | ✅ Ready | Daily journal with LLM narration |
 | `alpha-quant ask` | ✅ Ready | Query recorded decisions and events |
@@ -113,7 +125,7 @@ Alpha-Quant follows a **ports-and-adapters (hexagonal) architecture** where the 
 | `alpha-quant status` | ✅ Ready | Full system status (portfolio, equity, positions, risk) |
 | `alpha-quant halt` | ✅ Ready | Halt or resume pipeline |
 | `alpha-quant schedule` | ✅ Ready | Start/stop the APScheduler daily scheduler |
-| `alpha-quant backup` | ✅ Ready | Backup DuckDB state store and vault |
+| `alpha-quant backup` | ✅ Ready | Backup DuckDB state store |
 
 ## Documentation
 
@@ -139,10 +151,12 @@ make bless-golden   # Update golden replay fixture hash
 
 ## Configuration
 
-API keys and secrets are **never committed** to the repository. Use one of:
+Secrets are **never committed** to the repository. Use one of:
 
 1. **`config.local.toml`** (recommended for local dev) — gitignored, merged on top of `config.toml`
-2. **Environment variables** — `ALPHA_QUANT_TIINGO__API_KEY=...` (takes highest precedence)
+2. **Environment variables** — `ALPHA_QUANT_LLM__API_KEY=...` (takes highest precedence)
+
+Data-collection API keys (Tiingo, EODHD, SEC, OpenInsider, Reddit) are **no longer needed** — all market data is sourced through Alpha-Lake. Alpaca API keys remain only for the broker adapter (inactive in v1).
 
 See [config.local.toml.example](config.local.toml.example) for available options.
 
@@ -157,8 +171,7 @@ See [config.local.toml.example](config.local.toml.example) for available options
 | Indicators | numpy (incremental O(1)) |
 | Analytical SQL | DuckDB |
 | Columnar storage | pyarrow (Parquet, zstd) |
-| HTTP | httpx + tenacity retry |
-| Market data | Tiingo (bars) + SEC EDGAR (fundamentals) |
+| Data plane | **Alpha-Lake** (separate system; all market/fundamental/insider/sentiment data sourced via `LakeGateway` port) |
 | CLI | Typer + Rich |
 | Logging | structlog (JSON) |
 | Testing | pytest |
