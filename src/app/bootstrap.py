@@ -98,7 +98,7 @@ def _generate_mentions(symbol: str, ref_date: date | None = None) -> list[Mentio
         MentionCount(
             symbol=symbol,
             mention_date=today - timedelta(days=d),
-            source="reddit",
+            source="fixture",
             count=10 + _det(f"m-{symbol}-{d}", 200),
         )
         for d in range(30)
@@ -108,11 +108,8 @@ def _generate_mentions(symbol: str, ref_date: date | None = None) -> list[Mentio
 def run_bootstrap(
     config: AppConfig,
     fixture_base: Path,
-    vault_base: Path | None = None,
-    fixture_only: bool = True,
     ref_date: date | None = None,
 ) -> dict[str, Any]:
-    _ = vault_base, fixture_only
     cfg = config.bootstrap
     today = ref_date or date.today()
     start = date(today.year - cfg.history_years, today.month, today.day)

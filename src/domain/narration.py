@@ -59,7 +59,7 @@ def build(
 
     degraded_sources = {e.source_name for e in events if isinstance(e, SourceDegraded)}
     data_health: dict[str, bool] = {}
-    for src in ("eodhd", "alpaca", "openinsider", "reddit", "sec"):
+    for src in ("bars", "fundamentals", "insider_tx", "attention"):
         data_health[src] = src not in degraded_sources
 
     pos_narrations: list[PositionNarration] = []

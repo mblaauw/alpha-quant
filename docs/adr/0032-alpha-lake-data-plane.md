@@ -22,30 +22,30 @@ The P3.RB refinement sprint recommended replacing the vault-centric pipeline wit
 
 Specific changes:
 
-- **In-process first.** The initial implementation reads from local Parquet datasets and writes via the LakeStore adapter. This replaces the vault (ADR-0026), the SEC SQLite cache (ADR-0025), and the per-connector canonical write path.
+- **In-process first.** The initial implementation reads from local Parquet datasets via the `InProcessLakeGateway`. This replaces the vault (ADR-0026), the SEC SQLite cache (ADR-0025), and the per-connector canonical write path.
 
-- **REST deferred.** A REST API layer around the lake is designed but not implemented in P3.8. It will be introduced when multi-process or remote access is required (future phase).
+- **REST deferred.** A REST API layer around the lake is designed but not implemented. It will be introduced when multi-process or remote access is required (future phase).
 
-- **Connectors become lake writers.** Connectors now produce Lake events (BarsIngested, FundamentalsIngested, etc.) rather than writing directly to the vault. The LakeStore persists these events.
+- **Connectors removed.** All public internet data connectors (EODHD, Tiingo, SEC EDGAR, OpenInsider, Reddit, Alpaca Data) were removed. Alpha-Quant no longer fetches data directly — all reads go through the LakeGateway port.
 
-- **Vault retired.** The content-addressed vault (`vault/` directory, `manifest.db`, `vault.py`) is removed. Existing vault data is migrated to the lake format once.
+- **Vault retired.** The content-addressed vault (`vault/` directory, `manifest.db`, `vault.py`) is removed. No vault data required migration — the fixture bundle provides a clean starting point.
 
-- **SEC SQLite cache retired.** The per-connector SEC cache (`sec_cache.db`) is replaced by the lake's dataset cache.
+- **SEC SQLite cache retired.** The per-connector SEC cache (`sec_cache.db`) is removed.
 
 ## Consequences
 
 ### Positive
 
 - Single data-plane interface: all consumers read through LakeGateway, not directly from Parquet files
-- Connectors are simpler: they produce events instead of managing vault storage
+- All connectors removed: no per-source maintenance, no API key management, no rate limiting
 - The vault archive is eliminated — no dual-write, no dead code path
 - Backend swap: swapping local Parquet for S3/MinIO requires changing only the Lake adapter
-- Cache consistency: SEC ticker map caching moves from a per-connector SQLite DB to the lake's dataset cache
+- Fixture-first testing: deterministic CI via FixtureLakeGateway with no external dependencies
 
 ### Negative
 
-- Migration: existing vault data must be migrated to the lake format (one-time script)
-- The in-process lake writer is a single point of write coordination — acceptable for the daily batch pipeline
+- Alpha-Quant now depends on Alpha-Lake for all source data; lake downtime blocks new data
+- The fixture bundle must be regenerated when the lake schema changes
 - REST API is deferred: multi-process or remote access is not yet supported
 
 ## References
