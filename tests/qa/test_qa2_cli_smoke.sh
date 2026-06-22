@@ -46,12 +46,11 @@ git clone "$REPO_DIR" "$CLONE_DIR" 2>/dev/null
 cd "$CLONE_DIR"
 uv sync --extra dev 2>/dev/null
 
-# Seed canonical store from source repo (pipeline reads bars from store, not fixture adapters)
-if [ -d "$REPO_DIR/data/canonical" ]; then
+# Seed state DB from source repo (all bar data comes from fixture bundles / alpha-lake)
+if [ -f "$REPO_DIR/data/state.db" ]; then
   mkdir -p data
-  cp -r "$REPO_DIR/data/canonical" data/
-  [ -f "$REPO_DIR/data/state.db" ] && cp "$REPO_DIR/data/state.db" data/
-  echo "(seeded canonical data from source)"
+  cp "$REPO_DIR/data/state.db" data/
+  echo "(seeded state db from source)"
 fi
 
 if [ ! -d "fixtures/v1" ]; then
@@ -68,7 +67,7 @@ run_and_check "AC-3: run --mode fixture (seed data)" "(decisions|fills|events|co
   uv run alpha-quant run --mode fixture
 
 echo "--- AC-4: backtest ---"
-# Note: backtest requires canonical bar data (from ingest), not available in fixture-only mode
+# Note: backtest runs against fixture lake bundles; no ingest step needed
 BT_OUTPUT=$(uv run alpha-quant backtest --from-date 2024-01-02 --to-date 2024-01-10 2>&1) || true
 if echo "$BT_OUTPUT" | grep -qiE "(return|sharpe|trades|no.*file|No files found)"; then
   if echo "$BT_OUTPUT" | grep -qiE "(return|sharpe)"; then

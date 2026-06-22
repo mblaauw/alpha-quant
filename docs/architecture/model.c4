@@ -28,12 +28,12 @@ model {
     description 'Deterministic, daily-cadence, long-only equity trading system. Internal paper engine. LLM-powered narration and education.'
 
     container cli 'CLI' {
-      description 'Command-line interface. Entry point for all operations: run, replay, backtest, bootstrap, ingest, journal, ask, report, status, halt, schedule, backup.'
+      description 'Command-line interface. Entry point for all operations: run, replay, backtest, bootstrap, journal, ask, report, status, halt, schedule, backup.'
       technology 'argparse'
     }
 
     container pipelineEngine 'Pipeline Engine' {
-      description 'Daily-run orchestrator. Sequences ingest, validate, derive, regime, risk, decide, order, persist, narrate. Runs at 17:30 ET via APScheduler.'
+      description 'Daily-run orchestrator. Sequences validate, derive, regime, risk, decide, order, persist, narrate. Runs at 17:30 ET via APScheduler.'
       technology 'APScheduler'
     }
 
@@ -57,7 +57,7 @@ model {
       }
 
       logicalComponent catalog 'Catalog' {
-        description 'Dataset versioning and manifest tracking. Run metadata, fixture integrity verification, golden replay hash management.'
+        description 'Dataset versioning and golden replay verification. Run metadata, fixture integrity checks, replay hash management.'
         technology 'DuckDB'
       }
     }
@@ -194,7 +194,7 @@ model {
     }
 
     monitoredProcess cliProcess 'CLI Process' {
-      description 'Ad-hoc operations. Invoked by user for run, replay, backtest, bootstrap, ingest, journal, ask, report, status, halt, schedule, backup.'
+      description 'Ad-hoc operations. Invoked by user for run, replay, backtest, bootstrap, journal, ask, report, status, halt, schedule, backup.'
       technology 'argparse, Python 3.14'
     }
 
@@ -233,12 +233,12 @@ model {
 
   lakeGateway -> deriveEngine 'Provides bars for indicator computation'
   lakeGateway -> validator 'Provides data for validation checks'
-  lakeGateway -> catalog 'Tracks dataset versions and manifests'
+  lakeGateway -> catalog 'Tracks dataset versions and health'
   lakeGateway -> alphaLake 'Reads PIT bars, fundamentals, insider, sentiment, earnings'
 
   cli -> pipelineEngine 'Dispatches run, replay, backtest commands'
 
-  pipelineEngine -> dataLayer 'Steps 1-3: ingest via LakeGateway, validate, derive' {
+  pipelineEngine -> dataLayer 'Steps 1-3: read via LakeGateway, validate, derive' {
     technology 'port interface'
   }
 
