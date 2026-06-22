@@ -123,6 +123,7 @@ class CanonicalStore(
         conn.execute("ALTER TABLE positions ADD COLUMN IF NOT EXISTS entry_date DATE")
         conn.execute("ALTER TABLE positions ADD COLUMN IF NOT EXISTS high_since_entry DOUBLE")
         conn.execute("ALTER TABLE positions ADD COLUMN IF NOT EXISTS partial_taken BOOLEAN")
+        conn.execute("UPDATE positions SET partial_taken = FALSE WHERE partial_taken IS NULL")
         conn.execute(
             "CREATE TABLE IF NOT EXISTS equity_curve ("
             "  equity_date DATE NOT NULL,"

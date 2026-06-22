@@ -413,7 +413,7 @@ def run_backtest(
             daily_returns.append((equity - prev_equity) / prev_equity)
             today_pnl = equity - prev_equity
             # Daily halt is informational in backtest; doesn't prevent entries
-            evaluate_daily_loss(today_pnl, equity, rc)
+            evaluate_daily_loss(today_pnl, prev_equity, rc)
         prev_equity = equity
         equity_curve.append(equity)
 

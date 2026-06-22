@@ -1008,7 +1008,8 @@ class TestShadowAblation:
 
     def test_pipeline_accepts_shadow_books(self) -> None:
         """Pipeline.run processes shadow books and persists their snapshots."""
-        from app.pipeline import PipelineConfig, run as run_pipeline
+        from app.pipeline import PipelineConfig
+        from app.pipeline import run as run_pipeline
         from domain.ablation import AblationConfig, ShadowBook
         from domain.fills import FillConfig
 
@@ -1069,7 +1070,7 @@ class TestShadowAblation:
             mock_regime.return_value = ("RISK_ON", 1.0)
             mock_decide.return_value = []
 
-            result = run_backtest(
+            run_backtest(
                 config=bt_config,
                 store=store,
                 market_data=store,

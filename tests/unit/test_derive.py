@@ -6,10 +6,10 @@ import numpy as np
 import pytest
 
 from domain.derive import (
-    _empty_state,
-    _REF_INPUT,
     _REF_EXPECTED,
+    _REF_INPUT,
     _REF_TOLERANCE,
+    _empty_state,
     _update_atr,
     _update_ema,
     _update_rsi,
@@ -111,10 +111,20 @@ class TestEmptyState:
     def test_creates_all_fields(self) -> None:
         st = _empty_state("TEST", date(2026, 1, 1))
         expected_keys = {
-            "ema12", "ema20", "ema26", "ema50", "ema200",
-            "macd_line", "macd_signal", "macd_histogram",
-            "rsi_avg_gain", "rsi_avg_loss", "rsi",
-            "atr", "processed_close", "bar_count",
+            "ema12",
+            "ema20",
+            "ema26",
+            "ema50",
+            "ema200",
+            "macd_line",
+            "macd_signal",
+            "macd_histogram",
+            "rsi_avg_gain",
+            "rsi_avg_loss",
+            "rsi",
+            "atr",
+            "processed_close",
+            "bar_count",
         }
         assert set(st.keys()) == expected_keys
         for k in expected_keys - {"bar_count"}:
@@ -206,7 +216,6 @@ class TestBackfillIndicatorState:
         ]
         result = backfill_indicator_state(bars)
         for i in range(n):
-            label = f"bar[{i}] close={_REF_INPUT['close'][i]}"
             exp_ema = _REF_EXPECTED["ema20"][i]
             obs_ema = result.values["ema20"] if i == n - 1 else np.nan
         ema_series = _build_ema_series(bars)
@@ -216,7 +225,9 @@ class TestBackfillIndicatorState:
             if exp_ema is None:
                 assert obs_ema is None, f"bar[{i}] ema20 expected None"
             else:
-                assert obs_ema == pytest.approx(exp_ema, abs=_REF_TOLERANCE), f"bar[{i}] ema20 mismatch"
+                assert obs_ema == pytest.approx(exp_ema, abs=_REF_TOLERANCE), (
+                    f"bar[{i}] ema20 mismatch"
+                )
 
     def test_backfill_30_bars_rsi(self) -> None:
         n = len(_REF_INPUT["close"])
@@ -302,17 +313,20 @@ class TestVerifyIntegrity:
 
 def _build_ema_series(bars: list[Bar]) -> list[float | None]:
     from domain.derive import _build_incremental_series
+
     series = _build_incremental_series(bars)
     return [float(v) if not np.isnan(v) else None for v in series["ema20"]]
 
 
 def _build_rsi_series(bars: list[Bar]) -> list[float | None]:
     from domain.derive import _build_incremental_series
+
     series = _build_incremental_series(bars)
     return [float(v) if not np.isnan(v) else None for v in series["rsi"]]
 
 
 def _build_atr_series(bars: list[Bar]) -> list[float | None]:
     from domain.derive import _build_incremental_series
+
     series = _build_incremental_series(bars)
     return [float(v) if not np.isnan(v) else None for v in series["atr"]]

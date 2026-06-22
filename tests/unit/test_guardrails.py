@@ -45,7 +45,7 @@ def test_no_forbidden_file_names() -> None:
         stem = path.stem
         if stem in _FORBIDDEN_NAMES:
             errors.append(str(path.relative_to(SRC)))
-    assert not errors, f"Forbidden file names found:\n  " + "\n  ".join(errors)
+    assert not errors, "Forbidden file names found:\n  " + "\n  ".join(errors)
 
 
 def test_no_forbidden_imports() -> None:
@@ -63,7 +63,7 @@ def test_no_forbidden_imports() -> None:
                 or f"from {forbidden}" in text
             ):
                 errors.append(f"{rel} -> {forbidden}")
-    assert not errors, f"Forbidden imports found:\n  " + "\n  ".join(errors)
+    assert not errors, "Forbidden imports found:\n  " + "\n  ".join(errors)
 
 
 def test_no_selectolax_in_lock() -> None:

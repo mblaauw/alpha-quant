@@ -1,7 +1,6 @@
 """Tests for golden replay determinism (I7)."""
 
 import hashlib
-import json
 from pathlib import Path
 
 from app.config import load_config
@@ -14,7 +13,9 @@ def test_replay_determinism(tmp_path: Path) -> None:
     fp = str(Path("fixtures/v1"))
     out1 = run_replay(config, "2024-01-01", "2024-01-03", fixture_path=fp)
     out2 = run_replay(config, "2024-01-01", "2024-01-03", fixture_path=fp)
-    assert golden_hash(out1) == golden_hash(out2), "deterministic replay must produce identical hash"
+    assert golden_hash(out1) == golden_hash(out2), (
+        "deterministic replay must produce identical hash"
+    )
 
 
 def test_replay_output_structure(tmp_path: Path) -> None:

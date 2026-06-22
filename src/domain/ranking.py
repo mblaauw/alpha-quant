@@ -48,11 +48,11 @@ def rank(
         if len(selected) >= slots:
             break
         sec = sector_map.get(cand.symbol, cand.sector) if sector_map else cand.sector
-        if sec and sector_counts.get(sec, 0) >= max_per_sector:
-            continue
-        selected.append(cand)
-        if sec:
+        if sec is not None:
+            if sector_counts.get(sec, 0) >= max_per_sector:
+                continue
             sector_counts[sec] = sector_counts.get(sec, 0) + 1
+        selected.append(cand)
 
     return selected
 

@@ -2,13 +2,14 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from domain.risk import RiskConfig
 
 
 class BootstrapConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
     """Configuration for initial data bootstrap (symbol list, history length)."""
 
     symbols: list[str]
@@ -24,6 +25,7 @@ class BootstrapConfig(BaseModel):
 
 
 class DataConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
     """Data source configuration — fixture vs live, staleness thresholds."""
 
     mode: str = "fixture"
@@ -47,6 +49,7 @@ class DataConfig(BaseModel):
 
 
 class LakeConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
     """Alpha-Lake data-plane configuration."""
 
     mode: str = "fixture"
@@ -73,27 +76,9 @@ class LakeConfig(BaseModel):
         return v
 
 
-class UniverseConfig(BaseModel):
-    min_price: float = 5.0
-    min_adv_usd: float = 5_000_000
-    index_base: str = "sp500_plus_midcap400"
-
-    @field_validator("min_price")
-    @classmethod
-    def _min_price_bounds(cls, v: float) -> float:
-        if not 0.1 <= v <= 1000:
-            raise ValueError("min_price must be between 0.1 and 1000")
-        return v
-
-    @field_validator("min_adv_usd")
-    @classmethod
-    def _min_adv_usd_bounds(cls, v: float) -> float:
-        if not 100_000 <= v <= 1_000_000_000:
-            raise ValueError("min_adv_usd must be between 100_000 and 1_000_000_000")
-        return v
-
-
 class PortfolioConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     max_positions: int = 8
     max_position_pct: float = 0.15
     max_gross_exposure: float = 0.80
@@ -116,6 +101,8 @@ class PortfolioConfig(BaseModel):
 
 
 class PaperConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     starting_equity: float = 100_000.0
     slippage_bps: int = 5
     spread_model: str = "half_spread_estimate"
@@ -135,11 +122,9 @@ class PaperConfig(BaseModel):
         return v
 
 
-class ShadowConfig(BaseModel):
-    books: list[str] = ["RULES_ONLY", "NO_INSIDER", "NO_CROWDING_VETO"]
+class AppLLMConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
 
-
-class LLMConfig(BaseModel):
     provider: str = "openrouter"
     model: str = "anthropic/claude-sonnet-4"
     base_url: str = ""
@@ -154,68 +139,14 @@ class LLMConfig(BaseModel):
         return v
 
 
-class EducationConfig(BaseModel):
-    level: str = "beginner"
-    concept_repeat_limit: int = 3
-
-    @field_validator("concept_repeat_limit")
-    @classmethod
-    def _concept_repeat_limit_bounds(cls, v: int) -> int:
-        if not 1 <= v <= 10:
-            raise ValueError("concept_repeat_limit must be between 1 and 10")
-        return v
-
-
-class EODHDConfig(BaseModel):
-    api_key: SecretStr = SecretStr("")
-    base_url: str = "https://eodhd.com/api"
-
-
 class AlpacaConfig(BaseModel):
     api_key: SecretStr = SecretStr("")
     secret_key: SecretStr = SecretStr("")
     base_url: str = "https://data.alpaca.markets"
 
 
-class TiingoConfig(BaseModel):
-    api_key: SecretStr = SecretStr("")
-    base_url: str = "https://api.tiingo.com"
-
-
-class ConnectorConfig(BaseModel):
-    user_agent: str = "AlphaQuant/0.2.0 (research project; contact m@mblaauw.dev)"
-    tokens_per_second: float = 10.0
-    max_burst: float = 20.0
-    default_timeout_s: float = 30.0
-
-
-class SourceConfig(BaseModel):
-    """Enable/disable a single adapter source for a port."""
-
-    enabled: bool = False
-
-
-class PortAdapterConfig(BaseModel):
-    """Which adapter sources are available for a port, and which is primary."""
-
-    primary: str = ""
-    sources: dict[str, SourceConfig] = {}
-
-
-class AdaptersConfig(BaseModel):
-    """Config-driven adapter selection for each port.
-
-    Controls which real adapters are enabled per data stream.
-    When multiple adapters are enabled, all are stored tagged with `adapter`.
-    """
-
-    fundamentals: PortAdapterConfig = PortAdapterConfig()
-    market_data: PortAdapterConfig = PortAdapterConfig()
-    insider_feed: PortAdapterConfig = PortAdapterConfig()
-    sentiment_feed: PortAdapterConfig = PortAdapterConfig()
-
-
 class DashboardConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
     """Streamlit dashboard configuration — refresh interval, display options."""
 
     host: str = "localhost"
@@ -244,6 +175,7 @@ class AppConfig(BaseSettings):
         env_prefix="ALPHA_QUANT_",
         env_nested_delimiter="__",
         extra="ignore",
+        frozen=True,
     )
 
     config_version: int = 1
@@ -268,18 +200,11 @@ class AppConfig(BaseSettings):
     bootstrap: BootstrapConfig
     data: DataConfig
     lake: LakeConfig = LakeConfig()
-    universe: UniverseConfig
     portfolio: PortfolioConfig
     paper: PaperConfig
     risk: RiskConfig
-    shadow: ShadowConfig
-    llm: LLMConfig
-    education: EducationConfig
-    connector: ConnectorConfig
-    eodhd: EODHDConfig
+    llm: AppLLMConfig
     alpaca: AlpacaConfig
-    tiingo: TiingoConfig = TiingoConfig()
-    adapters: AdaptersConfig = AdaptersConfig()
     dashboard: DashboardConfig
 
 

@@ -64,6 +64,7 @@ from domain.models import (
     Position,
 )
 from domain.ranking import rank as rank_candidates
+from domain.regime import Regime
 from domain.risk import (
     RiskConfig,
     evaluate_daily_loss,
@@ -312,6 +313,7 @@ def run(
     # --- 4. Regime ---
     with _time_step("regime", run_id, events):
         spy_state = indicator_states.get("SPY")
+        regime: Regime
         regime, regime_mult = detect_regime_and_multiplier(spy_state)
         if regime != prev_regime:
             events.append(
@@ -590,7 +592,7 @@ def run(
                 symbol=cand.symbol,
                 action="buy",
                 quantity=float(final_shares),
-                order_type="MARKET",
+                order_type="market",
                 status="submitted",
                 submitted_at=datetime.combine(run_date, datetime.min.time()),
             )
@@ -676,7 +678,7 @@ def run(
 
     if prev_snap is not None:
         today_pnl = today_equity - prev_snap.equity
-        daily_halt_actions = evaluate_daily_loss(today_pnl, today_equity, rc)
+        daily_halt_actions = evaluate_daily_loss(today_pnl, prev_snap.equity, rc)
         for action in daily_halt_actions:
             events.append(action)  # type: ignore  # RiskAction ≠ DomainEvent; stored as JSON payload
 
@@ -754,7 +756,7 @@ def run(
                             symbol=cand.symbol,
                             action="buy",
                             quantity=int(sized.shares),
-                            order_type="MARKET",
+                            order_type="market",
                             status="submitted",
                             submitted_at=datetime.now(UTC),
                         )

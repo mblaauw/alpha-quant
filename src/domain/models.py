@@ -7,6 +7,8 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from domain.regime import Regime
+
 
 class Bar(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -161,7 +163,7 @@ class Candidate(BaseModel):
     date: date
     scores: dict[str, float]
     composite_score: float
-    regime: str
+    regime: Regime
     gate_results: dict[str, bool]
     block_reason: str | None = None
     sector: str | None = None
@@ -178,11 +180,13 @@ class Order(BaseModel):
 
     order_id: str
     symbol: str
-    action: str
+    action: Literal["buy", "sell"]
     quantity: float
-    order_type: str
+    order_type: Literal["market", "limit", "stop"]
     limit_price: float | None = None
-    status: str
+    status: Literal[
+        "pending", "submitted", "partially_filled", "filled", "cancelled", "expired", "new"
+    ]
     submitted_at: datetime | None = None
     fill_date: datetime | None = None
     filled_quantity: float | None = None
@@ -260,16 +264,6 @@ class UniverseMember(BaseModel):
     fail_reason: str | None = None
 
 
-class TickerRecord(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    ticker: str
-    cik: str
-    name: str
-    exchange: str | None = None
-    sic_code: int | None = None
-
-
 class CorporateAction(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -297,5 +291,5 @@ class PortfolioSnapshot(BaseModel):
     date: date
     cash: float
     equity: float
-    regime: str = "CAUTION"
+    regime: Regime = "CAUTION"
     book: str = "PAPER"

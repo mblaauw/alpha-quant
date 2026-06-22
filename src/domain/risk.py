@@ -190,14 +190,14 @@ def evaluate_drawdown(
 
 def evaluate_daily_loss(
     today_pnl: float,
-    equity: float,
+    equity_before_pnl: float,
     config: RiskConfig | None = None,
 ) -> list[RiskAction]:
     cfg = config or RiskConfig()
-    if equity <= 0:
+    if equity_before_pnl <= 0:
         return []
 
-    loss_pct = abs(today_pnl) / equity if today_pnl < 0 else 0.0
+    loss_pct = abs(today_pnl) / equity_before_pnl if today_pnl < 0 else 0.0
     if loss_pct >= cfg.daily_loss_halt_pct:
         return [
             RiskAction(

@@ -4,16 +4,15 @@
 
 | Port                  | Interface                                                         | Real Adapter                 | Fake Adapter          |
 |-----------------------|-------------------------------------------------------------------|------------------------------|-----------------------|
-| **MarketData**        | `daily_bars`, `latest_quote`, `trading_calendar`                  | LakeMarketData               | FixtureMarketData     |
-| **Fundamentals**      | `snapshot`, `earnings_calendar`                                   | LakeFundamentals             | FixtureFundamentals   |
-| **InsiderFeed**       | `cluster_transactions`, `recent_clusters`                         | LakeInsiderFeed              | FixtureInsiderFeed    |
-| **SentimentFeed**     | `mention_counts`, `baseline`                                      | LakeSentimentFeed            | FixtureSentimentFeed  |
+| **MarketData**        | `daily_bars`, `latest_quote`, `trading_calendar`                  | LakeMarketData               | FixtureLakeGateway    |
+| **Fundamentals**      | `snapshot`, `earnings_calendar`                                   | LakeFundamentals             | FixtureLakeGateway    |
+| **InsiderFeed**       | `cluster_transactions`, `recent_clusters`                         | LakeInsiderFeed              | FixtureLakeGateway    |
+| **SentimentFeed**     | `mention_counts`, `baseline`                                      | LakeSentimentFeed            | FixtureLakeGateway    |
 | **Clock**             | `now`, `today`, `market_date`                                     | SystemClock                  | VirtualClock          |
 | **Broker**            | `submit_order`, `cancel_order`, `portfolio`, `positions`, `fills` | AlpacaBroker                 | FakeBroker            |
-| **EventSink**         | `emit`, `query`                                                   | DuckDBEventSink / SqliteEventSink | FakeEventSink    |
+| **EventSink**         | `emit`, `query`                                                   | DuckDBEventSink              | FakeEventSink         |
 | **LLM**               | `explain`, `generate_card`                                        | OpenAILikeLLM                | CannedLLM             |
 | **Store** (composite) | bar/order/position/event/indicator/journal/admin stores           | CanonicalStore (DuckDB)      | FixtureStore          |
-| *(no port)*           | —                                                                | *(none)*                     | —                     |
 
 ---
 
@@ -103,5 +102,4 @@ create_store           → CanonicalStore
 - **SEC XBRL taxonomy**: US-GAAP only; IFRS filers (e.g., ASML) may return `None` for some fields
 - **AlpacaBroker `fills()`** returns `[]` (not implemented)
 - **RestLakeGateway** deferred until Alpha-Lake exposes PIT panels over REST
-- **FixtureInsiderFeed `recent_clusters()`** returns `[]` unconditionally
 - **Alpha-Lake data freshness**: depends on the lake's ingestion schedule; gap between source publication and lake availability creates a natural 1-day latency

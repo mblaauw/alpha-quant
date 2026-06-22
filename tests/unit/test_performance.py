@@ -1,6 +1,5 @@
 """Performance benchmarks for hot paths (scoring, ranking)."""
 
-import time
 from datetime import date, timedelta
 
 from domain.models import Bar, Candidate, IndicatorState

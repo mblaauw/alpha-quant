@@ -248,7 +248,6 @@ def run(
     sizing_config = SizingConfig(
         risk_per_trade_pct=config.portfolio.risk_per_trade_pct,
         max_position_pct=config.portfolio.max_position_pct,
-        max_gross_exposure=config.portfolio.max_gross_exposure,
     )
 
     prev = store.load_latest_portfolio_snapshot()
@@ -430,7 +429,6 @@ def backtest(
     sizing_config = SizingConfig(
         risk_per_trade_pct=config.portfolio.risk_per_trade_pct,
         max_position_pct=config.portfolio.max_position_pct,
-        max_gross_exposure=config.portfolio.max_gross_exposure,
     )
     bt_config = BacktestConfig(
         start_date=fd,
@@ -613,11 +611,13 @@ def ask(
     Ask questions about why decisions were made, what the system is thinking,
     or get concept explanations.
     """
+    from datetime import UTC, datetime
     from pathlib import Path
 
     from app.store import CanonicalStore
     from domain.ask import ask as ask_domain
     from domain.ask import is_concept_query
+    from domain.events import CandidateBlocked
 
     query_text = " ".join(query)
     store = CanonicalStore(base_path=Path("data"))
@@ -627,7 +627,11 @@ def ask(
         concepts_dir = Path(__file__).resolve().parent / "concepts"
         concept_card = _load_concept_card(query_text, concepts_dir)
 
-    result = ask_domain(query_text, store, concept_card=concept_card, ref_date=date.today())
+    cutoff_dt = datetime.combine(date.today(), datetime.min.time(), tzinfo=UTC)
+    all_events = store.load_events(since=cutoff_dt)
+    blocked_events = [e for e in all_events if isinstance(e, CandidateBlocked)]
+
+    result = ask_domain(query_text, blocked_events, concept_card=concept_card)
     console.print(result)
 
 

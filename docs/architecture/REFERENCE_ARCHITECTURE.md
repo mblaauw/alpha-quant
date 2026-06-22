@@ -102,7 +102,7 @@ Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamli
 
 ## 5. Architecture Decision Records
 
-31 ADRs document every technology and architectural decision.
+34 ADRs document every technology and architectural decision.
 
 | ADR | Title | Key Decision |
 |-----|-------|-------------|
@@ -137,6 +137,9 @@ Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamli
 | 0029 | Store Mixin Decomposition | 9 single-concern mixin files for CanonicalStore |
 | 0030 | Shadow Ablation Books | Parallel portfolios for mechanism evaluation |
 | 0031 | File-Based Halt Mechanism | Crash-safe .HALT file protocol |
+| 0032 | Alpha-Lake Data Plane | Unified data plane replaces vault/connectors/canonical store |
+| 0033 | Clock-Driven PIT Reads | All lake reads use `clock.now()` as `as_of` for determinism |
+| 0034 | LakeGateway Port | Single `typing.Protocol` port for all source-data reads |
 
 See [docs/adr/README.md](../adr/README.md) for full ADR index.
 
@@ -220,6 +223,6 @@ At the next open: fill queued orders against T+1 bars.
 - [DESIGN.md](../../DESIGN.md) — Detailed system design specification (v1.2)
 - [Model DSL](model.c4) — LikeC4 model definitions (all elements, relationships, deployment)
 - [Views DSL](views.c4) — LikeC4 view definitions (6 diagram layouts)
-- [ADR Index](../adr/README.md) — 31 Architecture Decision Records
+- [ADR Index](../adr/README.md) — 34 Architecture Decision Records
 - [ROADMAP.md](../planning/ROADMAP.md) — 6-phase implementation timeline
 - [BACKLOG.md](../planning/BACKLOG.md) — Full backlog with epics and stories

@@ -109,6 +109,7 @@ class FixtureStore(Store):
             return None
         return max(matching, key=lambda s: s.date)
 
+    @override
     def load_portfolio_snapshots(
         self, book: str = "PAPER", limit: int = 500
     ) -> list[PortfolioSnapshot]:

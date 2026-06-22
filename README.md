@@ -133,7 +133,7 @@ Degradation is derived from `LakeGateway.dataset_health()` — per-dataset stale
 |----------|-------------|
 | [Design Specification](DESIGN.md) | Full system design (v1.2) |
 | [Architecture Diagrams](docs/architecture/README.md) | C4 model (LikeC4 DSL) |
-| [ADR Log](docs/adr/README.md) | 31 Architecture Decision Records |
+| [ADR Log](docs/adr/README.md) | 34 Architecture Decision Records |
 | [Concept Cards](src/app/concepts/) | 21 mechanism descriptions (ablation, ATR, crowding, momentum, etc.) |
 | [GitHub Issues](https://github.com/mblaauw/alpha-quant/issues) | Active backlog — prioritised by P0–P3 |
 | [Roadmap](docs/planning/ROADMAP.md) | Beta release status and known limitations |

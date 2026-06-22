@@ -15,9 +15,7 @@ import pytest
 import streamlit as st
 from streamlit.testing.v1 import AppTest
 
-DASHBOARD_PATH = str(
-    Path(__file__).resolve().parent.parent.parent / "src" / "app" / "dashboard.py"
-)
+DASHBOARD_PATH = str(Path(__file__).resolve().parent.parent.parent / "src" / "app" / "dashboard.py")
 
 
 def _seed_state_db(db_path: Path, with_data: bool = True) -> None:
@@ -150,11 +148,11 @@ def _seed_state_db(db_path: Path, with_data: bool = True) -> None:
         conn.execute(
             "INSERT INTO events (event_id, event_type, timestamp, run_id, payload)"
             " VALUES ('evt-1', 'candidate_scored', '2026-06-12 17:30:01', 'run-001',"
-            " '{\"symbol\": \"AAPL\", \"composite_score\": 0.75}'),"
+            ' \'{"symbol": "AAPL", "composite_score": 0.75}\'),'
             " ('evt-2', 'candidate_blocked', '2026-06-12 17:30:02', 'run-001',"
-            " '{\"symbol\": \"TSLA\", \"gate\": \"risk\", \"reason\": \"Max positions reached\"}'),"
+            ' \'{"symbol": "TSLA", "gate": "risk", "reason": "Max positions reached"}\'),'
             " ('evt-3', 'stop_adjusted', '2026-06-12 17:30:03', 'run-001',"
-            " '{\"symbol\": \"AAPL\", \"old_stop\": 140.0, \"new_stop\": 145.0}')"
+            ' \'{"symbol": "AAPL", "old_stop": 140.0, "new_stop": 145.0}\')'
         )
         conn.execute(
             "INSERT INTO decisions (decision_id, run_id, symbol, decision_date,"
