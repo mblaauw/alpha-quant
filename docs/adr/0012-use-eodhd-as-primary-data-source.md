@@ -2,9 +2,9 @@
 
 ## Status
 
-Deprecated
+Superseded
 
-*Deprecated — EODHD has been replaced by **Tiingo** (daily OHLCV bars) and **SEC EDGAR** (fundamentals). EODHD remains available as a disabled fallback connector but is no longer the primary data source.*
+*Superseded by ADR-0032 (Alpha-Lake as the sole data plane). EODHD-specific connector logic is removed; all source data flows through Alpha-Lake.*
 
 ## Date
 

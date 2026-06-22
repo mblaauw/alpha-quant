@@ -1,3 +1,5 @@
+## Status: Historical (Closed)
+
 # Secret Handling and Leakage Audit — Results
 
 ## Findings

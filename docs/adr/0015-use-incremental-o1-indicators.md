@@ -51,6 +51,10 @@ Rationale:
 - RSI and ATR use modified Wilder smoothing (different from standard RMA/ATR implementations) — must be documented clearly in the concept cards
 - State corruption (e.g., NaN in a stored value) would silently affect all subsequent updates — the validation gate (validate.py) must catch this
 
+## Amendment (2026-06-21)
+
+Indicators remain local; cold start uses lake bars via LakeGateway.bars().
+
 ## References
 
 - DESIGN.md §3.5 (Derived state / incremental engine), §3.7 (Bootstrap)

@@ -51,6 +51,10 @@ Rationale:
 - Degradation must be monitored (alerting in P5.3 catches prolonged outages)
 - If Tiingo (the primary bar source) degrades, the system still runs but with degraded data — the user might not notice without checking the journal
 
+## Amendment (2026-06-21)
+
+Degradation keys on lake dataset health/freshness rather than per-connector health.
+
 ## References
 
 - DESIGN.md §3.2 (Connectors — Failure policy), §16 (Invariants)

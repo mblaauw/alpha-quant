@@ -53,6 +53,10 @@ Rationale:
 - Parquet files are not human-readable in a terminal (but DuckDB CLI can query them)
 - DuckDB is not designed for concurrent writership (single-writer is fine for daily batch writes)
 
+## Amendment (2026-06-21)
+
+Analytical store role removed from Alpha-Quant; source-data Parquet reads delegated to Alpha-Lake.
+
 ## References
 
 - DESIGN.md §3.4 (Canonical store), §3.5 (Derived state), §3.8 (Library decisions)

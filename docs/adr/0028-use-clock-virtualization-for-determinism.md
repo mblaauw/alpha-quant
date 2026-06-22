@@ -57,6 +57,10 @@ Rationale:
 - An extra indirection layer for what could be `datetime.now(UTC).date()` in live mode
 - The `VirtualClock` must be carefully reset between CI runs to avoid state leakage
 
+## Amendment (2026-06-21)
+
+Clock drives lake `as_of` for all PIT reads.
+
 ## References
 
 - ADR-0017 (Golden Replay CI)

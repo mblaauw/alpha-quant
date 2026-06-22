@@ -54,6 +54,10 @@ Rationale:
 - Team must understand the recurrence math (Wilder smoothing, EMA alpha)
 - No TA-Lib's performance for non-recurrence indicators (but none are needed for v1)
 
+## Amendment (2026-06-21)
+
+Indicators remain local; bars now sourced from Alpha-Lake via LakeGateway.
+
 ## References
 
 - DESIGN.md §3.5 (Derived state), §3.8 (Library decisions)

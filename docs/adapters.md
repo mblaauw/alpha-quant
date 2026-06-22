@@ -2,124 +2,106 @@
 
 ## Port → Implementation Matrix
 
-| Port                  | Interface                                                         | Real Adapter                                 | Fake Adapter         |
-|-----------------------|-------------------------------------------------------------------|----------------------------------------------|----------------------|
-| **MarketData**        | `daily_bars`, `latest_quote`, `trading_calendar`                  | TiingoConnector, AlpacaConnector (redundant) | FixtureMarketData    |
-| **Fundamentals**      | `snapshot`, `earnings_calendar`                                   | SECFundamentalsConnector, EODHDConnector     | FixtureFundamentals  |
-| **InsiderFeed**       | `cluster_transactions`, `recent_clusters`                         | OpenInsiderConnector                         | FixtureInsiderFeed   |
-| **SentimentFeed**     | `mention_counts`, `baseline`                                      | RedditSentimentConnector                     | FixtureSentimentFeed |
-| **Clock**             | `now`, `today`, `market_date`                                     | SystemClock                                  | VirtualClock         |
-| **Broker**            | `submit_order`, `cancel_order`, `portfolio`, `positions`, `fills` | AlpacaBroker                                 | FakeBroker           |
-| **EventSink**         | `emit`, `query`                                                   | DuckDBEventSink / SqliteEventSink            | FakeEventSink        |
-| **LLM**               | `explain`, `generate_card`                                        | OpenAILikeLLM                                | CannedLLM            |
-| **Store** (composite) | bar/order/position/event/indicator/journal/admin stores           | *(none — CanonicalStore is app-layer)*       | FixtureStore         |
-| *(no port)*           | `ticker_map`, `check_connection`                                  | SECConnector                                 | —                    |
+| Port                  | Interface                                                         | Real Adapter                 | Fake Adapter          |
+|-----------------------|-------------------------------------------------------------------|------------------------------|-----------------------|
+| **MarketData**        | `daily_bars`, `latest_quote`, `trading_calendar`                  | LakeMarketData               | FixtureMarketData     |
+| **Fundamentals**      | `snapshot`, `earnings_calendar`                                   | LakeFundamentals             | FixtureFundamentals   |
+| **InsiderFeed**       | `cluster_transactions`, `recent_clusters`                         | LakeInsiderFeed              | FixtureInsiderFeed    |
+| **SentimentFeed**     | `mention_counts`, `baseline`                                      | LakeSentimentFeed            | FixtureSentimentFeed  |
+| **Clock**             | `now`, `today`, `market_date`                                     | SystemClock                  | VirtualClock          |
+| **Broker**            | `submit_order`, `cancel_order`, `portfolio`, `positions`, `fills` | AlpacaBroker                 | FakeBroker            |
+| **EventSink**         | `emit`, `query`                                                   | DuckDBEventSink / SqliteEventSink | FakeEventSink    |
+| **LLM**               | `explain`, `generate_card`                                        | OpenAILikeLLM                | CannedLLM             |
+| **Store** (composite) | bar/order/position/event/indicator/journal/admin stores           | CanonicalStore (DuckDB)      | FixtureStore          |
+| *(no port)*           | —                                                                | *(none)*                     | —                     |
 
 ---
 
-## Category: Bars (Daily OHLCV)
+## LakeGateway — Data Plane Port
 
-| Adapter             | Source                       | Auth          | Adj Close          | Status                                      |
-|---------------------|------------------------------|---------------|--------------------|---------------------------------------------|
-| **TiingoConnector** | `api.tiingo.com`             | `?token=`     | ✅ `adjClose`       | **Active** — free tier, ~500-1000 calls/hr  |
-| AlpacaConnector     | `data.alpaca.markets`        | key+secret    | ❌ (close only)     | **Redundant** — not wired in factory        |
-| EODHDConnector      | `eodhd.com/api`              | `?api_token=` | ✅ `adjusted_close` | **Unused for bars** — used for fundamentals |
-| FixtureMarketData   | `fixtures/v1/bars/*.parquet` | —             | ✅                  | **Test** — deterministic replay             |
+All market, fundamental, insider, and sentiment data flows through a single port: `LakeGateway` (`ports/lake.py`). Every read is a point-in-time (PIT) query against Alpha-Lake, clock-driven by `as_of` — the pipeline never ingests raw data directly.
 
-## Category: Fundamentals
+| Method | Returns | Purpose |
+|--------|---------|---------|
+| `bars(symbol, start, end, as_of, price_mode)` | `list[Bar]` | Daily OHLCV bars with split/dividend adjustment |
+| `latest_bar(symbol, as_of)` | `Bar \| None` | Most recent bar available as of a timestamp |
+| `trading_calendar(start, end)` | `list[TradingDay]` | Market-open calendar |
+| `fundamentals(symbol, as_of)` | `FundamentalsSnapshot \| None` | Latest fundamentals snapshot |
+| `earnings_calendar(start, end, as_of)` | `list[EarningsEntry]` | Earnings report dates |
+| `insider_transactions(symbol, as_of)` | `list[InsiderTransaction]` | Insider filings |
+| `mention_counts(symbol, days, as_of)` | `list[MentionCount]` | Social-media mention counts |
+| `dataset_health()` | `dict[str, object]` | Per-dataset staleness and availability |
+| `pin_snapshot(snapshot_id)` | `None` | Pin a specific lake snapshot for replay |
 
-| Adapter                     | Source                              | Auth       | Fields                                                      | Status                                    |
-|-----------------------------|-------------------------------------|------------|-------------------------------------------------------------|-------------------------------------------|
-| **SECFundamentalsConnector** | `data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json` | User-Agent | EPS TTM, revenue, NI, OCF, debt, equity, liabilities, accruals | **Active** — free, no API key required   |
-| EODHDConnector              | `eodhd.com/api`                     | `?api_token=` | mcap, PE, EPS, D/E, OCF, accruals, revenue, sector/industry | **Fallback** — needs valid API key (403) |
-| FixtureFundamentals         | `fixtures/v1/fundamentals/*.parquet` | —          | Subset (mcap, PE, EPS, sector)                              | **Test**                                  |
+### Adapter: InProcessLakeGateway
 
-### SEC XBRL → FundamentalsSnapshot mapping
+`adapters/real/lake_inprocess.py` — imports the `alpha_lake` library in-process, connecting to the lake's DuckDB catalog directly. Used in live mode.
 
-| Snapshot field | US-GAAP concept(s) | Method |
-|---|---|---|
-| `eps_ttm` | `EarningsPerShareDiluted` | `_sum_quarterly` — sum last 4 Q entries |
-| `net_income` | `NetIncomeLoss` | `_latest_annual` — latest `fp=FY` |
-| `revenue` | `Revenues` → `RevenueFromContractWithCustomerExcludingAssessedTax` | Fallback chain |
-| `operating_cash_flow` | `NetCashProvidedByOperatingActivities` → `...ContinuingOperations` → `NetCashProvidedByUsedInOperatingActivities` | Fallback chain (3 levels) |
-| `total_debt` | `LongTermDebtNoncurrent` + `ShortTermBorrowings` | `_sum_annual` — sum both |
-| `total_equity` | `StockholdersEquity` | `_latest_annual` |
-| `total_liabilities` | `Liabilities` | `_latest_annual` |
-| `accruals` | computed: `net_income - operating_cash_flow` | — |
-| `market_cap`, `pe_ratio`, etc. | Not in CompanyFacts | `None` |
+- Resolves symbols to security IDs via `alpha_lake.security_master`
+- Reads PIT-panel data via `alpha_lake.serving.read_bars_adjusted()`
+- Queries per-dataset views (`fundamentals`, `earnings_calendar`, `insider_tx`, `attention_metrics`) with `available_at <= as_of` filtering
+- Returns domain-typed models with `adapter="alpha_lake"` lineage tag
 
-## Category: Insider Transactions
+### Adapter: FixtureLakeGateway
 
-| Adapter | Source | Auth | Coverage | Status |
-|---|---|---|---|---|
-| **OpenInsiderConnector** | `openinsider.com` (HTML scrape) | None | Last 30 days, max 1000 rows | **Active** — slow (0.33 tps), fragile to HTML changes |
-| FixtureInsiderFeed | `fixtures/v1/insider_tx/*.parquet` | — | Deterministic | **Test** — `recent_clusters()` returns `[]` |
+`adapters/fake/lake_fixture.py` — reads fixture parquet files shaped like lake views, with PIT visibility filtering (`available_at <= as_of`). Used in fixture/replay/test mode.
 
-## Category: Sentiment / Mentions
+- Reads `.parquet` files from `fixtures/{version}/lake/` or fixture root
+- Filters rows by `available_at` for deterministic PIT replay
+- Supports `pin_snapshot()` for snapshot-bound replays
+- Returns domain-typed models with `adapter="alpha_lake_fixture"` lineage tag
 
-| Adapter | Source | Auth | Coverage | Status |
-|---|---|---|---|---|
-| **RedditSentimentConnector** | `reddit.com/r/wallstreetbets+stocks` | None | ~100 most recent posts per subreddit | **Active** — slow (0.167 tps), Reddit now blocks unauthenticated JSON |
-| FixtureSentimentFeed | `fixtures/v1/mentions/*.parquet` | — | Deterministic | **Test** |
+### REST mode (deferred)
+
+`RestLakeGateway` is sketched in `factory.py` but raises `NotImplementedError`. It will be implemented when Alpha-Lake deploys PIT-serving panels over REST.
 
 ---
 
-## Shared Infrastructure
+## Lake Adapters (Port Wrappers)
 
-| Component | File | Role |
-|---|---|---|
-| **BaseConnector** | `adapters/real/base_connector.py` | HTTP client + token-bucket rate limiter + tenacity retry (5 attempts, 429-aware backoff) + vault lineage |
-| **TokenBucket** | `adapters/real/token_bucket.py` | Thread-safe rate limiter used by every real connector |
-| **FetchResult** | `adapters/real/base_connector.py` | Dataclass pairing `httpx.Response` with optional `fetch_id` for data lineage |
+The `LakeMarketData`, `LakeFundamentals`, `LakeInsiderFeed`, and `LakeSentimentFeed` classes in `adapters/real/lake_data.py` wrap `LakeGateway` to implement the individual domain port interfaces (`MarketData`, `Fundamentals`, `InsiderFeed`, `SentimentFeed`). Each one delegates to the lake with `as_of=self._clock.now()`.
 
 ---
 
-## Multi-Adapter Fundamentals
+## Broker
 
-The fundamentals port supports **multiple concurrent adapters**. When more than one source
-is enabled in `[adapters.fundamentals]`, each adapter's data is stored tagged with its
-`adapter` column (e.g., `sec_edgar`, `eodhd`). The `primary` setting controls which
-adapter is used for the live decision pipeline (via `CompositeFundamentals.snapshot()`).
+| Adapter | Source | Auth | Status |
+|---------|--------|------|--------|
+| **AlpacaBroker** | `alpaca-py` trading SDK | key+secret | **Inactive in v1** — live execution out of scope; wired but not used |
+| FakeBroker | In-memory | — | **Test** — deterministic fills for replay/backtest |
 
-```toml
-[adapters.fundamentals]
-primary = "sec_edgar"
+---
 
-[adapters.fundamentals.sources.sec_edgar]
-enabled = true
+## LLM
 
-[adapters.fundamentals.sources.eodhd]
-enabled = false
-```
+| Adapter | Source | Auth | Status |
+|---------|--------|------|--------|
+| **OpenAILikeLLM** | OpenAI-compatible API (OpenAI, OpenRouter) | `api_key` | **Active** — explainer only, never in decision path |
+| CannedLLM | Static templates | — | **Test** — deterministic LLM responses |
 
 ---
 
 ## Wiring (factory.py → live mode)
 
 ```
-create_market_data     → TiingoConnector
-create_fundamentals    → SECFundamentalsConnector | CompositeFundamentals (multi)
-create_insider_feed    → OpenInsiderConnector
-create_sentiment_feed  → RedditSentimentConnector
+create_lake_gateway    → FixtureLakeGateway / InProcessLakeGateway
+create_market_data     → LakeMarketData(lake_gateway, clock)
+create_fundamentals    → LakeFundamentals(lake_gateway, clock)
+create_insider_feed    → LakeInsiderFeed(lake_gateway, clock)
+create_sentiment_feed  → LakeSentimentFeed(lake_gateway, clock)
 create_clock           → SystemClock
 create_broker          → AlpacaBroker
 create_llm             → OpenAILikeLLM
 create_event_sink      → DuckDBEventSink
 create_store           → CanonicalStore
-create_sec_connector   → SECConnector
 ```
 
 ---
 
 ## Gaps & Known Limitations
 
-- **SECFundamentalsConnector `earnings_calendar()`** returns `[]` — SEC provides actuals only; no estimates API
 - **SEC XBRL taxonomy**: US-GAAP only; IFRS filers (e.g., ASML) may return `None` for some fields
-- **SEC revenue concept varies**: different companies use different XBRL tags; `Revenues` + `RevenueFromContractWithCustomerExcludingAssessedTax` covers most US filers
-- **Tiingo `latest_quote`** uses last close as bid/ask proxy (no real quote endpoint on free tier)
-- **Tiingo `trading_calendar`** is weekday-only — no market holiday awareness
 - **AlpacaBroker `fills()`** returns `[]` (not implemented)
-- **OpenInsider** HTML scraping is fragile; rate limited to 0.33 tps
-- **Reddit** now requires authentication for JSON access (403 on public endpoint)
-- **EODHD fundamentals** kept as configurable fallback but requires valid API key (currently 403)
+- **RestLakeGateway** deferred until Alpha-Lake exposes PIT panels over REST
 - **FixtureInsiderFeed `recent_clusters()`** returns `[]` unconditionally
+- **Alpha-Lake data freshness**: depends on the lake's ingestion schedule; gap between source publication and lake availability creates a natural 1-day latency

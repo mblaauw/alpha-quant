@@ -39,24 +39,24 @@ Six diagrams model the system at Levels 1–4 of the C4 model, rendered via Like
 
 | Level | Diagram | Source | Description |
 |-------|---------|--------|-------------|
-| L1 | System Context | `views/systemContext.png` | System boundary, user, and all 6 external dependencies. |
-| L2 | Container | `views/container.png` | 10 containers, 2 data stores, external systems. |
-| L3 | Data Layer | `views/dataLayerComponents.png` | 7 components in the four-zone architecture. |
+| L1 | System Context | `views/systemContext.png` | System boundary, user, and external systems (Alpha-Lake, LLM Provider). |
+| L2 | Container | `views/container.png` | 10 containers, 1 data store, external systems. |
+| L3 | Data Layer | `views/dataLayerComponents.png` | 4 components: LakeGateway, indicator engine, validator, catalog. |
 | L3 | Decision Engine | `views/decisionEngineComponents.png` | 8 mechanisms (M1–M8), position sizer, risk evaluator. |
 | L3 | Fill Model & Portfolio | `views/fillModelPortfolioComponents.png` | 4 fill actions, portfolio, shadow books, consistency checker. |
 | L4 | Deployment | `views/deployment.png` | Single-machine deployment with processes and storage. |
 
 ### 3.1 System Context (L1)
 
-The user (retail investor) interacts with Alpha-Quant via CLI and Streamlit dashboard. The system fetches data from 7 external sources: **Tiingo** (primary daily bars, earnings calendar), **SEC EDGAR** (company ticker mapping), **SEC EDGAR CompanyFacts** (fundamentals snapshots — OCF, D/E, accruals), **Alpaca Data** (quotes, calendar — data only, no trading), **OpenInsider** (insider transactions), **Reddit** (mention counts for crowding veto), and **LLM Provider** (OpenAI/OpenRouter for narration).
+The user (retail investor) interacts with Alpha-Quant via CLI and Streamlit dashboard. The system reads all market, fundamental, insider, and sentiment data from a single external software system: **Alpha-Lake** (point-in-time data plane). An **LLM Provider** (OpenAI/OpenRouter) generates narrated journal and explanations — never in the decision path.
 
 ### 3.2 Container Diagram (L2)
 
-Alpha-Quant contains 10 containers and 2 internal data stores:
+Alpha-Quant contains 10 containers and 1 internal data store:
 
 - **CLI** — Typer+Rich-based entry point for all operations
 - **Pipeline Engine** — APScheduler-driven daily orchestrator (17:30 ET)
-- **Data Layer** — Four zones: connectors → vault → canonical store → derived state
+- **Data Layer** — LakeGateway to Alpha-Lake, indicator engine, validation gates, catalog
 - **Domain Core** — Pure functions: M1–M8, position sizing, risk management
 - **Fill Model** — Pessimistic fill semantics shared by all execution realities
 - **Paper Portfolio** — Authoritative internal portfolio (transactional DuckDB)
@@ -65,11 +65,10 @@ Alpha-Quant contains 10 containers and 2 internal data stores:
 - **Dashboard** — Streamlit read-only monitoring
 - **Event Log** — Append-only typed event stream
 - **DuckDB State Store** — Transactional state (ACID)
-- **Parquet Archive** — Analytical data (date-partitioned)
 
 ### 3.3 Component Diagrams (L3)
 
-**Data Layer** (7 components): Connectors (7 implementations sharing httpx + tenacity), Raw Vault (append-only zstd), Normalizer (pydantic parsers), Canonical Writer (PyArrow), Derive Engine (numpy indicator recurrences), Validator (~15 predicate checks), Catalog (versioning/manifest).
+**Data Layer** (4 components): LakeGateway (port to Alpha-Lake with InProcess and REST implementations), Derive Engine (numpy indicator recurrences), Validator (~15 predicate checks), Catalog (versioning/manifest).
 
 **Decision Engine** (10 components): M1 Universe, M2 Regime, M3 Technical, M4 Quality, M5 Insider, M6 Crowding, M7 Blackout, M8 Ranker, Position Sizer, Risk Evaluator. Gates are hard filters; scores feed the composite M8 rank.
 
@@ -77,7 +76,7 @@ Alpha-Quant contains 10 containers and 2 internal data stores:
 
 ### 3.4 Deployment Diagram (L4)
 
-Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamlit Dashboard) and 5 storage locations (Vault Directory, Canonical Directory, DuckDB State Database, Config File, Halt Lockfile). All processes share the local filesystem; the dashboard reads DuckDB concurrently.
+Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamlit Dashboard) and 3 storage locations (DuckDB State Database, Config File, Halt Lockfile). All processes share the local filesystem; the dashboard reads DuckDB concurrently.
 
 ## 4. Technology Stack
 
@@ -86,8 +85,7 @@ Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamli
 | Runtime | Python 3.14 | Latest stable; all core deps provide 3.14 wheels |
 | Package manager | uv | Rust-based, 10-100x faster resolution, deterministic lockfile |
 | HTTP client | httpx | Sync+async, HTTP/2, configurable timeouts |
-| Retry/backoff | tenacity | Declarative per-connector policies |
-| HTML parsing | selectolax | Fast, lenient |
+| Data plane | Alpha-Lake | Point-in-time PIT data for bars, fundamentals, insider, sentiment, earnings |
 | Validation | pydantic v2 | Parse-don't-validate at zone boundaries |
 | Analytical SQL | DuckDB | Zero-ops parquet queries, embedded |
 | Columnar storage | PyArrow / Parquet (zstd) | Standard columnar format |
@@ -98,7 +96,6 @@ Single-machine deployment with 3 processes (APScheduler Scheduler, CLI, Streamli
 | Logging | structlog (JSON) | Events + logs share shape |
 | Testing | pytest | Golden replay, integration tests, unit tests |
 | LLM client | Direct httpx (no SDK) | Single adapter for OpenAI + OpenRouter |
-| Market data | Tiingo (bars, earnings) + SEC EDGAR (fundamentals) | Free tiers, reliable; EODHD kept as disabled fallback |
 | Dashboard | Streamlit | Read-only, zero pipeline coupling |
 | CLI | Typer + Rich | Type-hint-driven commands, formatted tables/panels/progress |
 | Diagramming | LikeC4 | DSL-driven C4 diagrams, PNG export |
@@ -188,7 +185,7 @@ Every mechanism must show non-negative walk-forward Sharpe impact or be flagged 
 
 Single-machine, zero-server deployment on a developer workstation or headless server. The daily pipeline runs at **17:30 ET** via APScheduler (cron fallback) in 9 sequential steps:
 
-1. Ingest — Tiingo daily bars, SEC EDGAR fundamentals snapshot, earnings calendar, OpenInsider, Reddit, SEC ticker map (weekly)
+1. Ingest — read PIT data from Alpha-Lake (bars, fundamentals, insider, sentiment, earnings)
 2. Validate — gaps/staleness/splits → `DATA_HALT`?
 3. Derive — incremental indicator state, month-end calc
 4. Regime — M2 classification
@@ -202,14 +199,13 @@ At the next open: fill queued orders against T+1 bars.
 
 ### 8.1 Data Layout
 
-- Raw vault: `vault/{source}/{yyyy}/{mm}/{dd}/{fetch_id}.zst`
-- Canonical data: `canonical/bars/date=*/` (Parquet, date-partitioned)
+- PIT data: Alpha-Lake (bars, fundamentals, insider, sentiment, earnings)
 - Transactional state: `data/state.db` (DuckDB)
 
 ### 8.2 Operational Controls
 
 - **Halt**: `alpha-quant halt` creates a lockfile that blocks the scheduler
-- **Backup**: DuckDB state store copy + vault sync
+- **Backup**: DuckDB state store copy
 - **Monitoring**: alerts on data staleness, source degradation, consistency violations
 - **Chaos testing**: kill mid-run, restart, verify idempotency; forced staleness → halt + alert
 

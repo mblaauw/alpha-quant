@@ -52,6 +52,10 @@ Rationale:
 - DuckDB connection management is slightly more involved than sqlite3 (DuckDB connections are not lightweight for high-concurrency OLTP).
 - If the manifest grows very large (millions of rows), DuckDB's lack of B-tree index support for single-row lookups might impact read performance — mitigated by content-addressable fetch_id lookups being hash-equality, not range scans.
 
+## Amendment (2026-06-21)
+
+Vault retired; manifest no longer used.
+
 ## References
 
 - ADR-0006: DuckDB + Parquet for the Analytical Store

@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Superseded
+
+*Superseded by ADR-0032 (Alpha-Lake as the sole data plane). The per-connector SEC SQLite cache is replaced by the lake's dataset cache.*
 
 ## Date
 

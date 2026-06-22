@@ -1,3 +1,5 @@
+## Status: Historical (Closed)
+
 # OpenInsider HTML Parsing Robustness Audit — Results
 
 ## Current CSS Selectors

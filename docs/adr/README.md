@@ -17,7 +17,7 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0009](./0009-use-pessimistic-fill-model.md) | Use Custom Pessimistic Fill Model | Accepted | 2026-06-10 |
 | [0010](./0010-use-custom-event-driven-backtester.md) | Use Custom Event-Driven Backtester | Accepted | 2026-06-10 |
 | [0011](./0011-use-httpx-for-llm-integration.md) | Use Direct httpx (No SDK) for LLM Integration | Accepted | 2026-06-10 |
-| [0012](./0012-use-eodhd-as-primary-data-source.md) | Use EODHD as the Primary Market Data Source | **Deprecated** | 2026-06-10 |
+| [0012](./0012-use-eodhd-as-primary-data-source.md) | Use EODHD as the Primary Market Data Source | **Superseded** | 2026-06-10 |
 | [0013](./0013-use-structlog-structured-logging.md) | Use structlog with JSON Format for Structured Logging | Accepted | 2026-06-10 |
 | [0014](./0014-use-streamlit-for-dashboard.md) | Use Streamlit for the Read-Only Dashboard | Accepted | 2026-06-10 |
 | [0015](./0015-use-incremental-o1-indicators.md) | Use Incremental O(1) Indicator Engine | Accepted | 2026-06-10 |
@@ -30,13 +30,16 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0022](./0022-use-paper-portfolio-engine.md) | Use Paper Portfolio Engine as Authoritative State Manager | Accepted | 2026-06-12 |
 | [0023](./0023-use-pipeline-orchestrator.md) | Use Pipeline Orchestrator for Daily Run Sequencing | Accepted | 2026-06-12 |
 | [0024](./0024-use-self-consistency-invariants.md) | Use Self-Consistency Invariants for Portfolio Integrity | Accepted | 2026-06-12 |
-| [0025](./0025-use-sec-connector-sqlite-cache.md) | Use SQLite Cache for SEC Connector | Accepted | 2026-06-12 |
-| [0026](./0026-use-content-addressed-vault.md) | Use Content-Addressed Vault for Raw Data Storage | Accepted | 2026-06-12 |
+| [0025](./0025-use-sec-connector-sqlite-cache.md) | Use SQLite Cache for SEC Connector | **Superseded** | 2026-06-12 |
+| [0026](./0026-use-content-addressed-vault.md) | Use Content-Addressed Vault for Raw Data Storage | **Superseded** | 2026-06-12 |
 | [0027](./0027-use-dependency-pruning.md) | Dependency Pruning — polars, SQLAlchemy, APScheduler CLI, 50-Day Prune | Accepted | 2026-06-13 |
 | [0028](./0028-use-clock-virtualization-for-determinism.md) | Clock Virtualization for Deterministic Replay | Accepted | 2026-06-15 |
 | [0029](./0029-use-store-mixin-decomposition.md) | Store Mixin Decomposition for Schema Organization | Accepted | 2026-06-15 |
 | [0030](./0030-use-shadow-ablation-books.md) | Shadow Ablation Books for Mechanism Evaluation | Accepted | 2026-06-15 |
 | [0031](./0031-use-file-based-halt-mechanism.md) | File-Based Halt Mechanism for System Safety | Accepted | 2026-06-15 |
+| [0032](./0032-alpha-lake-data-plane.md) | Alpha-Lake as the Sole Data Plane | **Accepted** | 2026-06-21 |
+| [0033](./0033-pit-reads-via-clock-asof.md) | PIT Reads via Clock-Driven `as_of` | **Accepted** | 2026-06-21 |
+| [0034](./0034-lake-gateway-port.md) | LakeGateway Port and Adapters | **Accepted** | 2026-06-21 |
 
 ## Status Meanings
 
