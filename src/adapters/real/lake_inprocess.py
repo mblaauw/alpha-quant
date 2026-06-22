@@ -25,8 +25,17 @@ class InProcessLakeGateway(LakeGateway):
     """
 
     def __init__(self, config_path: str | Path, price_mode: str = "split_adjusted") -> None:
-        config_mod = import_module("alpha_lake.config")
-        catalog_mod = import_module("alpha_lake.catalog")
+        try:
+            config_mod = import_module("alpha_lake.config")
+            catalog_mod = import_module("alpha_lake.catalog")
+        except ModuleNotFoundError as exc:
+            if exc.name == "alpha_lake":
+                raise ModuleNotFoundError(
+                    "alpha_lake is not available. "
+                    "Ensure the alpha-lake Docker container is running and accessible "
+                    "via lake.base_url, or use lake.mode='fixture' for fixture-based operation."
+                ) from exc
+            raise
         cfg = config_mod.load_config(str(config_path))
         self._con = catalog_mod.connect(cfg)
         self._snapshot_id: str | None = None

@@ -64,6 +64,7 @@ def run_daily_pipeline(
 ) -> dict[str, Any]:
     config = load_config(config_path)
     config.data.mode = mode
+    config.lake.mode = mode
 
     if is_halted():
         logger.info("scheduler_skip_halted")

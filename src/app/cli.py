@@ -188,6 +188,7 @@ def run(
 
     config = _load_config_cached(ctx)
     config.data.mode = mode
+    config.lake.mode = mode
 
     if is_halted():
         _print_error("Pipeline Halted", "Use alpha-quant halt --resume to clear")
@@ -898,6 +899,7 @@ def schedule(
     """
     config = _load_config_cached(ctx)
     config.data.mode = mode
+    config.lake.mode = mode
 
     from app.scheduler import setup_scheduler
 
