@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class LLMConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
     provider: str = "openrouter"
     model: str = "anthropic/claude-sonnet-4"
     base_url: str = ""

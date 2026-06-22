@@ -17,7 +17,7 @@ from domain.loop_helpers import (  # noqa: F401 — re-export for consumers
     size_entry,
 )
 from domain.models import Bar, Candidate, IndicatorState
-from domain.regime import REGIME_MULTIPLIERS
+from domain.regime import REGIME_MULTIPLIERS, Regime
 from domain.regime import detect as detect_regime
 
 
@@ -30,7 +30,7 @@ def ensure_spy(symbols: list[str]) -> list[str]:
 
 def detect_regime_and_multiplier(
     spy_state: IndicatorState | None,
-) -> tuple[str, float]:
+) -> tuple[Regime, float]:
     if spy_state is not None:
         regime = detect_regime(spy_state, vix_level=15.0, breadth=0.6)
     else:
@@ -43,7 +43,7 @@ def decide_candidates(
     all_bars: dict[str, list[Bar]],
     indicator_states: dict[str, IndicatorState],
     run_date: date,
-    regime: str,
+    regime: Regime,
     mechanism_data: MechanismData | None = None,
     ablation: AblationConfig | None = None,
 ) -> list[Candidate]:

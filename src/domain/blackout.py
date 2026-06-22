@@ -22,7 +22,7 @@ def check(
         return "PASS"
 
     blackout_start = _trading_days_before(report, window_days)
-    if blackout_start <= target_date < report:
+    if blackout_start <= target_date <= report:
         return "BLOCK"
 
     return "PASS"

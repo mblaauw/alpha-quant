@@ -96,7 +96,7 @@ def config_file(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def isolated_dir(tmp_path: Path) -> Generator[Path, None, None]:
+def isolated_dir(tmp_path: Path) -> Generator[Path]:
     """Create an isolated temp dir and chdir into it."""
     cwd = Path.cwd()
     os.chdir(str(tmp_path))

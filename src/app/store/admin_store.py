@@ -14,7 +14,6 @@ from ports.store import AdminStore
 
 class AdminStoreMixin(AdminStore):
     _state_conn: duckdb.DuckDBPyConnection
-    _analytical: duckdb.DuckDBPyConnection
     _base: Path
 
     @contextmanager
@@ -122,5 +121,4 @@ class AdminStoreMixin(AdminStore):
 
     @override
     def close(self) -> None:
-        self._analytical.close()
         self._state_conn.close()

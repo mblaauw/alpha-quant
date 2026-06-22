@@ -139,7 +139,6 @@ def run_daily_pipeline(
     sizing_config = SizingConfig(
         risk_per_trade_pct=config.portfolio.risk_per_trade_pct,
         max_position_pct=config.portfolio.max_position_pct,
-        max_gross_exposure=config.portfolio.max_gross_exposure,
     )
 
     # Initialize shadow books on first run

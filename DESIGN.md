@@ -36,12 +36,10 @@ src/
 ├── domain/                      # pure functions, no I/O (§1 rationale)
 │   ├── __init__.py              # re-exports models + events
 │   ├── models.py                # all pydantic data models (frozen)
-│   ├── events.py                # 22 discriminated domain event types (plus BaseDomainEvent base)
-│   ├── normalize.py             # boundary parsing: bytes → pydantic models
-│   ├── _normalize_helpers.py    # normalization utility functions
+│   ├── events.py                # 21 discriminated domain event types (plus BaseDomainEvent base)
 │   ├── validate.py              # quality gates → QUARANTINE/DATA_HALT
 │   ├── derive.py                # incremental O(1) indicator engine (numpy)
-│   ├── universe.py              # M1 universe selection
+│   ├── regime.py                # M2 regime detection
 │   ├── regime.py                # M2 regime detection
 │   ├── technical.py             # M3 technical score
 │   ├── fundamental.py           # M4 fundamental quality gate
@@ -60,13 +58,10 @@ src/
 │   ├── narration.py             # narration context builder
 │   ├── journal.py               # daily journal generator
 │   ├── reporting.py             # weekly/monthly report generators
-│   ├── fact_check.py            # LLM fact-checking
 │   ├── ask.py                   # natural-language query
 │   ├── calendar.py              # trading calendar utilities
-│   ├── corp_actions.py          # corporate action adjustment factors
 │   ├── degradation.py           # lake-health-based degradation fallback
 │   ├── constants.py             # shared constants
-│   └── exceptions.py            # AlphaQuantError, DataNormalizationError
 ├── ports/                       # ABC interfaces for all external dependencies
 │   ├── __init__.py              # re-exports
 │   ├── broker.py                # port interface; FakeBroker and AlpacaBroker adapters exist, live execution out of v1 scope (§9.4)
@@ -106,16 +101,12 @@ src/
 │   ├── catalog.py               # fixture integrity verification
 │   ├── config.py                # pydantic-settings + TOML loading
 │   ├── dashboard.py             # Streamlit dashboard
-│   ├── event_log.py             # typed event log
 │   ├── factory.py               # dependency injection factory
 │   ├── fixtures.py              # freeze_bundle: parquet + manifest writer
 │   ├── halt.py                  # halt file management
-│   ├── paper.py                 # paper trading engine
 │   ├── pipeline.py              # main daily pipeline (reads from lake, no ingest)
-│   ├── pipeline_steps.py        # pipeline step models
 │   ├── replay.py                # golden replay harness
 │   ├── scheduler.py             # APScheduler-based daily scheduling
-│   ├── step_models.py           # pipeline step data models
 │   └── store/                   # DuckDB-backed state store (decisions, orders, positions, indicators)
 │       ├── __init__.py          # re-exports
 │       ├── admin_store.py       # run metadata, config snapshots
@@ -144,7 +135,7 @@ src/
 └── config.local.toml.example    # local override template
 ```
 
-**Rationale for domain/ layout:** `normalize.py`, `validate.py`, and `derive.py` live in `domain/` because they are pure functions with no I/O — they take data and return data. Normalization is boundary parsing (HTTP response bytes → pydantic models), but the parsing itself has no adapter dependency. This keeps the domain core complete (all data transformations are together) while ports and adapters remain separate in their own layers.
+**Rationale for domain/ layout:** `validate.py` and `derive.py` live in `domain/` because they are pure functions with no I/O — they take data and return data. This keeps the domain core complete (all data transformations are together) while ports and adapters remain separate in their own layers.
 
 **Rules:** `domain/` imports nothing from `adapters/`. Every connector has a fixture-backed fake twin on the same port. The pipeline never knows which reality it runs in.
 

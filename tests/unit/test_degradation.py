@@ -3,7 +3,6 @@
 from datetime import UTC, datetime, timedelta
 
 from domain.degradation import (
-    BAR_STALENESS_HOURS_DEFAULT,
     DegradationStatus,
     blackout_window_days,
     health_to_degradation,

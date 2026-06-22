@@ -1,7 +1,7 @@
 """AlpacaBroker — live trading via alpaca-py trading API."""
 
 from datetime import UTC, datetime
-from typing import Any, override
+from typing import Any, Literal, cast, override
 
 import structlog
 
@@ -9,6 +9,10 @@ from domain.models import Fill, Order, Position
 from ports.broker import Broker
 
 logger = structlog.get_logger()
+
+_OrderStatus = Literal[
+    "pending", "submitted", "partially_filled", "filled", "cancelled", "expired", "new"
+]
 
 
 class AlpacaBroker(Broker):
@@ -44,7 +48,7 @@ class AlpacaBroker(Broker):
             action=order.action,
             quantity=float(str(alpaca_order.qty)),
             order_type="market",
-            status=str(alpaca_order.status),
+            status=cast(_OrderStatus, str(alpaca_order.status)),
             submitted_at=order.submitted_at,
             fill_date=datetime.now(UTC),
             filled_quantity=float(str(alpaca_order.filled_qty)) if alpaca_order.filled_qty else 0.0,

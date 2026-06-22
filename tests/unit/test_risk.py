@@ -194,22 +194,22 @@ class TestEvaluateDailyLoss:
     def test_loss_exceeds_halt(self) -> None:
         result = evaluate_daily_loss(
             today_pnl=-5_000.0,
-            equity=100_000.0,
+            equity_before_pnl=100_000.0,
             config=RiskConfig(daily_loss_halt_pct=0.03),
         )
         assert len(result) == 1
         assert result[0].action_type == "daily_halt"
 
     def test_loss_within_tolerance(self) -> None:
-        result = evaluate_daily_loss(today_pnl=-1_000.0, equity=100_000.0)
+        result = evaluate_daily_loss(today_pnl=-1_000.0, equity_before_pnl=100_000.0)
         assert result == []
 
     def test_positive_pnl_returns_empty(self) -> None:
-        result = evaluate_daily_loss(today_pnl=5_000.0, equity=100_000.0)
+        result = evaluate_daily_loss(today_pnl=5_000.0, equity_before_pnl=100_000.0)
         assert result == []
 
     def test_zero_equity_returns_empty(self) -> None:
-        result = evaluate_daily_loss(today_pnl=-1_000.0, equity=0.0)
+        result = evaluate_daily_loss(today_pnl=-1_000.0, equity_before_pnl=0.0)
         assert result == []
 
 

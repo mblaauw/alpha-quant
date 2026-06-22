@@ -9,7 +9,6 @@ class SizingConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     risk_per_trade_pct: float = 0.01
     max_position_pct: float = 0.15
-    max_gross_exposure: float = 0.80
     stop_atr_mult: float = 2.0
 
 

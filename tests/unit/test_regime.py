@@ -8,9 +8,7 @@ from domain.models import IndicatorState
 from domain.regime import REGIME_MULTIPLIERS, detect
 
 
-def _state(
-    close: float, ema50: float, ema200: float, bar_count: float = 300.0
-) -> IndicatorState:
+def _state(close: float, ema50: float, ema200: float, bar_count: float = 300.0) -> IndicatorState:
     return IndicatorState(
         symbol="SPY",
         date=date(2026, 6, 11),
@@ -84,9 +82,10 @@ class TestDetect:
         result = detect(state, vix_level=15.0, breadth=None)
         assert result == "RISK_ON"
 
-    def test_bearish_with_very_low_breadth_stays_caution(self) -> None:
-        result = detect(_state(close=170, ema50=190, ema200=180), vix_level=15.0, breadth=0.15)
-        assert result == "CAUTION"
+    def test_bearish_with_very_low_breadth_triggers_risk_off(self) -> None:
+        bear_state = _state(close=170, ema50=190, ema200=180)
+        result = detect(bear_state, vix_level=15.0, breadth=0.15)
+        assert result == "RISK_OFF"
 
     def test_bearish_ema50_cross_with_very_low_breadth_stays_caution(self) -> None:
         result = detect(_state(close=210, ema50=190, ema200=200), vix_level=15.0, breadth=0.1)

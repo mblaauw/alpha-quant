@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from domain.models import IndicatorState
+if TYPE_CHECKING:
+    from domain.models import IndicatorState
 
 Regime = Literal["RISK_ON", "CAUTION", "RISK_OFF"]
 
@@ -38,17 +39,17 @@ def detect(
     ema200_warm = bar_count >= warmup_bars
 
     if spy_close <= spy_ema50:
-        if breadth is not None and breadth <= 0.2:
-            return CAUTION
         if not ema200_warm:
             return CAUTION
+        if breadth is not None and breadth <= 0.2:
+            return _check_risk_off(spy_close, spy_ema200, vix_level)
         return _check_risk_off(spy_close, spy_ema200, vix_level)
 
     if spy_ema50 <= spy_ema200:
-        if breadth is not None and breadth <= 0.2:
-            return CAUTION
         if not ema200_warm:
             return CAUTION
+        if breadth is not None and breadth <= 0.2:
+            return _check_risk_off(spy_close, spy_ema200, vix_level)
         return _check_risk_off(spy_close, spy_ema200, vix_level)
 
     if vix_level is not None and vix_level >= 20:

@@ -60,6 +60,8 @@ def fill_entry_order(
 
     cfg = config or FillConfig()
 
+    if prev_close < 0:
+        return None
     if prev_close > 0:
         gap_pct = abs(bar.open - prev_close) / prev_close
         if gap_pct > cfg.max_gap_pct:
@@ -67,7 +69,7 @@ def fill_entry_order(
 
     slippage = _slippage_pct(quote=quote, config=cfg)
     fill_price = bar.open * (1.0 + slippage)
-    fill_qty = int(order.quantity * cfg.max_fill_pct)
+    fill_qty = round(order.quantity * cfg.max_fill_pct)
     if fill_qty <= 0:
         return None
 
@@ -119,7 +121,7 @@ def fill_partial_take(
     quote: Quote | None = None,
     config: FillConfig | None = None,
 ) -> Fill | None:
-    sell_qty = int(position.quantity * 0.5)
+    sell_qty = round(position.quantity * 0.5)
     if sell_qty <= 0:
         logger.debug("Skipping partial take — position too small", quantity=position.quantity)
         return None

@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import re
-from datetime import UTC, date, datetime
 
 from domain.events import CandidateBlocked
-from ports.store import Store
 
 _STOP_WORDS = {
     "A",
@@ -124,8 +122,7 @@ def format_blocked_answer(
 
 def ask(
     query: str,
-    store: Store,
-    ref_date: date,
+    events: list[CandidateBlocked],
     concept_card: str | None = None,
     days: int = 30,
 ) -> str:
@@ -136,14 +133,6 @@ def ask(
     if symbol is None:
         return "I couldn't identify a symbol or concept in your query."
 
-    cutoff_dt = datetime.combine(
-        ref_date,
-        datetime.min.time(),
-        tzinfo=UTC,
-    )
-    all_events = store.load_events(since=cutoff_dt)
-    blocked = [
-        e for e in all_events if isinstance(e, CandidateBlocked) and e.symbol.upper() == symbol
-    ]
+    blocked = [e for e in events if e.symbol.upper() == symbol]
 
     return format_blocked_answer(symbol, blocked, days)

@@ -33,15 +33,6 @@ def _backup_sqlite(store: CanonicalStore, tmp_dir: Path) -> Path:
     return dest
 
 
-def _backup_vault_manifest(tmp_dir: Path, vault_base: Path = Path("vault")) -> Path | None:
-    manifest_path = vault_base / "manifest.db"
-    if not manifest_path.exists():
-        return None
-    dest = tmp_dir / "vault_manifest.db"
-    shutil.copy2(manifest_path, dest)
-    return dest
-
-
 def _backup_config(tmp_dir: Path, config_path: str | None = None) -> Path:
     config = _load_config_for_backup(config_path)
     dest = tmp_dir / "config.json"
@@ -63,7 +54,6 @@ def run_backup(config_path: str | None = None) -> Path:
 
     try:
         _backup_sqlite(store, tmp_dir)
-        _backup_vault_manifest(tmp_dir)
         _backup_config(tmp_dir, config_path)
 
         sha = _compute_dir_hash(tmp_dir)

@@ -30,13 +30,6 @@ class PipelineRunCompleted(BaseDomainEvent):
     status: str
 
 
-class DataIngested(BaseDomainEvent):
-    event_type: Literal["data_ingested"] = "data_ingested"
-    connector: str
-    symbol: str
-    records: int
-
-
 class DataQuarantined(BaseDomainEvent):
     event_type: Literal["data_quarantined"] = "data_quarantined"
     symbol: str
@@ -154,7 +147,6 @@ class PipelineStepCompleted(BaseDomainEvent):
 DomainEvent = Annotated[
     PipelineRunStarted
     | PipelineRunCompleted
-    | DataIngested
     | DataQuarantined
     | SourceDegraded
     | StalenessHaltSet

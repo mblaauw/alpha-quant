@@ -25,6 +25,7 @@ from domain.models import (
     MentionCount,
     Position,
 )
+from domain.regime import Regime
 from domain.risk import RiskAction, RiskConfig, evaluate_stops, evaluate_time_stop
 from domain.scoring import compute_composite
 from domain.sizing import PositionSize, SizingConfig, size_position
@@ -124,7 +125,7 @@ def score_candidate(
     bar: Bar,
     state: IndicatorState,
     dt: date,
-    regime: str,
+    regime: Regime,
 ) -> Candidate:
     tech = score_technical(bars_to_date, state)
     momentum_scr = momentum_score(bars_to_date, bar.close)
