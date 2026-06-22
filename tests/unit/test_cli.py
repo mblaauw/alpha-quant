@@ -66,24 +66,10 @@ def config_file(tmp_path: Path) -> Path:
         base_url = ""
         timeout_s = 30
 
-        [education]
-        level = "beginner"
-        concept_repeat_limit = 3
-
-        [eodhd]
-        api_key = ""
-        base_url = "https://eodhd.com/api"
-
         [alpaca]
         api_key = ""
         secret_key = ""
         base_url = "https://data.alpaca.markets"
-
-        [connector]
-        user_agent = "AlphaQuant/0.2.0 (test)"
-        tokens_per_second = 10.0
-        max_burst = 20.0
-        default_timeout_s = 30.0
 
         [dashboard]
         host = "localhost"

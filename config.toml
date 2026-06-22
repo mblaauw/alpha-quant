@@ -52,33 +52,10 @@ model = "anthropic/claude-sonnet-4"
 base_url = ""
 timeout_s = 30
 
-[education]
-level = "beginner"
-concept_repeat_limit = 3
-
-[eodhd]
-api_key = ""
-base_url = "https://eodhd.com/api"
-
 [alpaca]
 api_key = ""
 secret_key = ""
 base_url = "https://data.alpaca.markets"
-
-[connector]
-user_agent = "AlphaQuant/0.2.0 (research project; contact m@mblaauw.dev)"
-tokens_per_second = 10.0
-max_burst = 20.0
-default_timeout_s = 30.0
-
-[adapters.fundamentals]
-primary = "sec_edgar"
-
-[adapters.fundamentals.sources.sec_edgar]
-enabled = true
-
-[adapters.fundamentals.sources.eodhd]
-enabled = false
 
 [dashboard]
 host = "localhost"

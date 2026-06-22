@@ -18,7 +18,6 @@ class TestDegradationStatus:
         assert d.crowding_degraded is False
         assert d.fundamentals_degraded is False
         assert d.earnings_stale is False
-        assert d.sec_degraded is False
 
     def test_set_flags(self) -> None:
         d = DegradationStatus(insider_degraded=True, crowding_degraded=True)

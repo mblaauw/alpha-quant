@@ -21,17 +21,9 @@ class DegradationStatus(BaseModel):
     crowding_degraded: bool = False
     fundamentals_degraded: bool = False
     earnings_stale: bool = False
-    sec_degraded: bool = False
 
 
 BAR_STALENESS_HOURS_DEFAULT = 30
-
-_LAKE_DATASETS = {
-    "bars": "bars",
-    "fundamentals": "fundamentals",
-    "insider_tx": "insider_transactions",
-    "attention": "attention_metrics",
-}
 
 
 def health_to_degradation(

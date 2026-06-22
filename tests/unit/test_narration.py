@@ -74,7 +74,7 @@ class TestBuild:
             SourceDegraded(
                 **{
                     **_event(),
-                    "source_name": "openinsider",
+                    "source_name": "insider_tx",
                     "fallback": "skip",
                 }
             ),
@@ -87,9 +87,9 @@ class TestBuild:
             cash=90_000.0,
             regime="CAUTION",
         )
-        assert ctx.data_health["openinsider"] is False
-        assert ctx.data_health["eodhd"] is True
-        assert ctx.data_health["reddit"] is True
+        assert ctx.data_health["insider_tx"] is False
+        assert ctx.data_health["bars"] is True
+        assert ctx.data_health["attention"] is True
 
     def test_positions_included(self) -> None:
         positions = [

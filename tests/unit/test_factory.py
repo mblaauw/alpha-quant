@@ -49,9 +49,6 @@ def _fixture_config() -> AppConfig:
             "risk": {},
             "shadow": {},
             "llm": {},
-            "education": {},
-            "connector": {},
-            "eodhd": {},
             "alpaca": {},
             "dashboard": {},
         }
@@ -69,9 +66,6 @@ def _live_config() -> AppConfig:
             "risk": {},
             "shadow": {},
             "llm": {},
-            "education": {},
-            "connector": {},
-            "eodhd": {"api_key": "test_key"},
             "alpaca": {"api_key": "test_key", "secret_key": "test_secret"},
             "dashboard": {},
         }

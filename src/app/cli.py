@@ -528,25 +528,6 @@ def bootstrap(
     )
 
 
-# ── Ingest (deprecated) ─────────────────────────────────────────────────────────────────
-
-
-@app.command(rich_help_panel="Data", hidden=True)
-def ingest(
-    ctx: typer.Context,
-    days: int = typer.Option(  # noqa: B008
-        200,
-        "--days",
-        "-d",
-        help="Lookback days for historical data (deprecated)",
-    ),
-) -> None:
-    """[deprecated] All source-data reads now go through Alpha-Lake."""
-    _ = ctx, days
-    console.print("[yellow]`alpha-quant ingest` is deprecated.[/yellow]")
-    console.print("All source-data reads now go through Alpha-Lake. See #567 for removal.")
-
-
 # ── Journal ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -937,25 +918,6 @@ def schedule(
         scheduler.shutdown(wait=False)
 
 
-# ── Sanity Check ────────────────────────────────────────────────────────────────────────
-
-
-@app.command(rich_help_panel="Ops", hidden=True)
-def sanity_check(
-    ctx: typer.Context,
-    symbol: str = typer.Option(  # noqa: B008
-        "AAPL",
-        "--symbol",
-        "-s",
-        help="Symbol to test against (deprecated)",
-    ),
-) -> None:
-    """[deprecated] All source-data reads now go through Alpha-Lake."""
-    _ = symbol, ctx
-    console.print("[yellow]`alpha-quant sanity-check` is deprecated.[/yellow]")
-    console.print("All source-data reads now go through Alpha-Lake.")
-
-
 # ── Backup ──────────────────────────────────────────────────────────────────────────────
 
 
@@ -967,9 +929,9 @@ def backup(
         help="Remove old backups per retention policy",
     ),
 ) -> None:
-    """Create a backup archive of the state store and vault.
+    """Create a backup archive of the state store.
 
-    Compresses the DuckDB state database and vault data into a single archive.
+    Compresses the DuckDB state database into a single archive.
     Use --prune to clean up old backups after creating a new one.
     """
     from app.backup import prune_backups, run_backup

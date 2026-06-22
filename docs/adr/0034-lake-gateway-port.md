@@ -18,56 +18,58 @@ Before Alpha-Lake, there was no unified read port. Each consumer either:
 
 ## Decision
 
-**Define a `LakeGateway` port (`typing.Protocol`) with fixture-first testing.**
+**Define a `LakeGateway` port (`ABC`) with fixture-first testing.**
 
 ### Port Interface
 
 ```python
-class LakeGateway(Protocol):
-    def bars(self, symbol: str, as_of: date) -> pd.DataFrame: ...
-    def fundamentals(self, symbol: str, as_of: date) -> dict | None: ...
-    def insider_transactions(self, symbol: str, as_of: date) -> pd.DataFrame: ...
-    def mentions(self, symbol: str, as_of: date) -> pd.DataFrame: ...
-    def earnings_calendar(self, symbol: str, as_of: date) -> list[dict]: ...
+class LakeGateway(ABC):
+    def bars(self, symbol: str, start: date, end: date, as_of: datetime, price_mode: str = "split_adjusted") -> list[Bar]: ...
+    def latest_bar(self, symbol: str, as_of: datetime) -> Bar | None: ...
+    def trading_calendar(self, start: date, end: date) -> list[TradingDay]: ...
+    def fundamentals(self, symbol: str, as_of: datetime) -> FundamentalsSnapshot | None: ...
+    def earnings_calendar(self, start: date, end: date, as_of: datetime) -> list[EarningsEntry]: ...
+    def insider_transactions(self, symbol: str, as_of: datetime) -> list[InsiderTransaction]: ...
+    def mention_counts(self, symbol: str, days: int, as_of: datetime) -> list[MentionCount]: ...
+    def dataset_health(self) -> dict[str, object]: ...
+    def pin_snapshot(self, snapshot_id: str | None) -> None: ...
 ```
 
-The `as_of` parameter is required (per ADR-0033). All methods return data that was available on or before `as_of`.
+The `as_of` parameter is required (per ADR-0033). All methods return data that was available on or before `as_of`. Methods return domain model objects, not raw DataFrames.
 
 ### Adapter Implementations
 
 | Adapter | Mode | Storage | I/O |
 |---------|------|---------|-----|
-| `RealLakeGateway` | Live, replay | Parquet datasets (local → S3) | Real filesystem |
-| `FixtureLakeGateway` | CI, golden replay | In-memory from fixture bundles | None (pre-loaded) |
-| `FakeLakeGateway` | Unit tests | In-memory dicts | None (canned) |
+| `InProcessLakeGateway` | Live, replay | Parquet datasets via alpha-lake library | Local filesystem |
+| `FixtureLakeGateway` | CI, golden replay | In-memory from fixture Parquet bundles | None (pre-loaded) |
+| (REST variant deferred) | Future live | Alpha-Lake REST panel (not yet implemented) | Network |
 
 ### Fixture-First Testing
 
 - All golden replay tests use `FixtureLakeGateway`, which reads from fixture bundles created by the bootstrap workflow (ADR-0018).
-- Unit tests use `FakeLakeGateway` to test domain logic in isolation without any I/O.
-- Integration tests use `RealLakeGateway` with a temporary lake directory.
+- Unit tests use `FixtureLakeGateway` with minimal fixture Parquet files.
+- Integration tests use `InProcessLakeGateway` with a temporary lake directory.
 
 ### Adapter Selection
 
-The app layer injects the appropriate adapter at startup based on mode:
-- `--replay` / `--test` → `FixtureLakeGateway`
-- `--live` → `RealLakeGateway`
-- Unit tests → `FakeLakeGateway`
+The app layer injects the appropriate adapter at startup based on config:
+- `lake.mode = "fixture"` → `FixtureLakeGateway`
+- `lake.mode = "in_process"` → `InProcessLakeGateway`
 
 ## Consequences
 
 ### Positive
 
-- Domain code never depends on storage internals — only on the `LakeGateway` protocol
-- Three adapter implementations cover every execution mode without conditional logic in domain code
-- `FakeLakeGateway` enables sub-millisecond unit tests for indicator and scoring logic
+- Domain code never depends on storage internals — only on the `LakeGateway` ABC
+- Two adapter implementations cover every execution mode without conditional logic in domain code
 - `FixtureLakeGateway` makes golden replay deterministic (pre-loaded data, no filesystem I/O during replay)
 - Swapping storage backend (Parquet → S3 → DuckDB) requires only a new adapter implementation
 
 ### Negative
 
-- Three adapters to maintain, though each is small (~50 lines each) and the interface is stable
-- The port interface must evolve carefully — adding a new read method requires updating all three adapters
+- Two adapters to maintain (~320 lines each), though the interface is stable
+- The port interface must evolve carefully — adding a new read method requires updating both adapters
 - `FixtureLakeGateway` must mirror the real adapter's query semantics exactly (same filtering, same sort order) to avoid fixture-replay mismatches
 
 ## References
