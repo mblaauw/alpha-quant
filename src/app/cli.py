@@ -182,7 +182,6 @@ def run(
     from app.pipeline import PipelineConfig, persist_run_result
     from app.pipeline import run as run_pipeline
     from app.store import CanonicalStore
-    from app.vault import Vault
     from domain.fills import FillConfig
     from domain.risk import RiskConfig as DomainRiskConfig
     from domain.sizing import SizingConfig
@@ -194,16 +193,12 @@ def run(
         _print_error("Pipeline Halted", "Use alpha-quant halt --resume to clear")
         return
 
-    vault: Vault | None = None
-    if config.data.mode == "live":
-        vault = Vault(base_path=Path("vault"))
-
     clock = create_clock(config)
     lake_gateway = create_lake_gateway(config, clock)
-    market_data = create_market_data(config, vault, lake_gateway=lake_gateway, clock=clock)
-    fundamentals = create_fundamentals(config, vault, lake_gateway=lake_gateway, clock=clock)
-    insider = create_insider_feed(config, vault, lake_gateway=lake_gateway, clock=clock)
-    sentiment = create_sentiment_feed(config, vault, lake_gateway=lake_gateway, clock=clock)
+    market_data = create_market_data(config, lake_gateway, clock)
+    fundamentals = create_fundamentals(config, lake_gateway, clock)
+    insider = create_insider_feed(config, lake_gateway, clock)
+    sentiment = create_sentiment_feed(config, lake_gateway, clock)
 
     adapter_names = [
         type(market_data).__name__,
@@ -446,10 +441,10 @@ def backtest(
 
     clock = create_clock(config)
     lake_gateway = create_lake_gateway(config, clock)
-    market_data = create_market_data(config, lake_gateway=lake_gateway, clock=clock)
-    fundamentals = create_fundamentals(config, lake_gateway=lake_gateway, clock=clock)
-    insider = create_insider_feed(config, lake_gateway=lake_gateway, clock=clock)
-    sentiment = create_sentiment_feed(config, lake_gateway=lake_gateway, clock=clock)
+    market_data = create_market_data(config, lake_gateway, clock)
+    fundamentals = create_fundamentals(config, lake_gateway, clock)
+    insider = create_insider_feed(config, lake_gateway, clock)
+    sentiment = create_sentiment_feed(config, lake_gateway, clock)
 
     with console.status(f"[cyan]Backtesting {fd} \u2192 {td}...", spinner="dots"):
         result = run_backtest(
@@ -723,11 +718,6 @@ def report(
 @app.command(rich_help_panel="Ops")
 def status(
     ctx: typer.Context,
-    check_connections: bool = typer.Option(  # noqa: B008
-        False,
-        "--check-connections",
-        help="Ping each data source to verify connectivity",
-    ),
     alerts: bool = typer.Option(  # noqa: B008
         False,
         "--alerts",
@@ -747,21 +737,11 @@ def status(
     """Display full system status.
 
     Shows halt state, last run, portfolio equity/cash, and active positions.
-    Use flags to drill into connections, alerts, or configuration.
     """
     from pathlib import Path
 
-    from adapters.real.base_connector import BaseConnector
-    from app.factory import (
-        create_fundamentals,
-        create_insider_feed,
-        create_market_data,
-        create_sec_connector,
-        create_sentiment_feed,
-    )
     from app.halt import is_halted, read_halt
     from app.store import CanonicalStore
-    from app.vault import Vault
 
     config = _load_config_cached(ctx)
 
@@ -780,24 +760,6 @@ def status(
             for a in recent[-10:]:
                 table.add_row(a["level"], a["title"], a["message"], a["timestamp"][:19])
             console.print(table)
-        return
-
-    if check_connections:
-        vault: Vault | None = Vault(base_path=Path("vault")) if config.data.mode == "live" else None
-        connectors: list[tuple[str, object]] = [
-            ("market_data", create_market_data(config, vault)),
-            ("fundamentals", create_fundamentals(config, vault)),
-            ("insider_feed", create_insider_feed(config, vault)),
-            ("sentiment_feed", create_sentiment_feed(config, vault)),
-            ("sec", create_sec_connector(config, vault)),
-        ]
-        table = Table(title="Connection Status", border_style="cyan")
-        table.add_column("Source", style="bold")
-        table.add_column("Status")
-        for name, conn in connectors:
-            ok = conn.check_connection() if isinstance(conn, BaseConnector) else True
-            _check_connection(name, ok, table)
-        console.print(table)
         return
 
     store = CanonicalStore(base_path=Path("data"))
@@ -974,96 +936,20 @@ def schedule(
 # ── Sanity Check ────────────────────────────────────────────────────────────────────────
 
 
-@app.command(rich_help_panel="Ops")
+@app.command(rich_help_panel="Ops", hidden=True)
 def sanity_check(
     ctx: typer.Context,
     symbol: str = typer.Option(  # noqa: B008
         "AAPL",
         "--symbol",
         "-s",
-        help="Symbol to test against (default: AAPL)",
+        help="Symbol to test against (deprecated)",
     ),
 ) -> None:
-    """Test all ingestion adapters against a single symbol.
-
-    Runs a quick check against every data source to verify connectivity
-    and API keys are working. No data is written to the store.
-
-    [bold]Examples:[/bold]
-      \b
-      alpha-quant sanity-check
-      alpha-quant sanity-check --symbol MSFT
-      alpha-quant sanity-check --symbol AAPL --verbose
-    """
-    import time
-    from datetime import date, timedelta
-
-    from app.factory import (
-        create_fundamentals,
-        create_insider_feed,
-        create_market_data,
-        create_sentiment_feed,
-    )
-
-    config = _load_config_cached(ctx)
-    config.data.mode = "live"
-
-    table = Table(title=f"Sanity Check — {symbol}", border_style="cyan")
-    table.add_column("Source", style="bold")
-    table.add_column("Status")
-    table.add_column("Detail")
-    table.add_column("Time", style="dim")
-
-    results: list[tuple[str, str, str, str]] = []
-
-    def run_check(name: str, fn) -> None:
-        t0 = time.perf_counter()
-        try:
-            detail = fn()
-            elapsed = time.perf_counter() - t0
-            results.append((name, "[green]\u2713 OK[/green]", detail, f"{elapsed:.1f}s"))
-        except Exception as e:
-            elapsed = time.perf_counter() - t0
-            msg = str(e)[:80]
-            results.append((name, "[red]\u2717 FAIL[/red]", f"[red]{msg}[/red]", f"{elapsed:.1f}s"))
-
-    def check_bars() -> str:
-        md = create_market_data(config)
-        today = date.today()
-        bars = md.daily_bars(symbol, today - timedelta(days=10), today)
-        return f"{len(bars)} bars" if bars else "[yellow]no bars returned[/yellow]"
-
-    def check_eodhd() -> str:
-        fd = create_fundamentals(config)
-        snap = fd.snapshot(symbol)
-        if snap is None:
-            return "[yellow]no snapshot[/yellow]"
-        fields = []
-        if snap.market_cap:
-            fields.append(f"mcap={snap.market_cap:,.0f}")
-        if snap.pe_ratio:
-            fields.append(f"pe={snap.pe_ratio:.1f}")
-        return ", ".join(fields) if fields else "snapshot OK"
-
-    def check_openinsider() -> str:
-        insider = create_insider_feed(config)
-        txns = insider.cluster_transactions(symbol)
-        return f"{len(txns)} clusters" if txns else "[yellow]no clusters[/yellow]"
-
-    def check_reddit() -> str:
-        sentiment = create_sentiment_feed(config)
-        mentions = sentiment.mention_counts(symbol)
-        return f"{len(mentions)} mentions" if mentions else "[yellow]no mentions[/yellow]"
-
-    run_check("Tiingo Bars", check_bars)
-    run_check("EODHD Fundamentals", check_eodhd)
-    run_check("OpenInsider", check_openinsider)
-    run_check("Reddit Sentiment", check_reddit)
-
-    for name, status, detail, elapsed in results:
-        table.add_row(name, status, detail, elapsed)
-
-    console.print(table)
+    """[deprecated] All source-data reads now go through Alpha-Lake."""
+    _ = symbol, ctx
+    console.print("[yellow]`alpha-quant sanity-check` is deprecated.[/yellow]")
+    console.print("All source-data reads now go through Alpha-Lake.")
 
 
 # ── Backup ──────────────────────────────────────────────────────────────────────────────
