@@ -19,6 +19,7 @@ from adapters.real.lake_data import (
     LakeSentimentFeed,
 )
 from adapters.real.lake_inprocess import InProcessLakeGateway
+from adapters.real.lake_rest import RestLakeGateway
 from adapters.real.llm_adapter import OpenAILikeLLM
 from app.config import AppConfig
 from app.store import CanonicalStore
@@ -49,9 +50,17 @@ def create_lake_gateway(config: AppConfig, clock: Clock) -> LakeGateway:
             config_path=config.lake.config_path,
             price_mode=config.lake.price_mode,
         )
+    elif config.lake.mode == "rest":
+        import os
+
+        lake = RestLakeGateway(
+            base_url=config.lake.base_url,
+            api_key=os.environ.get(config.lake.api_key_env, ""),
+            price_mode=config.lake.price_mode,
+        )
     else:
-        msg = "RestLakeGateway is deferred until Alpha-Lake serves PIT panels over REST"
-        raise NotImplementedError(msg)
+        msg = f"Unknown lake mode: {config.lake.mode}"
+        raise ValueError(msg)
 
     lake.pin_snapshot(config.lake.snapshot_id or None)
     return lake
