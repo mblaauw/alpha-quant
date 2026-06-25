@@ -6,12 +6,10 @@ from pathlib import Path
 import pytest
 
 from adapters.fake.canned_llm import CannedLLM
-from adapters.fake.fake_broker import FakeBroker
 from adapters.fake.fake_event_sink import FakeEventSink
 from adapters.fake.fixture_store import FixtureStore
 from adapters.fake.lake_fixture import FixtureLakeGateway
 from adapters.fake.virtual_clock import VirtualClock
-from adapters.real.alpaca_broker import AlpacaBroker
 from adapters.real.clock import SystemClock
 from adapters.real.event_sink import DuckDBEventSink
 from adapters.real.lake_data import (
@@ -20,12 +18,10 @@ from adapters.real.lake_data import (
     LakeMarketData,
     LakeSentimentFeed,
 )
-from adapters.real.lake_inprocess import InProcessLakeGateway
 from adapters.real.lake_rest import RestLakeGateway
 from adapters.real.llm_adapter import OpenAILikeLLM
 from app.config import AppConfig
 from app.factory import (
-    create_broker,
     create_clock,
     create_event_sink,
     create_fundamentals,
@@ -106,33 +102,6 @@ class TestCreateLakeGateway:
         assert captured["base_url"] == config.lake.base_url
         assert captured["price_mode"] == config.lake.price_mode
 
-    def test_in_process_mode_uses_configured_adapter(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        captured: dict[str, object] = {}
-
-        def fake_init(self: InProcessLakeGateway, config_path: str, price_mode: str) -> None:
-            _ = self
-            captured["config_path"] = config_path
-            captured["price_mode"] = price_mode
-
-        monkeypatch.setattr(InProcessLakeGateway, "__init__", fake_init)
-        config = AppConfig.model_validate(
-            {
-                **_fixture_config().model_dump(mode="json"),
-                "lake": {
-                    "mode": "in_process",
-                    "config_path": "../alpha-lake/config/test.toml",
-                    "price_mode": "raw",
-                },
-            }
-        )
-        clock = VirtualClock(date(2026, 1, 2))
-        lake = create_lake_gateway(config, clock)
-        assert isinstance(lake, InProcessLakeGateway)
-        assert captured == {
-            "config_path": "../alpha-lake/config/test.toml",
-            "price_mode": "raw",
-        }
-
 
 class TestCreateMarketData:
     def test_returns_lake_market_data(self) -> None:
@@ -209,13 +178,3 @@ class TestCreateLLM:
     def test_live_mode_returns_openai_like_llm(self) -> None:
         llm = create_llm(_live_config())
         assert isinstance(llm, OpenAILikeLLM)
-
-
-class TestCreateBroker:
-    def test_fixture_mode_returns_fake_broker(self) -> None:
-        broker = create_broker(_fixture_config())
-        assert isinstance(broker, FakeBroker)
-
-    def test_live_mode_returns_alpaca_broker(self) -> None:
-        broker = create_broker(_live_config())
-        assert isinstance(broker, AlpacaBroker)

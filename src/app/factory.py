@@ -4,12 +4,10 @@ from datetime import date
 from pathlib import Path
 
 from adapters.fake.canned_llm import CannedLLM
-from adapters.fake.fake_broker import FakeBroker
 from adapters.fake.fake_event_sink import FakeEventSink
 from adapters.fake.fixture_store import FixtureStore
 from adapters.fake.lake_fixture import FixtureLakeGateway
 from adapters.fake.virtual_clock import VirtualClock
-from adapters.real.alpaca_broker import AlpacaBroker
 from adapters.real.clock import SystemClock
 from adapters.real.event_sink import DuckDBEventSink
 from adapters.real.lake_data import (
@@ -18,12 +16,10 @@ from adapters.real.lake_data import (
     LakeMarketData,
     LakeSentimentFeed,
 )
-from adapters.real.lake_inprocess import InProcessLakeGateway
 from adapters.real.lake_rest import RestLakeGateway
 from adapters.real.llm_adapter import OpenAILikeLLM
 from app.config import AppConfig
 from app.store import CanonicalStore
-from ports.broker import Broker
 from ports.clock import Clock
 from ports.event_sink import EventSink
 from ports.fundamentals import Fundamentals
@@ -45,11 +41,6 @@ def create_lake_gateway(config: AppConfig, clock: Clock) -> LakeGateway:
     _ = clock
     if config.lake.mode == "fixture":
         lake = FixtureLakeGateway(_lake_fixture_path(config))
-    elif config.lake.mode == "in_process":
-        lake = InProcessLakeGateway(
-            config_path=config.lake.config_path,
-            price_mode=config.lake.price_mode,
-        )
     elif config.lake.mode == "rest":
         import os
 
@@ -122,15 +113,6 @@ def create_llm(config: AppConfig) -> LLM:
         )
         return OpenAILikeLLM(config=port_cfg)
     return CannedLLM()
-
-
-def create_broker(config: AppConfig) -> Broker:
-    if config.data.mode == "live":
-        return AlpacaBroker(
-            api_key=config.alpaca.api_key.get_secret_value(),
-            secret_key=config.alpaca.secret_key.get_secret_value(),
-        )
-    return FakeBroker()
 
 
 def create_clock(config: AppConfig) -> Clock:

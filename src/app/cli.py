@@ -12,7 +12,6 @@ import structlog
 import typer
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm as RichConfirm
 from rich.table import Table
 
@@ -484,51 +483,6 @@ def backtest(
 # ── Bootstrap ───────────────────────────────────────────────────────────────────────────
 
 
-@app.command(rich_help_panel="Data")
-def bootstrap(
-    ctx: typer.Context,
-) -> None:
-    """Generate a deterministic lake-shaped fixture bundle.
-
-    Used by replay and run --mode fixture.
-    """
-    import time
-    from pathlib import Path
-
-    from app.bootstrap import run_bootstrap
-
-    config = _load_config_cached(ctx)
-    t0 = time.perf_counter()
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-        console=console,
-        transient=True,
-    ) as progress:
-        progress.add_task("[cyan]Generating deterministic fixture bundle...", total=1)
-
-        result = run_bootstrap(
-            config=config,
-            fixture_base=Path("."),
-        )
-
-    elapsed = time.perf_counter() - t0
-
-    _print_panel(
-        "Bootstrap Complete",
-        [
-            ("Symbols", str(result["symbols_processed"])),
-            ("Bars", f"{result['total_bars']:,}"),
-            ("Bundle", result["bundle_path"]),
-            ("Time", f"{elapsed:.1f}s"),
-        ],
-        border_style="green",
-    )
-
-
 # ── Journal ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -880,44 +834,6 @@ def halt(
 
 
 # ── Schedule ─────────────────────────────────────────────────────────────────────────────
-
-
-@app.command(rich_help_panel="Ops")
-def schedule(
-    ctx: typer.Context,
-    mode: str = typer.Option(  # noqa: B008
-        "live",
-        "--mode",
-        "-m",
-        help="Schedule mode: live or fixture",
-    ),
-) -> None:
-    """Start the daily scheduler daemon.
-
-    Launches APScheduler to run the pipeline automatically every trading day
-    at 17:30 ET.
-    """
-    config = _load_config_cached(ctx)
-    config.data.mode = mode
-    config.lake.mode = mode
-
-    from app.scheduler import setup_scheduler
-
-    scheduler = setup_scheduler(config_path=ctx.obj.get("config_path"), mode=mode)
-    _print_panel(
-        "Scheduler Started",
-        [
-            ("Mode", f"[cyan]{mode}[/cyan]"),
-            ("Time", "17:30 ET"),
-            ("Stop", "[dim]Ctrl+C to stop[/dim]"),
-        ],
-        border_style="green",
-    )
-    try:
-        scheduler.start()
-    except KeyboardInterrupt:
-        console.print("[yellow]Scheduler stopped.[/yellow]")
-        scheduler.shutdown(wait=False)
 
 
 # ── Backup ──────────────────────────────────────────────────────────────────────────────

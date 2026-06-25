@@ -106,13 +106,11 @@ class TestSmoke:
             "run",
             "replay",
             "backtest",
-            "bootstrap",
             "journal",
             "ask",
             "report",
             "status",
             "halt",
-            "schedule",
             "backup",
         ]:
             assert cmd in result.output, f"Command '{cmd}' not found in help"
@@ -135,13 +133,11 @@ class TestSmoke:
             "run",
             "replay",
             "backtest",
-            "bootstrap",
             "journal",
             "ask",
             "report",
             "status",
             "halt",
-            "schedule",
             "backup",
         ]:
             result = runner.invoke(app, [cmd, "--help"])
