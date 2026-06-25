@@ -12,7 +12,6 @@ from alpha_quant.contracts.alpha_lake import (
     DecisionPanel,
     EarningsEvent,
     FundamentalMetric,
-    IndicatorObservation,
     InsiderTransaction,
     MentionObservation,
     SymbolPanel,

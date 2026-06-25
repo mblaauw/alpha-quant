@@ -27,7 +27,4 @@ def evaluate(context: DecisionContext) -> bool:
     if gross_margin is not None and gross_margin < -0.5:
         return False
 
-    if earnings_yield is not None and earnings_yield < -0.20:
-        return False
-
-    return True
+    return not (earnings_yield is not None and earnings_yield < -0.20)
