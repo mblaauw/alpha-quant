@@ -12,11 +12,11 @@ def evaluate(context: DecisionContext) -> float:
     if close is None:
         return 0.0
 
-    trend_s = _trend_score(close, context)
-    rsi_s = _rsi_score(rsi)
-    macd_s = _macd_score(macd_hist)
-    volume_s = _volume_score(context)
-    atr_s = _atr_score(close, atr_pct)
+    trend_s = _evaluate_trend(close, context)
+    rsi_s = _evaluate_rsi(rsi)
+    macd_s = _evaluate_macd(macd_hist)
+    volume_s = _evaluate_volume(context)
+    atr_s = _evaluate_atr(close, atr_pct)
 
     weights = {
         "trend": 0.3125,
@@ -54,7 +54,7 @@ def momentum_score(context: DecisionContext) -> float:
     return 0.4
 
 
-def _trend_score(close: float, context: DecisionContext) -> float:
+def _evaluate_trend(close: float, context: DecisionContext) -> float:
     ma_regime = context.indicator("trend.ma_regime_50")
     if ma_regime is None or ma_regime <= 0:
         return 0.0
@@ -68,7 +68,7 @@ def _trend_score(close: float, context: DecisionContext) -> float:
     return 0.0
 
 
-def _rsi_score(rsi: float | None) -> float:
+def _evaluate_rsi(rsi: float | None) -> float:
     if rsi is None:
         return 0.3
     if rsi >= 70:
@@ -82,7 +82,7 @@ def _rsi_score(rsi: float | None) -> float:
     return 0.0
 
 
-def _macd_score(macd_hist: float | None) -> float:
+def _evaluate_macd(macd_hist: float | None) -> float:
     if macd_hist is None:
         return 0.3
     if macd_hist > 0:
@@ -90,7 +90,7 @@ def _macd_score(macd_hist: float | None) -> float:
     return 0.2
 
 
-def _volume_score(context: DecisionContext) -> float:
+def _evaluate_volume(context: DecisionContext) -> float:
     vol_ratio = context.indicator("liquidity.volume_ratio_21")
     if vol_ratio is None:
         return 0.5
@@ -103,7 +103,7 @@ def _volume_score(context: DecisionContext) -> float:
     return 0.3
 
 
-def _atr_score(close: float, atr_pct: float | None) -> float:
+def _evaluate_atr(close: float, atr_pct: float | None) -> float:
     if atr_pct is None or atr_pct <= 0:
         return 0.5
     if atr_pct > 0.04:
