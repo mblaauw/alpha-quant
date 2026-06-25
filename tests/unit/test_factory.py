@@ -21,6 +21,7 @@ from adapters.real.lake_data import (
     LakeSentimentFeed,
 )
 from adapters.real.lake_inprocess import InProcessLakeGateway
+from adapters.real.lake_rest import RestLakeGateway
 from adapters.real.llm_adapter import OpenAILikeLLM
 from app.config import AppConfig
 from app.factory import (
@@ -79,7 +80,21 @@ class TestCreateLakeGateway:
         lake = create_lake_gateway(config, clock)
         assert isinstance(lake, FixtureLakeGateway)
 
-    def test_rest_mode_is_deferred(self) -> None:
+    def test_rest_mode_uses_rest_lake_gateway(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_init(
+            self: RestLakeGateway,
+            base_url: str = "",
+            api_key: str = "",
+            price_mode: str = "",
+            timeout_s: float = 30.0,
+        ) -> None:
+            _ = self
+            captured["base_url"] = base_url
+            captured["price_mode"] = price_mode
+
+        monkeypatch.setattr(RestLakeGateway, "__init__", fake_init)
         config = AppConfig.model_validate(
             {
                 **_fixture_config().model_dump(mode="json"),
@@ -87,8 +102,9 @@ class TestCreateLakeGateway:
             }
         )
         clock = VirtualClock(date(2026, 1, 2))
-        with pytest.raises(NotImplementedError, match="RestLakeGateway is deferred"):
-            create_lake_gateway(config, clock)
+        create_lake_gateway(config, clock)
+        assert captured["base_url"] == config.lake.base_url
+        assert captured["price_mode"] == config.lake.price_mode
 
     def test_in_process_mode_uses_configured_adapter(self, monkeypatch: pytest.MonkeyPatch) -> None:
         captured: dict[str, object] = {}
