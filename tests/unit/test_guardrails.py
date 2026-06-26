@@ -147,7 +147,7 @@ def test_no_alpha_lake_direct_import() -> None:
 
 def test_no_duckdb_for_market_facts() -> None:
     """Verify DuckDB is only used for local decision/paper state, not market facts."""
-    _ALLOWED_DUCKDB = frozenset({"store", "dashboard.py", "event_sink.py"})
+    _ALLOWED_DUCKDB = frozenset({"store", "dashboard.py", "db.py", "event_sink.py"})
     errors: list[str] = []
     for path in SRC.rglob("*.py"):
         if path.name.startswith("."):

@@ -4,8 +4,8 @@ from datetime import date
 
 import pytest
 
-from domain.models import Bar, Position
-from domain.risk import (
+from alpha_quant.domain.models import Bar, Position
+from alpha_quant.domain.risk import (
     RiskAction,
     RiskConfig,
     evaluate_daily_loss,

@@ -10,7 +10,7 @@ from textwrap import dedent
 import pytest
 from typer.testing import CliRunner
 
-from app.cli import _parse_date, app
+from alpha_quant.application.cli import _parse_date, app
 
 runner = CliRunner()
 
@@ -104,8 +104,6 @@ class TestSmoke:
         result = runner.invoke(app, ["--help"])
         for cmd in [
             "run",
-            "replay",
-            "backtest",
             "journal",
             "ask",
             "report",
@@ -131,8 +129,6 @@ class TestSmoke:
     def test_each_command_help(self) -> None:
         for cmd in [
             "run",
-            "replay",
-            "backtest",
             "journal",
             "ask",
             "report",

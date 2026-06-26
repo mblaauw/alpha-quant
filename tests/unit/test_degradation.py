@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 
-from domain.degradation import (
+from alpha_quant.domain.degradation import (
     DegradationStatus,
     blackout_window_days,
     health_to_degradation,

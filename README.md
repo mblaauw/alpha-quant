@@ -110,27 +110,43 @@ alpha-quant status
 | `report` | Generate performance report |
 | `status` | Show system and portfolio status |
 | `halt` | Manage system halt file |
+| `unhalt` | Resume halted pipeline |
 | `backup` | Backup local decision/paper state |
 | `ask` | Query recorded decisions with LLM |
+| `dashboard` | Launch FastAPI dashboard (port 8501) |
+| `db-health` | Check PostgreSQL operational store connectivity |
+| `db-migrate` | Run Alembic schema migrations |
+| `db-seed` | Seed default reference data |
+| `db-import` | Import legacy DuckDB data into PostgreSQL |
 
 ## Repo Structure
 
 ```
 src/alpha_quant/
-├── ports/              # Port interfaces (AlphaLakeReadPort)
-├── contracts/          # Data contracts (dataclasses)
+├── contracts/          # Data contracts (frozen dataclasses)
 ├── domain/
-│   ├── decision_context.py   # Fact context for policies
-│   └── policy/               # Strategy policy modules
+│   ├── decision_context.py   # NeutralObservations → DecisionContext
+│   └── policy/               # 7 strategy policy modules
+├── ports/              # Port interfaces (AlphaLakeReadPort, OperationalStorePort, ArtifactStorePort)
 ├── adapters/
-│   ├── real/                  # AlphaLakeRestClient (httpx)
-│   └── fake/                  # AlphaLakeHttpFixtureClient (offline replay)
-└── app/                      # CLI, config, factory, pipeline
+│   ├── postgres/             # PostgreSQL operational store (21 tables, 6 schemas)
+│   ├── artifacts/            # S3 artifact store
+│   ├── real/                 # AlphaLakeRestClient, SystemClock, LLM
+│   └── fake/                 # Fixture-based replay, in-memory fakes
+├── application/
+│   ├── cli.py                # Typer CLI (15+ commands)
+│   ├── factory.py            # Composition root
+│   ├── pipeline_v2.py        # Daily decision pipeline
+│   ├── config.py             # pydantic-settings (TOML + env)
+│   ├── dashboard/            # FastAPI + HTMX dashboard
+│   ├── import_legacy_duckdb.py  # DuckDB → PostgreSQL migration
+│   └── store/                # CanonicalStore (DuckDB — legacy)
+└── migrations/        # Alembic schema migrations (PostgreSQL)
 ```
 
 ## Documentation
 
-- [Architecture Decision Records](docs/adr/README.md) — 36 ADRs covering every architectural decision
+- [Architecture Decision Records](docs/adr/README.md) — 41 ADRs covering every architectural decision
 - [Reference Architecture](docs/architecture/REFERENCE_ARCHITECTURE.md) — System design and key decisions
 - [C4 Architecture Diagrams](docs/architecture/README.md) — Context, container, and component views
 - [DESIGN.md](DESIGN.md) — Detailed design document

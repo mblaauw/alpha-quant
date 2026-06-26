@@ -3,7 +3,7 @@ from datetime import date
 import pytest
 from pydantic import ValidationError
 
-from domain.models import Candidate
+from alpha_quant.domain.models import Candidate
 
 
 class TestCandidate:

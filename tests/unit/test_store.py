@@ -3,8 +3,8 @@
 from datetime import date
 from pathlib import Path
 
-from app.store import CanonicalStore
-from domain.journal import JournalEntry
+from alpha_quant.application.store import CanonicalStore
+from alpha_quant.domain.journal import JournalEntry
 
 
 def test_transaction_rollback_on_exception(tmp_path: Path) -> None:

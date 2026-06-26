@@ -11,12 +11,12 @@ specification {
 
 model {
   actor user 'User' {
-    description 'Retail investor with non-technical background. Reads daily journal, reviews reports, asks "why" questions, monitors dashboard.'
+    description 'Retail investor. Reads daily journal, reviews reports, monitors dashboard.'
   }
 
   externalSystem alphaLake 'Alpha-Lake' {
-    description 'Point-in-time data plane for bars, fundamentals, insider, sentiment, earnings'
-    technology 'Parquet (zstd) via DuckDB | REST API'
+    description 'Point-in-time data plane for bars, fundamentals, insider, earnings, attention. Consumed over REST API.'
+    technology 'REST API (httpx)'
   }
 
   externalSystem llmProvider 'LLM Provider' {
@@ -25,142 +25,102 @@ model {
   }
 
   softwareSystem alphaQuant 'Alpha-Quant' {
-    description 'Deterministic, daily-cadence, long-only equity trading system. Internal paper engine. LLM-powered narration and education.'
+    description 'Deterministic, daily-cadence, long-only equity system. Internal paper engine. LLM-powered narration.'
 
     container cli 'CLI' {
-      description 'Command-line interface. Entry point for all operations: run, replay, backtest, bootstrap, journal, ask, report, status, halt, schedule, backup.'
-      technology 'argparse'
+      description 'Command-line interface. Entry point for run, journal, ask, report, status, halt, backup.'
+      technology 'typer'
     }
 
     container pipelineEngine 'Pipeline Engine' {
-      description 'Daily-run orchestrator. Sequences validate, derive, regime, risk, decide, order, persist, narrate. Runs at 17:30 ET via APScheduler.'
-      technology 'APScheduler'
+      description 'Daily orchestrator. Reads decision panel from Alpha-Lake, runs policy modules, executes risk/fill/sizing, persists to store.'
+      technology 'run_v2() — single pipeline function'
+
+      logicalComponent sessionRunner 'run_v2()' {
+        description 'The sole pipeline function. Sequence: panel read → regime → risk → evaluate → rank → fill → mark → consistency → persist.'
+      }
+
+      logicalComponent alphaLakeReadPort 'AlphaLakeReadPort' {
+        description 'Single Protocol interface to Alpha-Lake. health(), read_contract(), read_universe(), read_decision_panel().'
+        technology 'Protocol'
+      }
+
+      logicalComponent decisionContext 'DecisionContext' {
+        description 'Extracted-facts facade over DecisionPanel. Policy modules receive this, not raw panel data.'
+        technology 'dataclass'
+      }
     }
 
-    container dataLayer 'Data Layer' {
-      description 'Data subsystem: LakeGateway to Alpha-Lake, indicator engine, validation gates, catalog.'
-      technology 'DuckDB, PyArrow, numpy'
+    container policyModules 'Policy Modules' {
+      description '7 policy modules, each evaluating on DecisionContext. Pure functions — no I/O, no imports from adapters.'
+      technology 'plain Python'
 
-      logicalComponent lakeGateway 'LakeGateway' {
-        description 'Port to Alpha-Lake. Two implementations: InProcessLakeGateway (local DuckDB) and RestLakeGateway (REST API, deferred). Reads PIT market/fundamental/insider/sentiment data.'
-        technology 'DuckDB | REST API'
-      }
-
-      logicalComponent deriveEngine 'Derive Engine' {
-        description 'Incremental O(1) indicator computation. EMA, RSI, ATR, MACD via numpy recurrence formulas.'
-        technology 'numpy'
-      }
-
-      logicalComponent validator 'Validator' {
-        description '~15 declarative predicate checks: calendar gaps, zero/negative prices, return anomalies, staleness, schema drift.'
+      logicalComponent regimePolicy 'Regime Policy (M2)' {
+        description 'SPY EMA50/200 + VIX → RISK_ON / CAUTION / RISK_OFF.'
         technology 'plain Python'
       }
 
-      logicalComponent catalog 'Catalog' {
-        description 'Dataset versioning and golden replay verification. Run metadata, fixture integrity checks, replay hash management.'
-        technology 'DuckDB'
+      logicalComponent technicalPolicy 'Technical Policy (M3)' {
+        description 'Composite score from trend + RSI + MACD + momentum + volume + ATR validation.'
+        technology 'plain Python'
+      }
+
+      logicalComponent fundamentalPolicy 'Fundamental Policy (M4)' {
+        description 'Binary pass/fail: OCF > 0, D/E < sector median, no negative surprises, accruals sane.'
+        technology 'plain Python'
+      }
+
+      logicalComponent insiderPolicy 'Insider Policy (M5)' {
+        description 'Cluster signal: ≥2 officers/directors, ≥$200k net in 30d → score boost.'
+        technology 'plain Python'
+      }
+
+      logicalComponent attentionPolicy 'Attention Policy (M6)' {
+        description 'Mention z-score veto. z > 3 gives 14-day entry block.'
+        technology 'plain Python'
+      }
+
+      logicalComponent blackoutPolicy 'Earnings Blackout Policy (M7)' {
+        description 'No entries within 3 trading days before earnings report.'
+        technology 'plain Python'
+      }
+
+      logicalComponent compositePolicy 'Composite Policy (M8)' {
+        description 'Weighted ranking: 0.6 × technical + 0.25 × momentum + 0.15 × insider. Gates applied first.'
+        technology 'plain Python'
       }
     }
 
     container domainCore 'Domain Core' {
-      description 'Pure functions implementing all decision mechanisms (M1-M8), position sizing, and risk management. No I/O, no imports from adapters.'
-      technology 'pydantic, numpy'
-
-      logicalComponent m1 'M1 Universe' {
-        description 'Filters by price >= $5, liquidity ADV >= $5M, SEC-map validity, quarantine status.'
-        technology 'plain Python'
-      }
-
-      logicalComponent m2 'M2 Regime' {
-        description 'Classifies market: RISK_ON (SPY uptrend, VIX < 20, breadth > 0.4), CAUTION, RISK_OFF (SPY < EMA200, VIX > 30).'
-        technology 'numpy'
-      }
-
-      logicalComponent m3 'M3 Technical' {
-        description 'Composite score from trend, momentum, RSI (45-70), MACD histogram, volume confirmation, ATR sanity.'
-        technology 'numpy'
-      }
-
-      logicalComponent m4 'M4 Quality' {
-        description 'Binary pass/fail: OCF > 0, D/E < 2x sector median, accruals sane, no negative earnings surprise.'
-        technology 'pydantic, numpy'
-      }
-
-      logicalComponent m5 'M5 Insider' {
-        description 'Insider cluster score: >= 2 officers/directors, >= $200k net in 30d gives 0.15 boost.'
-        technology 'plain Python'
-      }
-
-      logicalComponent m6 'M6 Crowding' {
-        description 'Reddit mention z-score veto. z > 3 gives 10-day entry block. Count arithmetic only, no LLM sentiment.'
-        technology 'numpy'
-      }
-
-      logicalComponent m7 'M7 Blackout' {
-        description 'Earnings blackout: no entries within 3 trading days before report.'
-        technology 'plain Python'
-      }
-
-      logicalComponent m8 'M8 Ranker' {
-        description 'Composite ranking: 0.6 x technical + 0.25 x momentum + 0.15 x insider. Gates applied first. Ties broken by ADV.'
-        technology 'numpy'
-      }
+      description 'Pure functions for position sizing, risk management, fill model, ranking, invariants. No I/O.'
+      technology 'pydantic'
 
       logicalComponent positionSizer 'Position Sizer' {
-        description 'Kelly-lite: shares = (equity x 1%) / (2 x ATR). Capped at 15% per position, 80% gross, 2 per sector.'
-        technology 'numpy'
+        description 'shares = (equity × 1%) / (2 × ATR). Capped per-position, per-sector, gross. × regime × drawdown.'
       }
 
       logicalComponent riskEvaluator 'Risk Evaluator' {
-        description 'Exit-only risk rules: 2x ATR stop, trail after +1R, partial at +2R, 30d time stop, drawdown ladder, daily loss halt.'
+        description 'Exit-only: 2× ATR stop, trail after +1R, partial at +2R, 30d time stop, drawdown ladder, daily loss halt.'
+      }
+
+      logicalComponent fillEngine 'Fill Engine' {
+        description 'Daily-bar fill model: entries at T+1 open + slippage, stops on low/range touch, gaps fill at open. One model for all modes.'
+      }
+
+      logicalComponent ranker 'Ranker' {
+        description 'Sorts candidates by composite score, enforces max positions, sector limits, liquidity tiebreak.'
       }
     }
 
-    container fillModel 'Fill Model' {
-      description 'The single fill model used by all execution realities. Pessimistic semantics: gap-through-stop fills at open, gap-up entries cancel.'
-      technology 'pydantic'
+    container stateStore 'State Store' {
+      description 'CanonicalStore — composite mixin over DuckDB tables. Positions, decisions, orders, fills, events, portfolio snapshots, indicator state.'
+      technology 'CanonicalStore (DuckDB)'
 
-      logicalComponent fillEntry 'Fill Entry' {
-        description 'Entry order filling: fills at T+1 open + slippage. Cancels if gap > 2% from decision quote.'
-      }
-
-      logicalComponent fillStop 'Fill Stop' {
-        description 'Stop-loss execution: if bar.low <= stop_price, fill at min(open, stop_price) - slippage. Gap-downs fill at open (pessimistic); intraday-break fills at stop price.'
-      }
-
-      logicalComponent fillPartial 'Fill Partial Take' {
-        description 'Partial take-profit: sell 50% at T+1 open - slippage. No take-price threshold check.'
-      }
-
-      logicalComponent fillCorpAction 'Fill Corporate Action' {
-        description 'Dividends and stock splits: cash dividends credited on pay date, splits adjust positions/stops atomically.'
-      }
-    }
-
-    container paperPortfolio 'Paper Portfolio' {
-      description 'Authoritative internal portfolio. Cash, positions, orders, fills, equity curve in DuckDB. Transactional integrity. No broker dependency.'
-      technology 'DuckDB'
-
-      logicalComponent paperPortfolioInternal 'Paper Portfolio State' {
-        description 'Authoritative portfolio: cash, positions, orders, fills, equity curve. All written transactionally with Decision lineage.'
-      }
-
-      logicalComponent consistencyChecker 'Self-Consistency Checker' {
-        description 'Assertion engine: cash + mark == equity, every position traces to Decision, no orphans. Violation = software bug = full halt.'
-      }
-    }
-
-    container shadowBooks 'Shadow Books' {
-      description '3 ablation books (RULES_ONLY, NO_INSIDER, NO_CROWDING_VETO) running parallel to PAPER with mechanism toggles. SPY buy-and-hold curve.'
-      technology 'DuckDB'
-
-      logicalComponent shadowBookInternal 'Shadow Books (x3)' {
-        description 'RULES_ONLY, NO_INSIDER, NO_CROWDING_VETO. Same fill model, toggled mechanisms. Live ablation by construction.'
-      }
-
-      logicalComponent spyBaseline 'SPY Buy-and-Hold' {
-        description 'Benchmark curve: buys SPY on day 1, holds, collects dividends. Zero decisions, zero costs (except initial slippage).'
-      }
+      logicalComponent positionStore 'Position Store'
+      logicalComponent decisionStore 'Decision Store'
+      logicalComponent orderStore 'Order Store'
+      logicalComponent eventStore 'Event Store'
+      logicalComponent adminStore 'Admin Store'
     }
 
     container narrator 'LLM Narrator' {
@@ -169,53 +129,47 @@ model {
     }
 
     container dashboard 'Streamlit Dashboard' {
-      description 'Read-only monitoring dashboard. Tabs: Home, Portfolio Risk, Reports, Concept Cards, Journal, Decision Explorer. Reads from DuckDB only — zero pipeline coupling.'
+      description 'Read-only monitoring dashboard. Tabs: Portfolio, Risk, Journal, Decisions. Reads from DuckDB only — zero pipeline coupling.'
       technology 'Streamlit'
     }
 
     container eventLog 'Event Log' {
-      description 'Append-only typed events from every pipeline stage. Written to DuckDB (queries) and structlog JSON stream (debugging).'
+      description 'Append-only typed events from every pipeline stage. Written to DuckDB (queries) and structlog JSON stream.'
       technology 'DuckDB, structlog'
     }
 
-    dataStore stateStore 'DuckDB State Store' {
-      description 'Transactional state: decisions, orders, fills, positions, equity curve, events, concept_log, indicator_state, catalog. Snapshot isolation for concurrent reads.'
-      technology 'DuckDB'
-    }
-
-  }
-
-  computeNode localMachine 'Local Machine' {
-    description 'Single-machine deployment. Developer workstation (macOS/Linux) or headless server. Runs the daily pipeline, CLI operations, and dashboard.'
-
-    monitoredProcess schedulerProcess 'APScheduler Process' {
-      description 'Daily pipeline scheduler. Runs at 17:30 ET on trading days. Single-threaded Python process.'
-      technology 'APScheduler 3.x, Python 3.14'
-    }
-
-    monitoredProcess cliProcess 'CLI Process' {
-      description 'Ad-hoc operations. Invoked by user for run, replay, backtest, bootstrap, journal, ask, report, status, halt, schedule, backup.'
-      technology 'argparse, Python 3.14'
-    }
-
-    monitoredProcess dashboardProcess 'Streamlit Process' {
-      description 'Read-only monitoring dashboard. Serves on localhost:8501. Auto-refresh every 60s.'
-      technology 'Streamlit 1.58+, Starlette'
-    }
-
-    dataStore stateDb 'DuckDB State Database' {
-      description 'Single-file DuckDB database. Contains all transactional state, indicator data, and event log.'
+    dataStore duckDb 'DuckDB State Database' {
+      description 'Single-file DuckDB database in data/. All transactional state: positions, decisions, orders, fills, equity curve, events.'
       technology 'DuckDB'
     }
 
     dataStore configFile 'Config File' {
-      description 'TOML configuration file at $PWD/config.toml or ~/.alpha-quant/config.toml.'
+      description 'config.toml at project root.'
       technology 'TOML'
     }
 
     dataStore haltFile 'Halt Lockfile' {
-      description 'data/.HALT lockfile. Written on halt condition. Pipeline refuses to run while it exists.'
+      description 'data/.HALT lockfile. Pipeline refuses to run while it exists.'
       technology 'JSON file'
+    }
+
+    dataStore fixtureDir 'Fixture Directory' {
+      description 'fixtures/v1/. JSON fixture files for replay: health, contract, universe, decision-panel.'
+      technology 'JSON files'
+    }
+  }
+
+  computeNode localMachine 'Local Machine' {
+    description 'Single-machine deployment. Developer workstation or headless server.'
+
+    monitoredProcess cliProcess 'CLI Process' {
+      description 'Ad-hoc operations. Run, journal, ask, report, status, halt, backup.'
+      technology 'typer, Python 3.14+'
+    }
+
+    monitoredProcess dashboardProcess 'Streamlit Process' {
+      description 'Read-only dashboard. Serves on localhost:8501. Auto-refresh every 60s.'
+      technology 'Streamlit, Starlette'
     }
   }
 
@@ -223,67 +177,39 @@ model {
     technology 'CLI, Streamlit browser'
   }
 
-  alphaQuant -> alphaLake 'reads PIT market/fundamental/insider/sentiment data' {
-    technology 'InProcessLakeGateway | RestLakeGateway (deferred)'
+  alphaQuant -> alphaLake 'reads decision panel, contract, universe' {
+    technology 'AlphaLakeRestClient (httpx)'
   }
 
   alphaQuant -> llmProvider 'Sends NarrationContext, receives prose' {
     technology 'httpx chat completions API'
   }
 
-  lakeGateway -> deriveEngine 'Provides bars for indicator computation'
-  lakeGateway -> validator 'Provides data for validation checks'
-  lakeGateway -> catalog 'Tracks dataset versions and health'
-  lakeGateway -> alphaLake 'Reads PIT bars, fundamentals, insider, sentiment, earnings'
+  cli -> pipelineEngine 'Dispatches run command'
 
-  cli -> pipelineEngine 'Dispatches run, replay, backtest commands'
+  pipelineEngine -> alphaLakeReadPort 'Reads panel via adapter'
+  pipelineEngine -> policyModules 'Runs M2-M8 evaluation'
+  pipelineEngine -> domainCore 'Risk, fill, size, rank'
+  pipelineEngine -> eventLog 'Emits events from every stage'
+  pipelineEngine -> stateStore 'Persists decisions, fills, events'
 
-  pipelineEngine -> dataLayer 'Steps 1-3: read via LakeGateway, validate, derive' {
-    technology 'port interface'
-  }
+  pipelineEngine.alphaLakeReadPort -> alphaLake 'HTTP request'
+  pipelineEngine.alphaLakeReadPort -> fixtureDir 'JSON file read (fixture mode)'
 
-  pipelineEngine -> domainCore 'Steps 4-6: regime, risk, decide' {
-    technology 'port interface'
-  }
+  policyModules -> decisionContext 'Extract facts from panel'
+  decisionContext -> pipelineEngine 'Receives DecisionPanel'
 
-  pipelineEngine -> fillModel 'Step 7: queue T+1 orders'
-  pipelineEngine -> paperPortfolio 'Steps 7-8: book fills, mark equity' {
-    technology 'port interface'
-  }
+  domaineCore.fillEngine -> stateStore 'Writes fills, positions'
+  domaineCore.riskEvaluator -> stateStore 'Updates position stops/trails'
 
-  pipelineEngine -> shadowBooks 'Parallel: same data, toggled mechanisms'
-  pipelineEngine -> eventLog 'Emits events from every stage' {
-    technology 'EventSink port'
-  }
+  stateStore -> duckDb 'SQL writes'
+  stateStore -> duckDb 'SQL reads'
 
-  dataLayer -> stateStore 'Writes indicator_state, catalog; reads quarantines'
+  cli -> stateStore 'Reads status, reports'
 
-  paperPortfolio -> stateStore 'Reads/writes positions, orders, fills, equity'
-  shadowBooks -> stateStore 'Reads/writes shadow book state'
-  shadowBooks -> fillModel 'Uses same fill model as PAPER'
-
-  narrator -> eventLog 'Reads events for context building'
-  narrator -> stateStore 'Reads positions, equity curve, concept_log'
+  narrator -> eventLog 'Reads events for context'
+  narrator -> stateStore 'Reads positions, equity'
   narrator -> llmProvider 'Sends context, receives prose'
 
-  dashboard -> stateStore 'Reads-only: positions, equity_curve, events, journals'
-
-  m1 -> m3 'Universe members for scoring'
-  m1 -> m4 'Universe members for quality gate'
-  m2 -> m8 'Regime multiplier for ranking'
-  m3 -> m8 'Technical scores'
-  m4 -> m8 'Gate pass/fail'
-  m5 -> m8 'Insider boost'
-  m6 -> m8 'Veto signal'
-  m7 -> m8 'Blackout signal'
-  m8 -> positionSizer 'Ranked candidates'
-  positionSizer -> riskEvaluator 'Sized positions for risk check'
-
-  fillEntry -> paperPortfolio 'Booked entry fills'
-  fillStop -> paperPortfolio 'Booked exit fills'
-  fillPartial -> paperPortfolio 'Booked partial fills'
-  fillCorpAction -> paperPortfolio 'Adjusts positions/stops'
-  paperPortfolio -> shadowBooks 'Same data, toggled mechanisms'
-  paperPortfolio -> spyBaseline 'Comparison baseline'
-  paperPortfolio.consistencyChecker -> paperPortfolio.paperPortfolioInternal 'Post-fill verification'
+  dashboard -> duckDb 'Read-only queries'
 }

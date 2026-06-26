@@ -1,0 +1,627 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from decimal import Decimal
+from typing import Any
+from uuid import UUID, uuid4
+
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from alpha_quant.contracts.operational import (
+    AuditEvent,
+    CandidateEvaluation,
+    CurrentHalt,
+    DecisionBatch,
+    DecisionRun,
+    FillBookingCommand,
+    FillBookingResult,
+    HaltCommand,
+    HaltReason,
+    PolicyEvaluation,
+    PortfolioBook,
+    PortfolioMark,
+    PortfolioState,
+    PositionCurrent,
+    RunKind,
+    RunReservation,
+    RunStatus,
+    Strategy,
+)
+
+
+class PostgresOperationalStore:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    # --- Run lifecycle ---
+
+    def reserve_run(self, request: RunReservation) -> DecisionRun:
+        run_id = str(uuid4())
+        now = datetime.now(UTC)
+        self.session.execute(
+            text(
+                """
+                INSERT INTO run.decision_run
+                    (decision_run_id, run_key, run_kind, status,
+                     strategy_version_id, portfolio_book_id,
+                     decision_as_of, resolved_snapshot_id,
+                     alpha_lake_api_version, alpha_lake_contract_version,
+                     config_hash, request_hash, response_hash,
+                     started_at)
+                VALUES
+                    (:rid, :rk, :kind, :status,
+                     :svid, :pbid,
+                     :dao, :sid,
+                     :apiv, :ctv,
+                     :ch, :reqh, :resh,
+                     :now)
+                """
+            ),
+            {
+                "rid": run_id,
+                "rk": request.run_key,
+                "kind": request.run_kind.value,
+                "status": RunStatus.RESERVED.value,
+                "svid": str(request.strategy_version_id),
+                "pbid": str(request.portfolio_book_id),
+                "dao": request.decision_as_of,
+                "sid": request.resolved_snapshot_id,
+                "apiv": request.alpha_lake_api_version,
+                "ctv": request.alpha_lake_contract_version,
+                "ch": request.config_hash,
+                "reqh": request.request_hash,
+                "resh": request.response_hash,
+                "now": now,
+            },
+        )
+        return DecisionRun(
+            decision_run_id=UUID(run_id),
+            run_key=request.run_key,
+            run_kind=request.run_kind,
+            status=RunStatus.RESERVED,
+            strategy_version_id=request.strategy_version_id,
+            portfolio_book_id=request.portfolio_book_id,
+            decision_as_of=request.decision_as_of,
+            execution_as_of=None,
+            resolved_snapshot_id=request.resolved_snapshot_id,
+            alpha_lake_api_version=request.alpha_lake_api_version,
+            alpha_lake_contract_version=request.alpha_lake_contract_version,
+            config_hash=request.config_hash,
+            request_hash=request.request_hash,
+            response_hash=request.response_hash,
+            started_at=now,
+        )
+
+    def start_run(self, run_id: UUID) -> None:
+        self.session.execute(
+            text("UPDATE run.decision_run SET status = :s WHERE decision_run_id = :rid"),
+            {"s": RunStatus.RUNNING.value, "rid": str(run_id)},
+        )
+
+    def complete_run(self, run_id: UUID, status: str, failure_reason: str | None = None) -> None:
+        self.session.execute(
+            text(
+                """
+                UPDATE run.decision_run
+                SET status = :s, completed_at = :now, failure_reason = :fr
+                WHERE decision_run_id = :rid
+                """
+            ),
+            {
+                "s": status,
+                "now": datetime.now(UTC),
+                "fr": failure_reason,
+                "rid": str(run_id),
+            },
+        )
+
+    # --- Decision batch ---
+
+    def commit_decision_batch(self, batch: DecisionBatch) -> None:
+        for cand in batch.candidates:
+            self.session.execute(
+                text(
+                    """
+                    INSERT INTO run.candidate_evaluation
+                        (candidate_id, decision_run_id, portfolio_book_id,
+                         security_id, symbol, composite_score, regime,
+                         blocked, block_reason, gate_results)
+                    VALUES
+                        (:cid, :rid, :pbid,
+                         :sid, :sym, :cs, :reg,
+                         :bl, :br, :gr)
+                    """
+                ),
+                {
+                    "cid": str(cand.candidate_id),
+                    "rid": str(batch.decision_run_id),
+                    "pbid": str(cand.portfolio_book_id),
+                    "sid": str(cand.security_id),
+                    "sym": cand.symbol,
+                    "cs": str(cand.composite_score),
+                    "reg": cand.regime,
+                    "bl": cand.blocked,
+                    "br": cand.block_reason,
+                    "gr": cand.gate_results,
+                },
+            )
+            for pe in batch.policy_evals:
+                self.session.execute(
+                    text(
+                        """
+                        INSERT INTO run.policy_evaluation
+                            (evaluation_id, candidate_id, policy_name,
+                             policy_version, score, passed, reason, details_json)
+                        VALUES
+                            (:eid, :cid, :pn,
+                             :pv, :sc, :pa, :re, :dj)
+                        """
+                    ),
+                    {
+                        "eid": str(pe.evaluation_id),
+                        "cid": str(pe.candidate_id),
+                        "pn": pe.policy_name,
+                        "pv": pe.policy_version,
+                        "sc": str(pe.score) if pe.score is not None else None,
+                        "pa": pe.passed,
+                        "re": pe.reason,
+                        "dj": pe.details_json,
+                    },
+                )
+
+    # --- Fills ---
+
+    def book_fill(self, command: FillBookingCommand) -> FillBookingResult:
+        existing = self.session.execute(
+            text("SELECT fill_id, fill_key FROM trade.paper_fill WHERE fill_key = :fk"),
+            {"fk": command.fill_key},
+        ).fetchone()
+
+        if existing is not None:
+            return FillBookingResult(
+                fill_id=UUID(existing._mapping["fill_id"]),
+                fill_key=existing._mapping["fill_key"],
+                already_booked=True,
+            )
+
+        fill_id = str(uuid4())
+        now = datetime.now(UTC)
+        self.session.execute(
+            text(
+                """
+                INSERT INTO trade.paper_fill
+                    (fill_id, order_id, security_id, symbol, side,
+                     quantity, price, fill_key, quality, fee, booked_at)
+                VALUES
+                    (:fid, :oid, :sid, :sym, :side,
+                     :qty, :pr, :fk, :ql, :fee, :now)
+                """
+            ),
+            {
+                "fid": fill_id,
+                "oid": str(command.order_id),
+                "sid": str(command.security_id),
+                "sym": command.symbol,
+                "side": command.side.value,
+                "qty": str(command.quantity),
+                "pr": str(command.price),
+                "fk": command.fill_key,
+                "ql": command.quality.value,
+                "fee": str(command.fee),
+                "now": now,
+            },
+        )
+        self.session.execute(
+            text(
+                """
+                INSERT INTO trade.cash_ledger_entry
+                    (entry_id, portfolio_book_id, fill_id, amount, currency, reason, booked_at)
+                VALUES
+                    (:eid, :pbid, :fid, :amt, :cur, :rea, :now)
+                """
+            ),
+            {
+                "eid": str(uuid4()),
+                "pbid": str(command.portfolio_book_id),
+                "fid": fill_id,
+                "amt": str(-command.price * command.quantity - command.fee),
+                "cur": "USD",
+                "rea": command.reason,
+                "now": now,
+            },
+        )
+        return FillBookingResult(
+            fill_id=UUID(fill_id),
+            fill_key=command.fill_key,
+            already_booked=False,
+        )
+
+    # --- Portfolio ---
+
+    def load_portfolio(self, book_id: UUID) -> PortfolioState:
+        cash_row = self.session.execute(
+            text("SELECT cash FROM projection.portfolio_current WHERE book_id = :bid"),
+            {"bid": str(book_id)},
+        ).fetchone()
+
+        cash = cash_row._mapping["cash"] if cash_row else Decimal("0")
+
+        pos_rows = self.session.execute(
+            text(
+                """
+                SELECT security_id, symbol, quantity, avg_cost, current_price,
+                       market_value, unrealized_pl, stop_price
+                FROM projection.position_current
+                WHERE book_id = :bid AND quantity != 0
+                """
+            ),
+            {"bid": str(book_id)},
+        ).fetchall()
+
+        positions = [
+            PositionCurrent(
+                book_id=book_id,
+                security_id=UUID(row._mapping["security_id"]),
+                symbol=row._mapping["symbol"],
+                quantity=row._mapping["quantity"],
+                avg_cost=row._mapping["avg_cost"],
+                current_price=row._mapping.get("current_price"),
+                market_value=row._mapping.get("market_value"),
+                unrealized_pl=row._mapping.get("unrealized_pl"),
+                stop_price=row._mapping.get("stop_price"),
+            )
+            for row in pos_rows
+        ]
+
+        return PortfolioState(book_id=book_id, cash=cash, positions=positions, open_orders=[])
+
+    def save_portfolio_mark(self, mark: PortfolioMark) -> None:
+        self.session.execute(
+            text(
+                """
+                INSERT INTO trade.portfolio_mark
+                    (mark_id, portfolio_book_id, effective_date, cash, equity,
+                     gross_exposure, regime, mark_as_of)
+                VALUES
+                    (:mid, :pbid, :ed, :c, :eq,
+                     :ge, :reg, :mao)
+                """
+            ),
+            {
+                "mid": str(mark.mark_id),
+                "pbid": str(mark.portfolio_book_id),
+                "ed": mark.effective_date,
+                "c": str(mark.cash),
+                "eq": str(mark.equity),
+                "ge": str(mark.gross_exposure),
+                "reg": mark.regime,
+                "mao": mark.mark_as_of,
+            },
+        )
+
+    # --- Halts ---
+
+    def set_halt(self, command: HaltCommand) -> None:
+        self.session.execute(
+            text(
+                """
+                INSERT INTO audit.halt_transition
+                    (halt_id, portfolio_book_id, reason, details, halted_at)
+                VALUES
+                    (:hid, :pbid, :rea, :det, :now)
+                """
+            ),
+            {
+                "hid": str(uuid4()),
+                "pbid": str(command.portfolio_book_id),
+                "rea": command.reason.value,
+                "det": command.details,
+                "now": datetime.now(UTC),
+            },
+        )
+        self.session.execute(
+            text(
+                """
+                INSERT INTO ops.current_halt
+                    (book_id, halted, reason, details, halted_at)
+                VALUES (:bid, TRUE, :rea, :det, :now)
+                ON CONFLICT (book_id) DO UPDATE SET
+                    halted = TRUE,
+                    reason = :rea,
+                    details = :det,
+                    halted_at = :now
+                """
+            ),
+            {
+                "bid": str(command.portfolio_book_id),
+                "rea": command.reason.value,
+                "det": command.details,
+                "now": datetime.now(UTC),
+            },
+        )
+
+    def clear_halt(self, book_id: UUID) -> None:
+        self.session.execute(
+            text("UPDATE ops.current_halt SET halted = FALSE WHERE book_id = :bid"),
+            {"bid": str(book_id)},
+        )
+
+    def current_halt(self, book_id: UUID) -> CurrentHalt | None:
+        row = self.session.execute(
+            text(
+                "SELECT halted, reason, details, halted_at"
+                " FROM ops.current_halt WHERE book_id = :bid"
+            ),
+            {"bid": str(book_id)},
+        ).fetchone()
+
+        if row is None:
+            return None
+        return CurrentHalt(
+            book_id=book_id,
+            halted=row._mapping["halted"],
+            reason=HaltReason(row._mapping["reason"]) if row._mapping["reason"] else None,
+            details=row._mapping["details"],
+            halted_at=row._mapping["halted_at"],
+        )
+
+    # --- Projections ---
+
+    def rebuild_projections(self, book_id: UUID) -> None:
+        self.session.execute(
+            text("DELETE FROM projection.position_current WHERE book_id = :bid"),
+            {"bid": str(book_id)},
+        )
+        self.session.execute(
+            text("DELETE FROM projection.portfolio_current WHERE book_id = :bid"),
+            {"bid": str(book_id)},
+        )
+        self.session.execute(
+            text(
+                """
+                INSERT INTO projection.position_current
+                    (book_id, security_id, symbol, quantity, avg_cost)
+                SELECT
+                    pf.portfolio_book_id,
+                    pf.security_id,
+                    pf.symbol,
+                    SUM(CASE WHEN pf.side = 'buy' THEN pf.quantity ELSE -pf.quantity END),
+                    CASE
+                        WHEN SUM(CASE WHEN pf.side = 'buy' THEN pf.quantity ELSE 0 END) > 0
+                        THEN SUM(
+                            pf.price * pf.quantity * CASE WHEN pf.side = 'buy' THEN 1 ELSE -1 END
+                        ) / SUM(CASE WHEN pf.side = 'buy' THEN pf.quantity ELSE 0 END)
+                        ELSE 0
+                    END
+                FROM trade.paper_fill pf
+                JOIN trade.paper_order po ON pf.order_id = po.order_id
+                WHERE po.portfolio_book_id = :bid
+                GROUP BY pf.portfolio_book_id, pf.security_id, pf.symbol
+                HAVING SUM(CASE WHEN pf.side = 'buy' THEN pf.quantity ELSE -pf.quantity END) != 0
+                """
+            ),
+            {"bid": str(book_id)},
+        )
+        self.session.execute(
+            text(
+                """
+                INSERT INTO projection.portfolio_current
+                    (book_id, cash, equity, gross_exposure, regime, updated_at)
+                VALUES
+                    (:bid, 0, 0, 0, 'unknown', :now)
+                ON CONFLICT (book_id) DO UPDATE SET
+                    cash = 0,
+                    equity = 0,
+                    gross_exposure = 0,
+                    updated_at = :now
+                """
+            ),
+            {"bid": str(book_id), "now": datetime.now(UTC)},
+        )
+
+    # --- Queries ---
+
+    def list_strategies(self) -> list[Strategy]:
+        rows = self.session.execute(
+            text("SELECT strategy_id, name, created_at FROM core.strategy ORDER BY name")
+        ).fetchall()
+        return [
+            Strategy(
+                strategy_id=UUID(r._mapping["strategy_id"]),
+                name=r._mapping["name"],
+                created_at=r._mapping["created_at"],
+            )
+            for r in rows
+        ]
+
+    def list_books(self) -> list[PortfolioBook]:
+        rows = self.session.execute(
+            text("SELECT book_id, name, kind, created_at FROM core.portfolio_book ORDER BY name")
+        ).fetchall()
+        return [
+            PortfolioBook(
+                book_id=UUID(r._mapping["book_id"]),
+                name=r._mapping["name"],
+                kind=r._mapping["kind"],
+                created_at=r._mapping["created_at"],
+            )
+            for r in rows
+        ]
+
+    def list_decision_runs(self, book_id: UUID, limit: int = 20) -> list[DecisionRun]:
+        rows = self.session.execute(
+            text(
+                """
+                SELECT decision_run_id, run_key, run_kind, status,
+                       strategy_version_id, portfolio_book_id,
+                       decision_as_of, execution_as_of,
+                       resolved_snapshot_id,
+                       alpha_lake_api_version, alpha_lake_contract_version,
+                       config_hash, request_hash, response_hash,
+                       started_at, completed_at, failure_reason
+                FROM run.decision_run
+                WHERE portfolio_book_id = :bid
+                ORDER BY started_at DESC
+                LIMIT :lim
+                """
+            ),
+            {"bid": str(book_id), "lim": limit},
+        ).fetchall()
+        return [self._row_to_decision_run(r) for r in rows]
+
+    def get_run_by_key(self, run_key: str) -> DecisionRun | None:
+        row = self.session.execute(
+            text(
+                """
+                SELECT decision_run_id, run_key, run_kind, status,
+                       strategy_version_id, portfolio_book_id,
+                       decision_as_of, execution_as_of,
+                       resolved_snapshot_id,
+                       alpha_lake_api_version, alpha_lake_contract_version,
+                       config_hash, request_hash, response_hash,
+                       started_at, completed_at, failure_reason
+                FROM run.decision_run
+                WHERE run_key = :rk
+                """
+            ),
+            {"rk": run_key},
+        ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_decision_run(row)
+
+    def list_candidates(self, run_id: UUID, limit: int = 100) -> list[CandidateEvaluation]:
+        rows = self.session.execute(
+            text(
+                """
+                SELECT candidate_id, decision_run_id, portfolio_book_id,
+                       security_id, symbol, composite_score, regime,
+                       blocked, block_reason, gate_results
+                FROM run.candidate_evaluation
+                WHERE decision_run_id = :rid
+                ORDER BY composite_score DESC
+                LIMIT :lim
+                """
+            ),
+            {"rid": str(run_id), "lim": limit},
+        ).fetchall()
+        return [
+            CandidateEvaluation(
+                candidate_id=UUID(r._mapping["candidate_id"]),
+                decision_run_id=UUID(r._mapping["decision_run_id"]),
+                portfolio_book_id=UUID(r._mapping["portfolio_book_id"]),
+                security_id=UUID(r._mapping["security_id"]),
+                symbol=r._mapping["symbol"],
+                composite_score=r._mapping["composite_score"],
+                regime=r._mapping["regime"],
+                blocked=r._mapping["blocked"],
+                block_reason=r._mapping["block_reason"],
+                gate_results=r._mapping["gate_results"],
+            )
+            for r in rows
+        ]
+
+    def list_policy_evals(self, run_id: UUID, limit: int = 500) -> list[PolicyEvaluation]:
+        rows = self.session.execute(
+            text(
+                """
+                SELECT pe.evaluation_id, pe.candidate_id,
+                       pe.policy_name, pe.policy_version,
+                       pe.score, pe.passed, pe.reason, pe.details_json
+                FROM run.policy_evaluation pe
+                JOIN run.candidate_evaluation ce ON pe.candidate_id = ce.candidate_id
+                WHERE ce.decision_run_id = :rid
+                ORDER BY pe.policy_name
+                LIMIT :lim
+                """
+            ),
+            {"rid": str(run_id), "lim": limit},
+        ).fetchall()
+        return [
+            PolicyEvaluation(
+                evaluation_id=UUID(r._mapping["evaluation_id"]),
+                candidate_id=UUID(r._mapping["candidate_id"]),
+                policy_name=r._mapping["policy_name"],
+                policy_version=r._mapping["policy_version"],
+                score=r._mapping["score"],
+                passed=r._mapping["passed"],
+                reason=r._mapping["reason"],
+                details_json=r._mapping["details_json"],
+            )
+            for r in rows
+        ]
+
+    def list_audit_events(self, run_id: UUID, limit: int = 200) -> list[AuditEvent]:
+        rows = self.session.execute(
+            text(
+                """
+                SELECT event_id, decision_run_id, event_type, payload_json, created_at
+                FROM audit.audit_event
+                WHERE decision_run_id = :rid
+                ORDER BY created_at
+                LIMIT :lim
+                """
+            ),
+            {"rid": str(run_id), "lim": limit},
+        ).fetchall()
+        return [
+            AuditEvent(
+                event_id=UUID(r._mapping["event_id"]),
+                decision_run_id=UUID(r._mapping["decision_run_id"]),
+                event_type=r._mapping["event_type"],
+                payload_json=r._mapping["payload_json"],
+                created_at=r._mapping["created_at"],
+            )
+            for r in rows
+        ]
+
+    def list_positions(self, book_id: UUID) -> list[PositionCurrent]:
+        rows = self.session.execute(
+            text(
+                """
+                SELECT book_id, security_id, symbol, quantity, avg_cost,
+                       current_price, market_value, unrealized_pl, stop_price
+                FROM projection.position_current
+                WHERE book_id = :bid AND quantity != 0
+                """
+            ),
+            {"bid": str(book_id)},
+        ).fetchall()
+        return [
+            PositionCurrent(
+                book_id=book_id,
+                security_id=UUID(r._mapping["security_id"]),
+                symbol=r._mapping["symbol"],
+                quantity=r._mapping["quantity"],
+                avg_cost=r._mapping["avg_cost"],
+                current_price=r._mapping.get("current_price"),
+                market_value=r._mapping.get("market_value"),
+                unrealized_pl=r._mapping.get("unrealized_pl"),
+                stop_price=r._mapping.get("stop_price"),
+            )
+            for r in rows
+        ]
+
+    # --- Helpers ---
+
+    def _row_to_decision_run(self, r: Any) -> DecisionRun:
+        return DecisionRun(
+            decision_run_id=UUID(r._mapping["decision_run_id"]),
+            run_key=r._mapping["run_key"],
+            run_kind=RunKind(r._mapping["run_kind"]),  # type: ignore[arg-type]
+            status=RunStatus(r._mapping["status"]),
+            strategy_version_id=UUID(r._mapping["strategy_version_id"]),
+            portfolio_book_id=UUID(r._mapping["portfolio_book_id"]),
+            decision_as_of=r._mapping["decision_as_of"],
+            execution_as_of=r._mapping.get("execution_as_of"),
+            resolved_snapshot_id=r._mapping["resolved_snapshot_id"],
+            alpha_lake_api_version=r._mapping["alpha_lake_api_version"],
+            alpha_lake_contract_version=r._mapping["alpha_lake_contract_version"],
+            config_hash=r._mapping["config_hash"],
+            request_hash=r._mapping["request_hash"],
+            response_hash=r._mapping["response_hash"],
+            started_at=r._mapping["started_at"],
+            completed_at=r._mapping.get("completed_at"),
+            failure_reason=r._mapping.get("failure_reason"),
+        )

@@ -52,11 +52,6 @@ model = "anthropic/claude-sonnet-4"
 base_url = ""
 timeout_s = 30
 
-[alpaca]
-api_key = ""
-secret_key = ""
-base_url = "https://data.alpaca.markets"
-
 [dashboard]
 host = "localhost"
 port = 8501

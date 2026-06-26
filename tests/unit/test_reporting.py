@@ -2,8 +2,8 @@
 
 from datetime import date
 
-from domain.narration import NarrationContext
-from domain.reporting import ReportEntry, generate_monthly, generate_weekly
+from alpha_quant.domain.narration import NarrationContext
+from alpha_quant.domain.reporting import ReportEntry, generate_monthly, generate_weekly
 
 
 def _ctx(

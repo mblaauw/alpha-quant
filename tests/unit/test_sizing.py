@@ -1,6 +1,6 @@
 """Unit tests for position sizing (domain.sizing)."""
 
-from domain.sizing import PositionSize, SizingConfig, size_position
+from alpha_quant.domain.sizing import PositionSize, SizingConfig, size_position
 
 
 def _config(**kwargs: float) -> SizingConfig:

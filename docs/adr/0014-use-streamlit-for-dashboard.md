@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded (by FastAPI Dashboard — see ADR-0041)
 
 ## Date
 

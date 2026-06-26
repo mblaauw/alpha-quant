@@ -1,7 +1,7 @@
 """Unit tests for self-consistency invariants (domain.invariants)."""
 
-from domain.invariants import InvariantViolation, check_invariants
-from domain.models import Position
+from alpha_quant.domain.invariants import InvariantViolation, check_invariants
+from alpha_quant.domain.models import Position
 
 
 def _position(

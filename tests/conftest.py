@@ -8,10 +8,9 @@ from typing import Self
 
 import pytest
 
-from domain.models import (
+from alpha_quant.domain.models import (
     Bar,
     CorporateAction,
-    EarningsEntry,
     Fill,
     FundamentalsSnapshot,
     Order,
@@ -160,23 +159,6 @@ def make_fundamentals(**kwargs: float | None) -> FundamentalsSnapshot:
         total_equity=kwargs.get("total_equity", 200_000_000_000.0),
         net_income=kwargs.get("net_income", 50_000_000_000.0),
         accruals=kwargs.get("accruals", 0.0),
-    )
-
-
-# ---- Earnings factory ----
-
-
-def make_earnings(
-    symbol: str = "AAPL",
-    dt: date = date(2026, 6, 11),
-    eps_estimate: float | None = None,
-    eps_actual: float | None = None,
-) -> EarningsEntry:
-    return EarningsEntry(
-        symbol=symbol,
-        date=dt,
-        eps_estimate=eps_estimate,
-        eps_actual=eps_actual,
     )
 
 

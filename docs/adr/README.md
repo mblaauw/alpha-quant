@@ -19,7 +19,7 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0011](./0011-use-httpx-for-llm-integration.md) | Use Direct httpx (No SDK) for LLM Integration | Accepted | 2026-06-10 |
 | [0012](./0012-use-eodhd-as-primary-data-source.md) | Use EODHD as the Primary Market Data Source | Superseded | 2026-06-10 |
 | [0013](./0013-use-structlog-structured-logging.md) | Use structlog with JSON Format for Structured Logging | Accepted | 2026-06-10 |
-| [0014](./0014-use-streamlit-for-dashboard.md) | Use Streamlit for the Read-Only Dashboard | Accepted | 2026-06-10 |
+| [0014](./0014-use-streamlit-for-dashboard.md) | Use Streamlit for the Read-Only Dashboard | **Superseded** | 2026-06-10 |
 | [0015](./0015-use-incremental-o1-indicators.md) | Use Incremental O(1) Indicator Engine | **Superseded** | 2026-06-10 |
 | [0016](./0016-use-degrade-dont-block-failure-model.md) | Use Degrade-Don't-Block Data Failure Model | Accepted | 2026-06-10 |
 | [0017](./0017-use-golden-replay-ci.md) | Use Golden Replay as the Primary CI Strategy | Accepted | 2026-06-10 |
@@ -36,12 +36,17 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0028](./0028-use-clock-virtualization-for-determinism.md) | Clock Virtualization for Deterministic Replay | Accepted | 2026-06-15 |
 | [0029](./0029-use-store-mixin-decomposition.md) | Store Mixin Decomposition for Schema Organization | Accepted | 2026-06-15 |
 | [0030](./0030-use-shadow-ablation-books.md) | Shadow Ablation Books for Mechanism Evaluation | Accepted | 2026-06-15 |
-| [0031](./0031-use-file-based-halt-mechanism.md) | File-Based Halt Mechanism for System Safety | Accepted | 2026-06-15 |
+| [0031](./0031-use-file-based-halt-mechanism.md) | File-Based Halt Mechanism for System Safety | **Superseded** | 2026-06-15 |
 | [0032](./0032-alpha-lake-data-plane.md) | Alpha-Lake as the Sole Data Plane | **Superseded** | 2026-06-21 |
 | [0033](./0033-pit-reads-via-clock-asof.md) | PIT Reads via Clock-Driven `as_of` | Accepted | 2026-06-21 |
 | [0034](./0034-lake-gateway-port.md) | LakeGateway Port and Adapters | **Superseded** | 2026-06-21 |
 | [0035](./0035-alpha-lake-rest-sole-facts-plane.md) | Alpha-Lake REST Is the Sole Alpha-Quant Runtime Facts Plane | **Accepted** | 2026-06-25 |
 | [0036](./0036-neutral-facts-strategy-policy.md) | Neutral Facts in Alpha-Lake, Strategy Policy in Alpha-Quant | **Accepted** | 2026-06-25 |
+| [0037](./0037-postgresql-operational-system-of-record.md) | PostgreSQL as the Operational System of Record | **Accepted** | 2026-06-26 |
+| [0038](./0038-append-only-ledger-rebuildable-projections.md) | Append-Only Ledger with Rebuildable Projections | **Accepted** | 2026-06-26 |
+| [0039](./0039-s3-compatible-artifact-store.md) | S3-Compatible Artifact Store | **Accepted** | 2026-06-26 |
+| [0040](./0040-database-backed-halts-transactional-run-locks.md) | Database-Backed Halts and Transactional Run Locks | **Accepted** | 2026-06-26 |
+| [0041](./0041-migration-strategy-src-alpha-quant.md) | Migration Strategy — Consolidating to `src/alpha_quant/` | **Accepted** | 2026-06-26 |
 
 ## Status Meanings
 

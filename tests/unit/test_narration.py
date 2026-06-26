@@ -5,14 +5,14 @@ from datetime import date, datetime
 import pytest
 from pydantic import ValidationError
 
-from domain.events import (
+from alpha_quant.domain.events import (
     CandidateBlocked,
     CandidatePromoted,
     CandidateScored,
     SourceDegraded,
 )
-from domain.models import Position
-from domain.narration import PositionNarration, build
+from alpha_quant.domain.models import Position
+from alpha_quant.domain.narration import PositionNarration, build
 
 
 def _event(**kwargs: object) -> dict:

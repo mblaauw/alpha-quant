@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
-from domain.models import Order
+from alpha_quant.domain.models import Order
 
 
 class TestOrderValidation:

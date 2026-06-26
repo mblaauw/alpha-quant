@@ -9,6 +9,8 @@ Alpha-Quant is a **deterministic strategy-policy and paper-trading engine**. It 
 | Dependency | Purpose | Protocol |
 |------------|---------|----------|
 | Alpha-Lake | All market facts (bars, indicators, fundamentals, insider, earnings, attention) | HTTPS REST (PIT `as_of` + optional `snapshot_id`) |
+| PostgreSQL 17+ | Operational system of record (decision runs, candidates, orders, fills, marks, halts) | psycopg 3 / SQLAlchemy 2 Core |
+| S3-compatible | Artifact store for decision evidence (SHA-256 verified) | HTTPS (boto3) |
 | OpenRouter/OpenAI (optional) | LLM narration and decision explanations | HTTPS REST |
 
 ### Non-Goals
@@ -22,38 +24,81 @@ Alpha-Quant is a **deterministic strategy-policy and paper-trading engine**. It 
 
 ## 2. Architecture Style
 
-**Ports-and-Adapters (Hexagonal).** The domain boundary is `ports/alpha_lake.py:AlphaLakeReadPort` — all market facts flow through a single authenticated REST interface. No direct Python imports, DuckDB connections, or Parquet file access for market data.
+**Ports-and-Adapters (Hexagonal).** The domain boundary is `ports/alpha_lake.py:AlphaLakeReadPort` — all market facts flow through a single authenticated REST interface. The operational system of record is `ports/operational_store.py:OperationalStorePort` — a PostgreSQL-backed append-only ledger with rebuildable projections. Artifact storage is `ports/artifact_store.py:ArtifactStorePort` — an S3-compatible store with content-addressable keys and SHA-256 verification.
 
 ## 3. Module Layout
 
 ```
 src/alpha_quant/
-├── ports/
-│   └── alpha_lake.py          # AlphaLakeReadPort (Protocol)
 ├── contracts/
-│   └── alpha_lake.py          # Data contracts (dataclasses)
+│   ├── alpha_lake.py             # NeutralObservation data contracts (frozen dataclasses)
+│   └── operational.py            # 25 frozen dataclass contracts for PostgreSQL operational store
 ├── domain/
-│   ├── decision_context.py    # Fact context for policy modules
-│   └── policy/                # Strategy policy modules
-│       ├── regime_policy.py
-│       ├── technical_policy.py
-│       ├── fundamental_policy.py
-│       ├── insider_policy.py
-│       ├── attention_policy.py
-│       ├── earnings_blackout_policy.py
-│       ├── ranking_policy.py
-│       └── composite_policy.py
+│   ├── decision_context.py       # DecisionContext wrapping NeutralObservations
+│   ├── policy/                   # 7 policy modules
+│   │   ├── regime_policy.py, technical_policy.py, fundamental_policy.py
+│   │   ├── insider_policy.py, attention_policy.py
+│   │   ├── earnings_blackout_policy.py, composite_policy.py
+│   ├── models.py                 # Bar, Position, Order, Fill, Decision, Candidate, PortfolioSnapshot (frozen Pydantic)
+│   ├── events.py                 # 20+ DomainEvent types (discriminated union)
+│   ├── fills.py                  # FillConfig, fill_entry_order, fill_stop_loss, fill_partial_take
+│   ├── risk.py                   # RiskConfig, evaluate_stops, evaluate_drawdown, evaluate_daily_loss
+│   ├── sizing.py                 # SizingConfig, size_position
+│   ├── ranking.py                # Candidate ranking with sector diversification
+│   ├── invariants.py             # Self-consistency invariant checks
+│   └── narration.py, journal.py, reporting.py, calendar.py, ask.py, degradation.py, regime.py, constants.py
+├── ports/
+│   ├── alpha_lake.py             # AlphaLakeReadPort (Protocol): read_observations → NeutralObservations
+│   ├── operational_store.py      # OperationalStorePort (Protocol): 20 methods for PostgreSQL
+│   ├── artifact_store.py         # ArtifactStorePort (Protocol): put_json, get_json, verify
+│   ├── store.py                  # Legacy Store port (DuckDB)
+│   ├── clock.py                  # Clock port
+│   ├── event_sink.py             # EventSink port
+│   └── llm.py                    # LLM port
 ├── adapters/
+│   ├── _parse.py                 # Shared parsing helpers for Alpha-Lake responses
+│   ├── postgres/                 # PostgreSQL adapters
+│   │   ├── tables.py             # 21 ORM models across 6 schemas (core, run, trade, projection, audit, ops)
+│   │   ├── engine.py             # Engine + session factory + init_schema()
+│   │   ├── health.py             # Health check
+│   │   ├── operational_store.py  # PostgresOperationalStore (20 methods, SQLAlchemy Core text)
+│   │   └── unit_of_work.py       # OperationalUnitOfWork context manager
+│   ├── artifacts/
+│   │   └── s3_artifact_store.py  # S3 artifact store with SHA-256 verification
 │   ├── real/
-│   │   ├── alpha_lake_rest.py       # HTTP client
-│   │   └── decision_store_duckdb.py # Local state store
+│   │   ├── alpha_lake_rest.py    # AlphaLakeRestClient (httpx → Alpha-Lake REST API)
+│   │   ├── clock.py              # SystemClock
+│   │   ├── event_sink.py         # DuckDBEventSink
+│   │   └── llm_adapter.py        # OpenAILikeLLM
 │   └── fake/
-│       ├── alpha_lake_http_fixture.py  # Offline replay
-│       └── virtual_clock.py
-└── app/
-    ├── cli.py, config.py, factory.py
-    ├── pipeline.py, replay.py, backtest.py
-    └── store/                 # Local decision/paper state (DuckDB)
+│       ├── alpha_lake_http_fixture.py  # Offline replay from fixture files
+│       ├── fake_operational_store.py   # In-memory fake for unit tests
+│       ├── fixture_store.py      # FixtureStore for test replay
+│       ├── virtual_clock.py      # Deterministic clock for tests
+│       ├── canned_llm.py         # Static LLM responses for tests
+│       └── fake_event_sink.py    # In-memory event sink for tests
+├── application/
+│   ├── cli.py                    # Typer CLI: run, journal, ask, report, status, halt, backup, db-*, dashboard
+│   ├── config.py                 # pydantic-settings AppConfig with nested Bootstrap/Data/Lake/Portfolio/Paper/Risk/LLM/Dashboard configs
+│   ├── factory.py                # Composition root: create_alpha_lake_reader, create_event_sink, create_store, create_llm, create_clock, create_unit_of_work, run_migrations, seed_default_data
+│   ├── pipeline_v2.py            # Pipeline orchestrator (daily decision cycle with NeutralObservations)
+│   ├── halt.py                   # Database-backed halt via ops.current_halt (ADR-0040)
+│   ├── backup.py                 # DuckDB state store backup
+│   ├── alerts.py                 # System alert management
+│   ├── catalog.py                # Data catalog queries
+│   ├── import_legacy_duckdb.py   # One-time DuckDB → PostgreSQL migration tool
+│   ├── dashboard/                # FastAPI dashboard package
+│   │   ├── __init__.py           # FastAPI app with CORS, lifespan, 10 routers, Jinja2 template
+│   │   ├── db.py                 # DashboardDB (DuckDB read layer for operator display)
+│   │   ├── routes/               # 10 route modules: status, equity, positions, runs, events, quarantine, reports, journal, decisions, concepts
+│   │   └── templates/dashboard.html  # HTMX v2 SPA with 6 tabs
+│   └── store/                    # CanonicalStore (DuckDB legacy — being replaced)
+│       ├── state.py              # CanonicalStore base + schema init
+│       └── *mixins               # PositionStore, OrderStore, DecisionStore, EventStore, JournalStore, AdminStore
+└── migrations/                   # Alembic migrations
+    ├── env.py
+    └── versions/
+        └── 0001_schema_baseline.py  # 21 tables across 6 schemas
 ```
 
 ## 4. Technology Stack
@@ -62,15 +107,20 @@ src/alpha_quant/
 |-------|-----------|-----------|
 | Runtime | Python 3.14 | Type hints, pattern matching, free-threaded |
 | HTTP Client | httpx | Async-capable, connection pooling, timeout support |
-| State Store | DuckDB | Embedded OLAP for local decision/paper state |
-| CLI | Typer + Rich | Type-hint-driven commands, formatted tables |
+| Operational Store | PostgreSQL 17+ (psycopg 3, SQLAlchemy 2 Core) | ACID-compliant system of record, append-only ledger |
+| Artifact Store | S3-compatible (boto3) | Durable, content-addressed, SHA-256 verified decision evidence |
+| CLI | Typer + Rich | Type-hint-driven commands, formatted tables, panels |
+| Dashboard | FastAPI + HTMX v2 + Jinja2 | Lightweight SPA, SSE, real-time status |
 | Type Checker | ty (Astral) | Fast, Python 3.14 compatible |
 | Linter/Formatter | ruff (Astral) | Unified lint + format, 10-100x faster |
-| Config | pydantic-settings + TOML | Type-safe environment overrides |
+| Config | pydantic-settings + TOML | Type-safe environment overrides, nested sub-configs |
+| Migrations | Alembic | Schema versioning for PostgreSQL |
+| Domain Models | pydantic.BaseModel (frozen=True) | Immutable, validated, JSON-serializable |
+| Data Contracts | frozen dataclasses | Lightweight, hashable, cross-boundary transfer types |
 
 ## 5. Architecture Decision Records
 
-36 ADRs document every technology and architectural decision.
+41 ADRs document every technology and architectural decision.
 
 | ADR | Title | Status |
 |-----|-------|--------|
@@ -82,7 +132,7 @@ src/alpha_quant/
 | 0010 | Custom Event-Driven Backtester | Accepted |
 | 0011 | Direct httpx for LLM | Accepted |
 | 0013 | structlog JSON Logging | Accepted |
-| 0014 | Streamlit Dashboard | Accepted |
+| 0014 | Streamlit Dashboard | **Superseded** (by FastAPI dashboard) |
 | 0016 | Degrade-Don't-Block Failure Model | Accepted |
 | 0017 | Golden Replay as CI Strategy | Accepted |
 | 0019 | Astral Development Tooling (ruff + ty) | Accepted |
@@ -94,10 +144,15 @@ src/alpha_quant/
 | 0028 | Clock Virtualization | Accepted |
 | 0029 | Store Mixin Decomposition | Accepted |
 | 0030 | Shadow Ablation Books | Accepted |
-| 0031 | File-Based Halt Mechanism | Accepted |
+| 0031 | File-Based Halt Mechanism | **Superseded** (by ADR-0040) |
 | 0033 | Clock-Driven PIT Reads | Accepted |
-| 0035 | Alpha-Lake REST Is the Sole Facts Plane | **Accepted** |
-| 0036 | Neutral Facts in Alpha-Lake, Strategy Policy in Alpha-Quant | **Accepted** |
+| 0035 | Alpha-Lake REST Is the Sole Facts Plane | Accepted |
+| 0036 | Neutral Facts in Alpha-Lake, Strategy Policy in Alpha-Quant | Accepted |
+| 0037 | PostgreSQL as Operational System of Record | **Accepted** |
+| 0038 | Append-Only Ledger with Rebuildable Projections | **Accepted** |
+| 0039 | S3-Compatible Artifact Store | **Accepted** |
+| 0040 | Database-Backed Halts and Transactional Run Locks | **Accepted** |
+| 0041 | Migration Strategy — Consolidating to `src/alpha_quant/` | **Accepted** |
 | 0004 | argparse for CLI | Superseded |
 | 0006 | DuckDB + Parquet for Analytics | Superseded |
 | 0007 | SQLite WAL + SQLAlchemy Core | Superseded |
@@ -115,33 +170,18 @@ See [docs/adr/README.md](../adr/README.md) for full ADR index with titles and da
 
 ## 6. Key Architecture Decisions
 
-### 6.1 Single REST Facts Port
+### 6.1 Single REST Facts Port (ADR-0035)
 
 All market facts enter through `AlphaLakeReadPort` — one protocol, one implementation per environment:
 
 - **Production:** `AlphaLakeRestClient` (httpx → Alpha-Lake REST API)
 - **Test/Replay:** `AlphaLakeHttpFixtureClient` (pre-recorded HTTP responses)
 
-No other runtime data-access mechanism exists.
+No other runtime data-access mechanism exists. The old in-process lake gateway (ADR-0034) and DuckDB/Parquet data plane (ADR-0032) are superseded.
 
-### 6.2 Point-in-Time (PIT) Determinism
+### 6.2 Neutral Observation Contract (ADR-0036)
 
-Every decision, backtest, and replay run uses:
-- `as_of` (mandatory): the knowledge-time boundary for all facts
-- `snapshot_id` (mandatory for replay, recommended for backtests): pins to a specific Alpha-Lake catalog snapshot
-
-This ensures byte-stable reproducibility: same config + same snapshot = same decisions.
-
-### 6.3 Pessimistic Fill Model (ADR-0009)
-
-The fill model remains the most distinctive architectural decision. It is shared across backtest, replay, paper, and shadow books:
-- **Gap-through-stops**: if `bar.low <= stop_price`, fills at `min(open, stop_price) - slippage`
-- **Gap-up entries**: cancels if the open gaps >2% above the decision quote
-- **Partial fills**: scaled by `max_fill_pct` with a deterministic volume-based fill price
-
-### 6.4 Policy over Facts
-
-Strategy modules in `domain/policy/` apply thresholds and rules to Alpha-Lake observations. No policy recalculates a neutral metric. For example:
+Alpha-Lake returns `NeutralObservations` — pre-computed, versioned observations. Policies never recalculate a neutral metric:
 
 ```python
 # Correct: policy applies threshold to Alpha-Lake metric
@@ -153,27 +193,84 @@ if rsi is not None and rsi > 70:
 # rsi = calc_rsi(bars, 14)  # forbidden
 ```
 
-### 6.5 Ablation Framework (ADR-0030)
+The contract is a frozen dataclass hierarchy: `NeutralObservations` → `SymbolObservations` → `PriceObservation | TechnicalObservations | FundamentalMetric | InsiderTransaction | EarningsEvent | MentionObservation | BarObservation`. Bars are provided solely for fill simulation and stop tracking — policies must not read bars directly.
+
+### 6.3 PostgreSQL Operational System of Record (ADR-0037)
+
+PostgreSQL 17+ replaces DuckDB as the authoritative operational store. The schema spans 21 tables across 6 schemas:
+
+| Schema | Tables | Purpose |
+|--------|--------|---------|
+| `core` | strategy, strategy_version, portfolio_book, security_reference, execution_profile | Static reference data |
+| `run` | decision_run, alpha_lake_manifest, candidate_evaluation, policy_evaluation | Decision run lifecycle |
+| `trade` | paper_order, paper_fill, cash_ledger_entry, corporate_action_booking, portfolio_mark | Paper execution |
+| `projection` | position_current, portfolio_current | Rebuildable read models |
+| `audit` | audit_event, risk_event, halt_transition | Append-only event log |
+| `ops` | current_halt, run_lock_audit | Operational controls |
+
+### 6.4 Append-Only Ledger with Rebuildable Projections (ADR-0038)
+
+The trade and audit schemas are append-only. Current positions and portfolio state are `projection` tables rebuilt on demand from the raw ledger. `rebuild_projections()` replays all fills to reconstruct position_current and portfolio_current. This eliminates update-in-place anomalies and provides a complete audit trail.
+
+### 6.5 S3-Compatible Artifact Store (ADR-0039)
+
+Decision evidence (JSON blobs) is stored in an S3-compatible bucket with SHA-256 content hashing. Each artifact is immutable and independently verifiable. The `ArtifactStorePort` protocol exposes `put_json`, `get_json`, and `verify` methods.
+
+### 6.6 Point-in-Time (PIT) Determinism (ADR-0033)
+
+Every decision, backtest, and replay run uses:
+- `as_of` (mandatory): the knowledge-time boundary for all facts
+- `snapshot_id` (mandatory for replay, recommended for backtests): pins to a specific Alpha-Lake catalog snapshot
+
+This ensures byte-stable reproducibility: same config + same snapshot = same decisions.
+
+### 6.7 Pessimistic Fill Model (ADR-0009)
+
+The fill model is shared across backtest, replay, paper, and shadow books:
+- **Gap-through-stops**: if `bar.low <= stop_price`, fills at `min(open, stop_price) - slippage`
+- **Gap-up entries**: cancels if the open gaps >2% above the decision quote
+- **Partial fills**: scaled by `max_fill_pct` with a deterministic volume-based fill price
+
+### 6.8 Database-Backed Halts and Run Locks (ADR-0040)
+
+The `ops.current_halt` table stores halt state per portfolio book. Pipeline execution uses PostgreSQL advisory locks to prevent concurrent runs. The old file-based `.HALT` sentinel (ADR-0031) is being phased out. Halt transitions are recorded in `audit.halt_transition` for full traceability.
+
+### 6.9 FastAPI Dashboard (supersedes ADR-0014)
+
+A FastAPI + HTMX v2 SPA replaces the deprecated Streamlit dashboard. It serves 10 route modules (status, equity, positions, runs, events, quarantine, reports, journal, decisions, concepts) with SSE-based real-time updates and a DuckDB read layer for operator display.
+
+### 6.10 Policy over Facts
+
+Strategy modules in `domain/policy/` apply thresholds and rules to Alpha-Lake observations. Policy execution order: regime → technical → fundamental → insider → attention → earnings blackout → ranking → composite. Each policy computes a score or gate result independently.
+
+### 6.11 Ablation Framework (ADR-0030)
 
 Shadow books run in parallel during every pipeline execution. Each book disables one mechanism (e.g., `NO_INSIDER`, `NO_CROWDING_VETO`) to measure its marginal contribution. Books share the same Alpha-Lake decision panel — the `as_of` and `snapshot_id` are identical across all books.
 
-### 6.6 Halt Mechanism (ADR-0031)
+### 6.12 Self-Consistency Invariants (ADR-0024)
 
-A `.HALT` sentinel file prevents pipeline execution. Alpha-Lake unavailability, incompatible API contract, and stale facts are all halt reasons. The system fails closed — no silent fallback.
+After every pipeline run, `check_invariants` verifies: equity = cash + market value, all positions have non-negative quantity, no duplicate run IDs, and cash accounts balance. Violations trigger audit events and optionally halt the pipeline.
 
 ## 7. Runtime Flow
 
 ```
-1. CLI: alpha-quant run --as-of T --snapshot-id S
-2. Factory: instantiate AlphaLakeRestClient(base_url, api_key)
-3. Client: GET /v1/contract → verify version + capabilities
-4. Client: GET /v1/health → verify server readiness
-5. Client: GET /v1/decision-panel?symbols=...&as_of=T&snapshot_id=S
-6. Assembly: build DecisionContext for each symbol
-7. Policy: apply regime → technical → fundamental → insider → crowding → blackout → ranking → composite
-8. Portfolio: apply risk controls, position sizing
-9. Execution: simulate paper orders and fills
-10. Persist: store decisions, orders, fills, portfolio snapshot, evidence trail
+1. CLI: alpha-quant run [--mode live|fixture]
+2. Factory: create_alpha_lake_reader(config) → AlphaLakeRestClient or AlphaLakeHttpFixtureClient
+3. Halt check: is_halted() → ops.current_halt table (ADR-0040)
+4. Store init: CanonicalStore(base_path) for legacy DuckDB state
+5. Client: GET /v1/health → verify server readiness
+6. Client: GET /v1/contract → verify version + capabilities
+7. Client: GET /v1/observations?symbols=...&as_of=T → NeutralObservations
+8. Parse: build NeutralObservations from JSON response (contracts/alpha_lake.py)
+9. Assembly: build DecisionContext for each symbol (domain/decision_context.py)
+10. Regime detection: regime_policy.detect(spy_ctx) → RISK_ON | CAUTION | RISK_OFF
+11. Risk controls: evaluate_stops, evaluate_time_stop, evaluate_drawdown on existing positions
+12. Policy: regime → technical → fundamental → insider → attention → earnings blackout → ranking → composite
+13. Portfolio: size_position, fill_entry_order, mark_to_market
+14. Persist (DuckDB legacy): store decisions, orders, fills, portfolio snapshot, events
+15. Self-consistency: check_invariants(equity, cash, positions)
+16. Persist (PostgreSQL): via OperationalStorePort → reserve_run, start_run, commit_decision_batch, book_fill, save_portfolio_mark, complete_run
+17. Artifact: S3 artifact store (decision evidence JSON, SHA-256 verified)
 ```
 
 ## 8. Configuration
@@ -182,17 +279,39 @@ A `.HALT` sentinel file prevents pipeline execution. Alpha-Lake unavailability, 
 [alpha_lake]
 base_url = "http://alpha-lake:8000"
 api_key_env = "ALPHA_LAKE_API_KEY"
+mode = "rest"
 
-[strategy]
-decision_mode = "paper"
+[data]
+mode = "live"
+
+[bootstrap]
+symbols = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "JPM"]
+include_benchmarks = ["SPY", "^VIX"]
 
 [portfolio]
 max_positions = 8
 max_position_pct = 0.15
+risk_per_trade_pct = 0.01
 
 [risk]
-max_drawdown_pct = 0.20
+stop_atr_mult = 2.0
+trail_after_r = 1.5
+partial_take_at_r = 2.5
+time_stop_days = 60
 daily_loss_halt_pct = 0.03
+
+[paper]
+starting_equity = 100000.0
+slippage_bps = 5
+
+[llm]
+provider = "openrouter"
+model = "anthropic/claude-sonnet-4"
+
+[dashboard]
+host = "localhost"
+port = 8501
+refresh_seconds = 60
 ```
 
 ## 9. Related Documents

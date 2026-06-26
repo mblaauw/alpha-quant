@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 
-from domain.fills import (
+from alpha_quant.domain.fills import (
     FillConfig,
     apply_corporate_action,
     fill_entry_order,
@@ -10,7 +10,7 @@ from domain.fills import (
     fill_stop_loss,
     make_fill_id,
 )
-from domain.models import Bar, CorporateAction, Order, Position, Quote
+from alpha_quant.domain.models import Bar, CorporateAction, Order, Position, Quote
 
 
 def _bar(open_v: float = 100.0, low: float = 95.0, high: float | None = None) -> Bar:

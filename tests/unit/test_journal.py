@@ -2,8 +2,8 @@
 
 from datetime import date
 
-from domain.journal import JournalEntry, generate_journal
-from domain.narration import NarrationContext, PositionNarration
+from alpha_quant.domain.journal import JournalEntry, generate_journal
+from alpha_quant.domain.narration import NarrationContext, PositionNarration
 
 
 def _ctx(

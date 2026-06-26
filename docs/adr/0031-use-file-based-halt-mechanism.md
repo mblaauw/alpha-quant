@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded (by ADR-0040 — Database-Backed Halts)
 
 ## Date
 

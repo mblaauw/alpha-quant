@@ -50,5 +50,5 @@ class BlackoutSchedule:
 def _parse_date(raw: str) -> date | None:
     try:
         return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
-    except ValueError, TypeError:
+    except (ValueError, TypeError):  # fmt: skip
         return None

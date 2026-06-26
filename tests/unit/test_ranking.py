@@ -2,8 +2,8 @@
 
 from datetime import date
 
-from domain.models import Candidate
-from domain.ranking import rank
+from alpha_quant.domain.models import Candidate
+from alpha_quant.domain.ranking import rank
 
 
 def _candidate(

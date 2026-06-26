@@ -2,9 +2,9 @@
 
 from datetime import date, datetime, timedelta
 
-from app.pipeline import RunResult, persist_run_result
-from domain.events import PipelineRunCompleted, PipelineRunStarted
-from domain.models import Decision, Fill
+from alpha_quant.application.pipeline_v2 import RunResult, persist_run_result
+from alpha_quant.domain.events import PipelineRunCompleted, PipelineRunStarted
+from alpha_quant.domain.models import Decision, Fill
 
 
 class _FakeStore:

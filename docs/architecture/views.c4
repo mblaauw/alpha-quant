@@ -1,14 +1,10 @@
 views {
   view systemContext of alphaQuant {
-    title 'System Context — Alpha-Quant v1.2'
-    description 'System boundary, user, and all external dependencies. Every external system has a fixture-backed fake twin for deterministic testing.'
+    title 'System Context — Alpha-Quant v2.0'
+    description 'System boundary and all external dependencies. Alpha-Lake is the sole data source.'
     include user
     include alphaQuant
-    include eodhd
-    include alpaca
-    include secEdgar
-    include openInsider
-    include reddit
+    include alphaLake
     include llmProvider
   }
 
@@ -17,87 +13,67 @@ views {
     include user
     include alphaQuant.cli
     include alphaQuant.pipelineEngine
-    include alphaQuant.dataLayer
+    include alphaQuant.policyModules
     include alphaQuant.domainCore
-    include alphaQuant.fillModel
-    include alphaQuant.paperPortfolio
-    include alphaQuant.shadowBooks
+    include alphaQuant.stateStore
     include alphaQuant.narrator
     include alphaQuant.dashboard
     include alphaQuant.eventLog
-    include alphaQuant.stateStore
-    include alphaQuant.parquetArchive
-    include eodhd
-    include alpaca
-    include secEdgar
-    include openInsider
-    include reddit
+    include alphaQuant.fixtureDir
+    include alphaLake
     include llmProvider
   }
 
-  view dataLayerComponents of alphaQuant.dataLayer {
-    title 'Component Diagram — Data Layer'
-    description 'Internal components of the Data Layer. Four-zone architecture: connectors to vault to canonical store to derived state.'
-    include alphaQuant.dataLayer.connectors
-    include alphaQuant.dataLayer.vault
-    include alphaQuant.dataLayer.normalizer
-    include alphaQuant.dataLayer.canonicalWriter
-    include alphaQuant.dataLayer.deriveEngine
-    include alphaQuant.dataLayer.validator
-    include alphaQuant.dataLayer.catalog
-    include alphaQuant.stateStore
-    include alphaQuant.parquetArchive
-    include eodhd
-    include alpaca
-    include secEdgar
-    include openInsider
-    include reddit
+  view policyEngineComponents of alphaQuant.pipelineEngine {
+    title 'Component Diagram — Pipeline Engine'
+    include alphaQuant.pipelineEngine.sessionRunner
+    include alphaQuant.pipelineEngine.alphaLakeReadPort
+    include alphaQuant.pipelineEngine.decisionContext
+    include alphaQuant.policyModules
+    include alphaQuant.domainCore
   }
 
-  view decisionEngineComponents of alphaQuant.domainCore {
-    title 'Component Diagram — Decision Engine (M1-M8)'
-    description 'The 8 decision mechanisms. Gates (M1, M4, M6, M7) are hard filters. Scores (M3, M5) contribute to the composite rank (M8).'
-    include alphaQuant.domainCore.m1
-    include alphaQuant.domainCore.m2
-    include alphaQuant.domainCore.m3
-    include alphaQuant.domainCore.m4
-    include alphaQuant.domainCore.m5
-    include alphaQuant.domainCore.m6
-    include alphaQuant.domainCore.m7
-    include alphaQuant.domainCore.m8
+  view policyModulesComponents of alphaQuant.policyModules {
+    title 'Component Diagram — Policy Modules (M2–M8)'
+    description 'All 7 policy modules evaluate on DecisionContext. Gates are hard filters; scores contribute to composite rank.'
+    include alphaQuant.policyModules.regimePolicy
+    include alphaQuant.policyModules.technicalPolicy
+    include alphaQuant.policyModules.fundamentalPolicy
+    include alphaQuant.policyModules.insiderPolicy
+    include alphaQuant.policyModules.attentionPolicy
+    include alphaQuant.policyModules.blackoutPolicy
+    include alphaQuant.policyModules.compositePolicy
+    include alphaQuant.pipelineEngine.decisionContext
+  }
+
+  view domainCoreComponents of alphaQuant.domainCore {
+    title 'Component Diagram — Domain Core'
+    description 'Pure functions used by the pipeline: sizing, risk, fills, ranking.'
     include alphaQuant.domainCore.positionSizer
     include alphaQuant.domainCore.riskEvaluator
+    include alphaQuant.domainCore.fillEngine
+    include alphaQuant.domainCore.ranker
   }
 
-  view fillModelPortfolioComponents of alphaQuant.fillModel {
-    title 'Component Diagram — Fill Model & Portfolio'
-    description 'The shared fill model used by all execution realities. Pessimistic semantics ensure simulation honesty.'
-    include alphaQuant.fillModel.fillEntry
-    include alphaQuant.fillModel.fillStop
-    include alphaQuant.fillModel.fillPartial
-    include alphaQuant.fillModel.fillCorpAction
-    include alphaQuant.paperPortfolio
-    include alphaQuant.paperPortfolio.consistencyChecker
-    include alphaQuant.shadowBooks.shadowBookInternal
-    include alphaQuant.shadowBooks.spyBaseline
+  view storeComponents of alphaQuant.stateStore {
+    title 'Component Diagram — State Store'
+    include alphaQuant.stateStore.positionStore
+    include alphaQuant.stateStore.decisionStore
+    include alphaQuant.stateStore.orderStore
+    include alphaQuant.stateStore.eventStore
+    include alphaQuant.stateStore.adminStore
+    include alphaQuant.duckDb
   }
 
   view deployment of localMachine {
     title 'Deployment Diagram — Alpha-Quant'
-    description 'Single-machine deployment on a developer workstation or headless server.'
-    include localMachine.schedulerProcess
+    description 'Single-machine deployment.'
     include localMachine.cliProcess
     include localMachine.dashboardProcess
-    include localMachine.vaultDir
-    include localMachine.canonicalDir
-    include localMachine.stateDb
-    include localMachine.configFile
-    include localMachine.haltFile
-    include eodhd
-    include alpaca
-    include secEdgar
-    include openInsider
-    include reddit
+    include alphaQuant.duckDb
+    include alphaQuant.configFile
+    include alphaQuant.haltFile
+    include alphaLake
     include llmProvider
   }
 }
