@@ -376,6 +376,28 @@ class CurrentHalt(Base):
     halted_at: Mapped[datetime | None] = dt_opt()
 
 
+class Command(Base):
+    __tablename__ = "command"
+    __table_args__ = {"schema": "ops"}
+
+    command_id: Mapped[str] = pk_uuid()
+    type: Mapped[str] = mapped_column(String(64), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    actor_id: Mapped[str] = str_64()
+    actor_display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    book_id: Mapped[str | None] = fk_opt("core.portfolio_book.book_id")
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    expected_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    payload_json: Mapped[str] = text_field()
+    result_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    failure_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    failure_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    requested_at: Mapped[datetime] = dt_field()
+    started_at: Mapped[datetime | None] = dt_opt()
+    finished_at: Mapped[datetime | None] = dt_opt()
+
+
 class RunLockAudit(Base):
     __tablename__ = "run_lock_audit"
     __table_args__ = {"schema": "ops"}

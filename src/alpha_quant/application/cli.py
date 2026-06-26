@@ -756,6 +756,50 @@ def dashboard(
     uvicorn.run(transport_app, host=host, port=port, reload=reload)
 
 
+@app.command(rich_help_panel="Dashboard")
+def worker(
+    poll_interval: int = typer.Option(1, "--poll-interval", "-i", help="Seconds between polls"),
+    one_shot: bool = typer.Option(False, "--one-shot", help="Process one command and exit"),
+) -> None:
+    """Run the background command worker."""
+    import time
+
+    import structlog
+
+    from alpha_quant.application.commands import dispatch
+    from alpha_quant.application.factory import create_unit_of_work
+    from alpha_quant.contracts.operational import CommandStatus
+
+    logger = structlog.get_logger("alpha_quant.worker")
+    log = logger.info
+
+    def _claim() -> object | None:
+        uow = create_unit_of_work()
+        with uow:
+            cmd = uow.store.claim_command()
+            if cmd is None:
+                return None
+            log("claimed_command", command_id=str(cmd.command_id), type=cmd.type)
+            result = dispatch(cmd)
+            log("completed_command", command_id=str(result.command_id), status=result.status.value)
+            return result
+
+    log("worker_started", poll_interval=poll_interval, one_shot=one_shot)
+    while True:
+        try:
+            result = _claim()
+            if result is None:
+                if one_shot:
+                    log("worker_no_work")
+                    return
+                time.sleep(poll_interval)
+        except Exception as e:
+            log("worker_error", error=str(e))
+            if one_shot:
+                return
+            time.sleep(poll_interval)
+
+
 # ── Entry point ─────────────────────────────────────────────────────────────────────────
 
 

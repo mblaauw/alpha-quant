@@ -330,6 +330,50 @@ class HaltCommand:
     details: str
 
 
+class CommandStatus(StrEnum):
+    REQUESTED = "requested"
+    VALIDATED = "validated"
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCEL_REQUESTED = "cancel_requested"
+    CANCELLED = "cancelled"
+    REJECTED = "rejected"
+
+
+@dataclass(frozen=True)
+class Command:
+    command_id: UUID
+    type: str
+    idempotency_key: str
+    status: CommandStatus
+    actor_id: str
+    actor_display_name: str
+    book_id: UUID | None = None
+    reason: str | None = None
+    expected_version: int | None = None
+    payload_json: str = "{}"
+    result_reference: str | None = None
+    failure_code: str | None = None
+    failure_message: str | None = None
+    requested_at: datetime | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class CommandEnvelope:
+    type: str
+    idempotency_key: str
+    actor_id: str
+    actor_display_name: str
+    book_id: UUID | None = None
+    reason: str | None = None
+    expected_version: int | None = None
+    payload_json: str = "{}"
+
+
 @dataclass(frozen=True)
 class PortfolioState:
     book_id: UUID

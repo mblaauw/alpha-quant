@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from alpha_quant.application.query.system import SystemService
+from alpha_quant.transport.commands import router as commands_router
 from alpha_quant.transport.dashboard import router as dashboard_router
 from alpha_quant.transport.health import router as health_router
 
@@ -40,6 +41,7 @@ if STATIC_DIR.is_dir():
 
 app.include_router(health_router)
 app.include_router(dashboard_router, prefix="/v1/dashboard")
+app.include_router(commands_router)
 
 
 @app.get("/", include_in_schema=False)

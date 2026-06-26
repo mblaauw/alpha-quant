@@ -11,6 +11,9 @@ from sqlalchemy.orm import Session
 from alpha_quant.contracts.operational import (
     AuditEvent,
     CandidateEvaluation,
+    Command,
+    CommandEnvelope,
+    CommandStatus,
     CurrentHalt,
     DecisionBatch,
     DecisionRun,
@@ -602,6 +605,212 @@ class PostgresOperationalStore:
             )
             for r in rows
         ]
+
+    # --- Commands ---
+
+    def submit_command(self, envelope: CommandEnvelope) -> Command:
+        now = datetime.now(UTC)
+        cmd = Command(
+            command_id=uuid4(),
+            type=envelope.type,
+            idempotency_key=envelope.idempotency_key,
+            status=CommandStatus.REQUESTED,
+            actor_id=envelope.actor_id,
+            actor_display_name=envelope.actor_display_name,
+            book_id=envelope.book_id,
+            reason=envelope.reason,
+            expected_version=envelope.expected_version,
+            payload_json=envelope.payload_json,
+            requested_at=now,
+        )
+        self.session.execute(
+            text("""
+                INSERT INTO ops.command
+                    (command_id, type, idempotency_key, status,
+                     actor_id, actor_display_name, book_id, reason,
+                     expected_version, payload_json, requested_at)
+                VALUES
+                    (:cid, :type, :ik, :s,
+                     :aid, :adn, :bid, :rea,
+                     :ev, :pj, :now)
+            """),
+            {
+                "cid": str(cmd.command_id),
+                "type": cmd.type,
+                "ik": cmd.idempotency_key,
+                "s": cmd.status.value,
+                "aid": cmd.actor_id,
+                "adn": cmd.actor_display_name,
+                "bid": str(cmd.book_id) if cmd.book_id else None,
+                "rea": cmd.reason,
+                "ev": cmd.expected_version,
+                "pj": cmd.payload_json,
+                "now": now,
+            },
+        )
+        self.session.execute(
+            text("""
+                INSERT INTO audit.audit_event
+                    (event_id, decision_run_id, event_type, payload_json, created_at)
+                VALUES (:eid, :rid, :et, :pj, :now)
+            """),
+            {
+                "eid": str(uuid4()),
+                "rid": str(cmd.book_id) if cmd.book_id else "",
+                "et": f"command.{cmd.type}.requested",
+                "pj": f'{{"command_id":"{cmd.command_id}","type":"{cmd.type}","actor":"{cmd.actor_id}"}}',
+                "now": now,
+            },
+        )
+        return cmd
+
+    def claim_command(self) -> Command | None:
+        row = self.session.execute(
+            text("""
+                UPDATE ops.command SET status = :running, started_at = :now
+                WHERE command_id = (
+                    SELECT command_id FROM ops.command
+                    WHERE status = :queued
+                    ORDER BY requested_at ASC
+                    LIMIT 1 FOR UPDATE SKIP LOCKED
+                )
+                RETURNING command_id, type, idempotency_key, status,
+                    actor_id, actor_display_name, book_id, reason,
+                    expected_version, payload_json, requested_at
+            """),
+            {
+                "queued": CommandStatus.QUEUED.value,
+                "running": CommandStatus.RUNNING.value,
+                "now": datetime.now(UTC),
+            },
+        ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_command(row)
+
+    def complete_command(
+        self,
+        command_id: UUID,
+        status: CommandStatus,
+        result: str | None = None,
+        failure_code: str | None = None,
+        failure_message: str | None = None,
+    ) -> None:
+        now = datetime.now(UTC)
+        self.session.execute(
+            text("""
+                UPDATE ops.command
+                SET status = :s, finished_at = :now,
+                    result_reference = :rr, failure_code = :fc, failure_message = :fm
+                WHERE command_id = :cid
+            """),
+            {
+                "cid": str(command_id),
+                "s": status.value,
+                "now": now,
+                "rr": result,
+                "fc": failure_code,
+                "fm": failure_message,
+            },
+        )
+
+    def get_command(self, command_id: UUID) -> Command | None:
+        row = self.session.execute(
+            text("""
+                SELECT command_id, type, idempotency_key, status,
+                    actor_id, actor_display_name, book_id, reason,
+                    expected_version, payload_json, result_reference,
+                    failure_code, failure_message, requested_at,
+                    started_at, finished_at
+                FROM ops.command WHERE command_id = :cid
+            """),
+            {"cid": str(command_id)},
+        ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_command(row)
+
+    def list_commands(self, book_id: UUID | None = None, limit: int = 50) -> list[Command]:
+        if book_id:
+            rows = self.session.execute(
+                text("""
+                    SELECT command_id, type, idempotency_key, status,
+                        actor_id, actor_display_name, book_id, reason,
+                        expected_version, payload_json, result_reference,
+                        failure_code, failure_message, requested_at,
+                        started_at, finished_at
+                    FROM ops.command WHERE book_id = :bid
+                    ORDER BY requested_at DESC LIMIT :lim
+                """),
+                {"bid": str(book_id), "lim": limit},
+            ).fetchall()
+        else:
+            rows = self.session.execute(
+                text("""
+                    SELECT command_id, type, idempotency_key, status,
+                        actor_id, actor_display_name, book_id, reason,
+                        expected_version, payload_json, result_reference,
+                        failure_code, failure_message, requested_at,
+                        started_at, finished_at
+                    FROM ops.command
+                    ORDER BY requested_at DESC LIMIT :lim
+                """),
+                {"lim": limit},
+            ).fetchall()
+        return [self._row_to_command(r) for r in rows]
+
+    def queue_command(self, command_id: UUID) -> None:
+        self.session.execute(
+            text("UPDATE ops.command SET status = :s WHERE command_id = :cid"),
+            {"s": CommandStatus.QUEUED.value, "cid": str(command_id)},
+        )
+
+    def get_command_by_idempotency(
+        self, actor_id: str, command_type: str, idempotency_key: str
+    ) -> Command | None:
+        row = self.session.execute(
+            text("""
+                SELECT command_id, type, idempotency_key, status,
+                    actor_id, actor_display_name, book_id, reason,
+                    expected_version, payload_json, result_reference,
+                    failure_code, failure_message, requested_at,
+                    started_at, finished_at
+                FROM ops.command
+                WHERE actor_id = :aid AND type = :type AND idempotency_key = :ik
+            """),
+            {"aid": actor_id, "type": command_type, "ik": idempotency_key},
+        ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_command(row)
+
+    def count_pending_commands(self) -> int:
+        row = self.session.execute(
+            text(
+                "SELECT COUNT(*) AS cnt FROM ops.command WHERE status IN ('requested', 'queued', 'running')"
+            )
+        ).fetchone()
+        return row._mapping["cnt"] if row else 0
+
+    def _row_to_command(self, r: Any) -> Command:
+        return Command(
+            command_id=UUID(r._mapping["command_id"]),
+            type=r._mapping["type"],
+            idempotency_key=r._mapping["idempotency_key"],
+            status=CommandStatus(r._mapping["status"]),
+            actor_id=r._mapping["actor_id"],
+            actor_display_name=r._mapping["actor_display_name"],
+            book_id=UUID(r._mapping["book_id"]) if r._mapping.get("book_id") else None,
+            reason=r._mapping.get("reason"),
+            expected_version=r._mapping.get("expected_version"),
+            payload_json=r._mapping["payload_json"],
+            result_reference=r._mapping.get("result_reference"),
+            failure_code=r._mapping.get("failure_code"),
+            failure_message=r._mapping.get("failure_message"),
+            requested_at=r._mapping["requested_at"],
+            started_at=r._mapping.get("started_at"),
+            finished_at=r._mapping.get("finished_at"),
+        )
 
     # --- Helpers ---
 
