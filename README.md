@@ -22,7 +22,7 @@ Deterministic strategy-policy and paper-trading engine
 
 Alpha-Quant is a deterministic strategy-policy and paper-trading engine. It consumes point-in-time market facts **exclusively from Alpha-Lake** through a versioned authenticated REST API.
 
-Alpha-Quant owns decisions, portfolio controls, paper execution, journals, and replay — not market data.
+Alpha-Quant owns decisions, portfolio controls, paper execution, journals, operational commands, and replay — not market data. Its frontend is a same-origin vanilla JavaScript SPA served by FastAPI with no build toolchain.
 
 **It does not:**
 - Ingest market data from any provider
@@ -113,7 +113,8 @@ alpha-quant status
 | `unhalt` | Resume halted pipeline |
 | `backup` | Backup local decision/paper state |
 | `ask` | Query recorded decisions with LLM |
-| `dashboard` | Launch FastAPI dashboard (port 8501) |
+| `dashboard` | Launch FastAPI operational console (port 8501) |
+| `worker` | Run background command worker process |
 | `db-health` | Check PostgreSQL operational store connectivity |
 | `db-migrate` | Run Alembic schema migrations |
 | `db-seed` | Seed default reference data |
@@ -146,7 +147,7 @@ src/alpha_quant/
 
 ## Documentation
 
-- [Architecture Decision Records](docs/adr/README.md) — 41 ADRs covering every architectural decision
+- [Architecture Decision Records](docs/adr/README.md) — 45 ADRs covering every architectural decision
 - [Reference Architecture](docs/architecture/REFERENCE_ARCHITECTURE.md) — System design and key decisions
 - [C4 Architecture Diagrams](docs/architecture/README.md) — Context, container, and component views
 - [DESIGN.md](DESIGN.md) — Detailed design document

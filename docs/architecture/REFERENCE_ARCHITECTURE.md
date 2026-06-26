@@ -77,9 +77,25 @@ src/alpha_quant/
 │       ├── virtual_clock.py      # Deterministic clock for tests
 │       ├── canned_llm.py         # Static LLM responses for tests
 │       └── fake_event_sink.py    # In-memory event sink for tests
+├── transport/
+│   ├── app.py                    # FastAPI BFF with CORS, static mounts, health, dashboard, and command routes
+│   ├── health.py                 # /livez, /readyz endpoints
+│   ├── dashboard.py              # Router aggregation for /v1/dashboard/*
+│   ├── commands.py               # /v1/commands CRUD + cancel API
+│   ├── handlers/                 # Transport handler modules (command_center, decisions, portfolio, orders, risk, runs, journal, reports, system, halts)
+│   └── static/                   # Vanilla JS SPA
+│       ├── index.html            # Application shell
+│       ├── styles.css            # CSS custom properties design system
+│       ├── app.js                # Entry point with routing, polling, event handling
+│       ├── state.js              # Explicit application state object
+│       ├── router.js             # Hash-based client-side router
+│       ├── api.js                # Fetch API wrapper with idempotency headers
+│       ├── commands.js           # Command confirmation modal workflow
+│       ├── render/               # 9 view renderers (command_center, decisions, portfolio, orders, risk, runs, journal, reports, system)
+│       └── components/           # Reusable UI components (cards, table, drawer, modal, tooltip, empty_state, loading_state)
 ├── application/
-│   ├── cli.py                    # Typer CLI: run, journal, ask, report, status, halt, backup, db-*, dashboard
-│   ├── config.py                 # pydantic-settings AppConfig with nested Bootstrap/Data/Lake/Portfolio/Paper/Risk/LLM/Dashboard configs
+│   ├── cli.py                    # Typer CLI: run, journal, ask, report, status, halt, backup, db-*, dashboard, worker
+│   ├── config.py                 # pydantic-settings AppConfig with nested configs
 │   ├── factory.py                # Composition root: create_alpha_lake_reader, create_event_sink, create_store, create_llm, create_clock, create_unit_of_work, run_migrations, seed_default_data
 │   ├── pipeline_v2.py            # Pipeline orchestrator (daily decision cycle with NeutralObservations)
 │   ├── halt.py                   # Database-backed halt via ops.current_halt (ADR-0040)
@@ -87,18 +103,16 @@ src/alpha_quant/
 │   ├── alerts.py                 # System alert management
 │   ├── catalog.py                # Data catalog queries
 │   ├── import_legacy_duckdb.py   # One-time DuckDB → PostgreSQL migration tool
-│   ├── dashboard/                # FastAPI dashboard package
-│   │   ├── __init__.py           # FastAPI app with CORS, lifespan, 10 routers, Jinja2 template
-│   │   ├── db.py                 # DashboardDB (DuckDB read layer for operator display)
-│   │   ├── routes/               # 10 route modules: status, equity, positions, runs, events, quarantine, reports, journal, decisions, concepts
-│   │   └── templates/dashboard.html  # HTMX v2 SPA with 6 tabs
+│   ├── query/                    # Query service layer (9 domain services, PostgreSQL-backed)
+│   ├── commands/                 # Durable command model + handler dispatcher
 │   └── store/                    # CanonicalStore (DuckDB legacy — being replaced)
 │       ├── state.py              # CanonicalStore base + schema init
 │       └── *mixins               # PositionStore, OrderStore, DecisionStore, EventStore, JournalStore, AdminStore
 └── migrations/                   # Alembic migrations
     ├── env.py
     └── versions/
-        └── 0001_schema_baseline.py  # 21 tables across 6 schemas
+        ├── 0001_schema_baseline.py  # 21 tables across 6 schemas
+        └── 0002_command_table.py     # ops.command table for durable commands
 ```
 
 ## 4. Technology Stack
@@ -110,17 +124,18 @@ src/alpha_quant/
 | Operational Store | PostgreSQL 17+ (psycopg 3, SQLAlchemy 2 Core) | ACID-compliant system of record, append-only ledger |
 | Artifact Store | S3-compatible (boto3) | Durable, content-addressed, SHA-256 verified decision evidence |
 | CLI | Typer + Rich | Type-hint-driven commands, formatted tables, panels |
-| Dashboard | FastAPI + HTMX v2 + Jinja2 | Lightweight SPA, SSE, real-time status |
+| Dashboard | Vanilla JS SPA + FastAPI BFF | No build step, same-origin, same container |
 | Type Checker | ty (Astral) | Fast, Python 3.14 compatible |
 | Linter/Formatter | ruff (Astral) | Unified lint + format, 10-100x faster |
 | Config | pydantic-settings + TOML | Type-safe environment overrides, nested sub-configs |
 | Migrations | Alembic | Schema versioning for PostgreSQL |
+| Frontend | Vanilla ES modules + CSS custom properties | No Node, no npm, no bundler |
 | Domain Models | pydantic.BaseModel (frozen=True) | Immutable, validated, JSON-serializable |
 | Data Contracts | frozen dataclasses | Lightweight, hashable, cross-boundary transfer types |
 
 ## 5. Architecture Decision Records
 
-41 ADRs document every technology and architectural decision.
+45 ADRs document every technology and architectural decision.
 
 | ADR | Title | Status |
 |-----|-------|--------|
@@ -153,6 +168,10 @@ src/alpha_quant/
 | 0039 | S3-Compatible Artifact Store | **Accepted** |
 | 0040 | Database-Backed Halts and Transactional Run Locks | **Accepted** |
 | 0041 | Migration Strategy — Consolidating to `src/alpha_quant/` | **Accepted** |
+| 0042 | Static SPA and Same-Origin FastAPI BFF | **Accepted** |
+| 0043 | Durable Command Model for Dashboard Mutations | **Accepted** |
+| 0044 | Persistent Named Docker Volumes and Idempotent Migrations | **Accepted** |
+| 0045 | No Offline Cache for the Write-Capable Operational Console | **Accepted** |
 | 0004 | argparse for CLI | Superseded |
 | 0006 | DuckDB + Parquet for Analytics | Superseded |
 | 0007 | SQLite WAL + SQLAlchemy Core | Superseded |
@@ -253,9 +272,10 @@ After every pipeline run, `check_invariants` verifies: equity = cash + market va
 
 ## 7. Runtime Flow
 
+### Decision Run
 ```
-1. CLI: alpha-quant run [--mode live|fixture]
-2. Factory: create_alpha_lake_reader(config) → AlphaLakeRestClient or AlphaLakeHttpFixtureClient
+1. CLI: alpha-quant run
+2. Factory: create_alpha_lake_reader(config) → AlphaLakeRestClient
 3. Halt check: is_halted() → ops.current_halt table (ADR-0040)
 4. Store init: CanonicalStore(base_path) for legacy DuckDB state
 5. Client: GET /v1/health → verify server readiness
@@ -271,6 +291,30 @@ After every pipeline run, `check_invariants` verifies: equity = cash + market va
 15. Self-consistency: check_invariants(equity, cash, positions)
 16. Persist (PostgreSQL): via OperationalStorePort → reserve_run, start_run, commit_decision_batch, book_fill, save_portfolio_mark, complete_run
 17. Artifact: S3 artifact store (decision evidence JSON, SHA-256 verified)
+```
+
+### Dashboard Mutation Flow
+```
+1. Browser POST /v1/commands with command envelope + idempotency_key
+2. submit_command() persists command to ops.command table
+3. Audit event recorded: command.{type}.requested
+4. Worker claims command via SKIP LOCKED
+5. Dispatcher routes to typed handler (halt.create, decision_run.create, etc.)
+6. Handler executes domain operation
+7. Command result persisted (succeeded/failed)
+8. UI polls GET /v1/commands/{id} until terminal status
+9. UI fetches affected read model and renders committed state
+```
+
+### Worker Lifecycle
+```
+1. alpha-quant worker starts
+2. Polls ops.command for status=queued rows via SKIP LOCKED
+3. Claims one command, sets status=running
+4. Dispatches to command handler
+5. Handler executes (synchronous, within worker process)
+6. Writes result (succeeded/failed/cancelled)
+7. Repeats or sleeps based on poll_interval
 ```
 
 ## 8. Configuration

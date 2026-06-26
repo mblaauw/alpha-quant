@@ -47,6 +47,10 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0039](./0039-s3-compatible-artifact-store.md) | S3-Compatible Artifact Store | **Accepted** | 2026-06-26 |
 | [0040](./0040-database-backed-halts-transactional-run-locks.md) | Database-Backed Halts and Transactional Run Locks | **Accepted** | 2026-06-26 |
 | [0041](./0041-migration-strategy-src-alpha-quant.md) | Migration Strategy — Consolidating to `src/alpha_quant/` | **Accepted** | 2026-06-26 |
+| [0042](./0042-static-spa-fastapi-bff.md) | Static SPA and Same-Origin FastAPI BFF | **Accepted** | 2026-06-26 |
+| [0043](./0043-durable-command-model.md) | Durable Command Model for Dashboard Mutations | **Accepted** | 2026-06-26 |
+| [0044](./0044-persistent-docker-volumes.md) | Persistent Named Docker Volumes and Idempotent Migrations | **Accepted** | 2026-06-26 |
+| [0045](./0045-no-offline-cache-operational-console.md) | No Offline Cache for the Write-Capable Operational Console | **Accepted** | 2026-06-26 |
 
 ## Status Meanings
 
