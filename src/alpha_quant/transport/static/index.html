@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alpha Quant</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div id="shell">
+    <header id="topbar">
+      <div class="topbar-left">
+        <span class="topbar-brand">αQ</span>
+        <span class="topbar-separator"></span>
+        <select id="book-selector" class="topbar-select" title="Active book"></select>
+        <span id="mode-badge" class="badge badge-paper">PAPER</span>
+      </div>
+      <div class="topbar-center">
+        <span id="as-of-label" class="topbar-meta"></span>
+        <span id="snapshot-label" class="topbar-meta"></span>
+      </div>
+      <div class="topbar-right">
+        <span id="lake-badge" class="badge badge-healthy" title="Alpha-Lake status">Lake</span>
+        <span id="ops-badge" class="badge badge-healthy" title="Operational status">Ops</span>
+        <button id="theme-toggle" class="icon-btn" title="Toggle theme">☾</button>
+        <button id="run-btn" class="btn btn-primary" title="Run decision cycle">▶ Run</button>
+      </div>
+    </header>
+
+    <div id="global-banner"></div>
+
+    <div id="layout">
+      <nav id="sidebar">
+        <ul>
+          <li data-route="command-center" class="active"><a href="#command-center">Command Center</a></li>
+          <li data-route="decisions"><a href="#decisions">Decisions</a></li>
+          <li data-route="portfolio"><a href="#portfolio">Portfolio</a></li>
+          <li data-route="orders"><a href="#orders">Orders &amp; Fills</a></li>
+          <li data-route="risk"><a href="#risk">Risk &amp; Halts</a></li>
+          <li data-route="runs"><a href="#runs">Runs</a></li>
+          <li data-route="journal"><a href="#journal">Journal</a></li>
+          <li data-route="reports"><a href="#reports">Reports</a></li>
+          <li data-route="system"><a href="#system">System</a></li>
+        </ul>
+      </nav>
+
+      <main id="content">
+        <div id="view" class="view-container"></div>
+        <div id="drawer" class="drawer hidden"></div>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="modal"></dialog>
+
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>

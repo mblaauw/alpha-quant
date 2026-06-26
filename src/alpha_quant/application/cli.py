@@ -748,12 +748,12 @@ def dashboard(
     port: int = typer.Option(8501, "--port", "-p", help="Port number"),
     reload: bool = typer.Option(False, "--reload", help="Auto-reload on code change"),
 ) -> None:
-    """Start the FastAPI dashboard server."""
+    """Start the Alpha-Quant operational console server."""
     import uvicorn
 
-    from alpha_quant.application.dashboard import app as dashboard_app
+    from alpha_quant.transport.app import app as transport_app
 
-    uvicorn.run(dashboard_app, host=host, port=port, reload=reload)
+    uvicorn.run(transport_app, host=host, port=port, reload=reload)
 
 
 # ── Entry point ─────────────────────────────────────────────────────────────────────────
