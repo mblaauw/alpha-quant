@@ -14,34 +14,6 @@ services:
       retries: 5
     restart: unless-stopped
 
-  artifacts:
-    image: rustfs/rustfs:latest
-    command: ["server", "/data", "--console-address", ":9001"]
-    volumes:
-      - alpha_quant_artifacts:/data
-    environment:
-      RUSTFS_ACCESS_KEY: rustfsadmin
-      RUSTFS_SECRET_KEY: rustfsadmin
-    healthcheck:
-      test: ["CMD", "pgrep", "rustfs"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  artifact-init:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    entrypoint: ["python3", "-c", "import boto3, os; c=boto3.client('s3', endpoint_url=os.environ['RUSTFS_ENDPOINT'], aws_access_key_id=os.environ['RUSTFS_ACCESS_KEY'], aws_secret_access_key=os.environ['RUSTFS_SECRET_KEY']); c.create_bucket(Bucket='alpha-quant-artifacts'); print('Bucket ready')"]
-    environment:
-      RUSTFS_ENDPOINT: http://artifacts:9000
-      RUSTFS_ACCESS_KEY: rustfsadmin
-      RUSTFS_SECRET_KEY: rustfsadmin
-    depends_on:
-      artifacts:
-        condition: service_healthy
-    restart: "no"
-
   migrate:
     build:
       context: .
@@ -73,8 +45,6 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-      artifact-init:
-        condition: service_completed_successfully
     restart: unless-stopped
 
   worker:
@@ -90,13 +60,9 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-      artifact-init:
-        condition: service_completed_successfully
     restart: unless-stopped
 
 volumes:
   alpha_quant_pgdata:
     name: alpha_quant_pgdata
-  alpha_quant_artifacts:
-    name: alpha_quant_artifacts
   alpha-quant-data:

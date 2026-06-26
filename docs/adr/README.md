@@ -44,7 +44,7 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0036](./0036-neutral-facts-strategy-policy.md) | Neutral Facts in Alpha-Lake, Strategy Policy in Alpha-Quant | **Accepted** | 2026-06-25 |
 | [0037](./0037-postgresql-operational-system-of-record.md) | PostgreSQL as the Operational System of Record | **Accepted** | 2026-06-26 |
 | [0038](./0038-append-only-ledger-rebuildable-projections.md) | Append-Only Ledger with Rebuildable Projections | **Accepted** | 2026-06-26 |
-| [0039](./0039-s3-compatible-artifact-store.md) | S3-Compatible Artifact Store | **Accepted** | 2026-06-26 |
+| [0039](./0039-s3-compatible-artifact-store.md) | S3-Compatible Artifact Store | **Superseded** | 2026-06-26 |
 | [0040](./0040-database-backed-halts-transactional-run-locks.md) | Database-Backed Halts and Transactional Run Locks | **Accepted** | 2026-06-26 |
 | [0041](./0041-migration-strategy-src-alpha-quant.md) | Migration Strategy — Consolidating to `src/alpha_quant/` | **Accepted** | 2026-06-26 |
 | [0042](./0042-static-spa-fastapi-bff.md) | Static SPA and Same-Origin FastAPI BFF | **Accepted** | 2026-06-26 |

@@ -380,19 +380,3 @@ class PortfolioState:
     cash: Decimal
     positions: list[PositionCurrent]
     open_orders: list[PaperOrder]
-
-
-@dataclass(frozen=True)
-class ImmutableArtifact:
-    key: str
-    content_type: str
-    body: str
-    checksum_sha256: str | None = None
-
-
-@dataclass(frozen=True)
-class ArtifactReference:
-    key: str
-    bucket: str
-    checksum_sha256: str | None = None
-    size_bytes: int | None = None

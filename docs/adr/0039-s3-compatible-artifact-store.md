@@ -1,6 +1,6 @@
 # ADR-0039: S3-Compatible Artifact Store for Decision Evidence
 
-**Status:** Accepted
+**Status:** Superseded — decision evidence stored as JSON rows in PostgreSQL, not in S3.
 
 **Date:** 2026-06-26
 

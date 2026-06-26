@@ -6,7 +6,7 @@
 |------|-----------|--------------|--------------|
 | AlphaLakeReadPort | read_observations(), health(), contract() | AlphaLakeRestClient (httpx → Alpha-Lake REST API) | AlphaLakeHttpFixtureClient (pre-recorded JSON fixtures) |
 | OperationalStorePort | 20 methods (reserve_run, start_run, complete_run, commit_decision_batch, book_fill, load_portfolio, set_halt, clear_halt, rebuild_projections, list_decision_runs, etc.) | PostgresOperationalStore (SQLAlchemy Core + psycopg) | FakeOperationalStore (in-memory dict) |
-| ArtifactStorePort | put_json, get_json, verify | S3ArtifactStore (boto3, SHA-256 checksums) | (none) |
+| ArtifactStorePort | put_json, get_json, verify | (removed — artifacts stored in PostgreSQL) | (none) |
 | Store (legacy) | 6 mixin interfaces (PositionStore, OrderStore, DecisionStore, EventStore, JournalStore, AdminStore) | CanonicalStore (DuckDB) | FixtureStore (in-memory) |
 | Clock | now, today, market_date | SystemClock (datetime.now(UTC)) | VirtualClock (deterministic) |
 | EventSink (legacy) | emit, query | DuckDBEventSink | FakeEventSink |
@@ -80,7 +80,7 @@ All market facts enter through a single port (`ports/alpha_lake.py`). Every read
 
 ## S3ArtifactStore — Decision Evidence
 
-`ports/artifact_store.py` — stores decision artifacts for audit and post-hoc analysis.
+(removed — artifacts are stored in PostgreSQL via the operational store).
 
 | Method | Purpose |
 |--------|---------|
