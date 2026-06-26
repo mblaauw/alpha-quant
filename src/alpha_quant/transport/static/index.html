@@ -1,35 +1,49 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Alpha-Quant Desk</title>
-<link rel="stylesheet" href="/static/styles.css">
+<meta name="theme-color" content="#FFF1E5">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz@8..60&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-  <header id="topbar">
-    <span class="topbar-brand">Alpha-Quant Desk</span>
-    <span class="topbar-sep"></span>
-    <select id="book-selector" class="topbar-select" title="Active book">
-      <option value="">Loading...</option>
-    </select>
-    <span id="mode-badge" class="chip chip-neutral">PAPER</span>
-    <span class="topbar-sep"></span>
-    <span id="ops-status" class="topbar-meta"><span class="dot inactive"></span>Checking...</span>
-    <span class="topbar-right">
-      <span id="last-run-label" class="topbar-meta"></span>
-      <span id="snapshot-label" class="topbar-meta"></span>
-      <span id="lake-health" class="topbar-meta"><span class="dot inactive"></span>Lake</span>
-      <button id="theme-toggle" class="icon-btn" title="Toggle theme">☾</button>
-      <button id="run-btn" class="btn btn-primary">▶ Run Decision Cycle</button>
-    </span>
+<div class="aq-page">
+
+  <header class="mast">
+    <div class="mast-top">
+      <div class="brand">
+        <h1 class="wordmark">Alpha<span>Quant</span> <small>Desk</small></h1>
+        <p class="standfirst"><b>Owns</b> decisions. <b>Acts</b> on the latest knowable facts. <b>Halts</b> when they go stale.</p>
+      </div>
+      <div class="mast-ctrls">
+        <div id="feed-pill" class="feed-pill">
+          <span class="d"></span>
+          <span class="col"><span class="k">Lake feed</span><span class="v" id="feed-label">Checking…</span></span>
+        </div>
+        <select id="book-selector" class="book-select" title="Active book">
+          <option value="">Loading…</option>
+        </select>
+        <span id="mode-badge" class="mode-badge">PAPER</span>
+        <button id="theme-toggle" class="theme-btn" title="Toggle theme" aria-label="Toggle theme">☾</button>
+        <button id="run-btn" class="run-btn">▶ Run cycle</button>
+      </div>
+    </div>
+    <div class="mast-meta">
+      <span id="header-time">—</span>
+      <span class="sep">·</span>
+      <span id="book-label">Book —</span>
+      <span class="sep">·</span>
+      <span id="last-run-label"></span>
+      <span class="sep">·</span>
+      <span class="ops" id="ops-status"><span class="d"></span>Checking…</span>
+    </div>
   </header>
 
-  <div id="global-banner"></div>
-
-  <nav id="tabs">
+  <nav class="nav" id="tabs">
     <a href="#desk" class="active">Desk</a>
     <a href="#portfolio">Portfolio</a>
     <a href="#decisions">Decisions</a>
@@ -40,13 +54,32 @@
     <a href="#system">System</a>
   </nav>
 
-  <main id="content"><div id="view"></div></main>
+  <div id="global-banner"></div>
 
-  <div id="drawer-overlay"></div>
-  <aside id="drawer"><div id="drawer-header"><span id="drawer-title"></span><button class="drawer-close" id="drawer-close-btn">✕</button></div><div id="drawer-body"></div></aside>
+  <main><div id="view"></div></main>
+</div>
 
-  <dialog id="modal"><div class="modal-header"><span class="modal-title" id="modal-title"></span><button class="drawer-close" id="modal-close-btn">✕</button></div><div class="modal-body" id="modal-body"></div><div class="modal-actions" id="modal-actions"></div></dialog>
+<div id="drawer-overlay"></div>
+<aside id="drawer">
+  <div id="drawer-header"><span id="drawer-title"></span><button class="drawer-close" id="drawer-close-btn">✕</button></div>
+  <div id="drawer-body"></div>
+</aside>
 
-  <script type="module" src="/static/app.js"></script>
+<dialog id="modal">
+  <div class="modal-header"><span class="modal-title" id="modal-title"></span><button class="drawer-close" id="modal-close-btn">✕</button></div>
+  <div class="modal-body" id="modal-body"></div>
+  <div class="modal-actions" id="modal-actions"></div>
+</dialog>
+
+<div id="toast">
+  <div class="toast-head">
+    <span class="toast-status" id="toast-status"><span class="d"></span><span id="toast-status-label">QUEUED</span></span>
+    <span class="toast-id" id="toast-id"></span>
+  </div>
+  <div class="toast-label" id="toast-label"></div>
+  <div class="toast-detail" id="toast-detail"></div>
+</div>
+
+<script type="module" src="/static/app.js"></script>
 </body>
 </html>

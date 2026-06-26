@@ -13,6 +13,7 @@ export async function api(path, options = {}) {
 }
 
 export async function get(path) { return api(path); }
+
 export async function post(path, body) {
   return api(path, {
     method: "POST",

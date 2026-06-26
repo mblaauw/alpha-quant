@@ -1,65 +1,100 @@
 import store from "../state.js";
 import { get } from "../api.js";
-import { fmtCurrency, fmtPct, fmtNum } from "../formatters.js";
-import { statusChip } from "../components/status.js";
+import { fmtCurrency, fmtPrice, fmtPct, fmtNum } from "../formatters.js";
 import { emptyState } from "../components/empty_state.js";
 import { errorState } from "../components/error_state.js";
-import { openDrawer } from "../components/drawer.js";
-import { renderTable } from "../components/table.js";
+import { showModal, closeModal, intro, fieldText, fieldNumber, val } from "../components/modal.js";
+import { runWithToast } from "../components/toast.js";
+import { cmd } from "../commands.js";
+import { classify, ageLabel, freshnessFor } from "../freshness.js";
+
+const COLS = "1.7fr .7fr .9fr .9fr 1fr 1fr .7fr 1.3fr";
 
 export async function renderPortfolio() {
   const view = document.getElementById("view");
-  view.innerHTML = `<div class="skeleton" style="height:200px"></div>`;
+  view.innerHTML = `<div class="skeleton" style="height:240px"></div>`;
   try {
-    const data = await get("/v1/console/portfolio");
-    const positions = await get("/v1/console/positions");
-    view.innerHTML = buildPortfolio(data, positions);
-    document.querySelectorAll("[data-position-id]").forEach(el => {
-      el.addEventListener("click", () => showPosition(el.dataset.positionId));
-    });
+    const [data, positions] = await Promise.all([get("/v1/console/portfolio"), get("/v1/console/positions")]);
+    view.innerHTML = buildPortfolio(data, positions.items || []);
+    wire(positions.items || []);
   } catch (e) {
     view.innerHTML = errorState("Failed to load portfolio", e.message);
   }
 }
 
-function buildPortfolio(data, positions) {
-  const p = data || {};
-  const rows = (positions.items || []).map(pos => [
-    `<span class="symbol" data-position-id="${pos.symbol}" style="cursor:pointer">${pos.symbol}</span>`,
-    fmtNum(pos.quantity),
-    fmtCurrency(pos.avg_cost),
-    fmtCurrency(pos.current_price),
-    fmtCurrency(pos.market_value),
-    `<span class="${pos.unrealized_pl >= 0 ? 'positive' : 'negative'}">${fmtCurrency(pos.unrealized_pl)}</span>`,
-    fmtPct(pos.portfolio_weight),
-  ]);
-  return `
-    <div class="metric-strip">
-      <div class="metric"><span class="metric-label">Equity</span><span class="metric-value">${fmtCurrency(p.equity)}</span></div>
-      <div class="metric"><span class="metric-label">Cash</span><span class="metric-value">${fmtCurrency(p.cash)}</span></div>
-      <div class="metric"><span class="metric-label">Gross Exposure</span><span class="metric-value">${fmtCurrency(p.gross_exposure)}</span></div>
-      <div class="metric"><span class="metric-label">Drawdown</span><span class="metric-value ${p.drawdown > 0 ? 'negative' : ''}">${fmtPct(p.drawdown)}</span></div>
-      <div class="metric"><span class="metric-label">Open Positions</span><span class="metric-value">${fmtNum(p.positions_count)}</span></div>
-    </div>
-    <div class="section-header">Positions</div>
-    ${rows.length ? renderTable(["Symbol", "Qty", "Avg Cost", "Price", "Market Val", "UPL", "Weight"], rows) : emptyState("No positions")}
-  `;
+function symFresh(pos) {
+  const f = pos.freshness || freshnessFor(pos.symbol);
+  if (!f) return { severity: "live", stale: false, age_minutes: null };
+  const c = classify(f.age_minutes);
+  return { ...f, severity: f.severity || c.severity, stale: c.stale };
 }
 
-async function showPosition(symbol) {
-  try {
-    const pos = await get(`/v1/console/positions/${symbol}`);
-    openDrawer(`Position: ${symbol}`, `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem">
-        <div><span class="metric-label">Quantity</span><div class="metric-value">${fmtNum(pos.quantity)}</div></div>
-        <div><span class="metric-label">Avg Cost</span><div class="metric-value">${fmtCurrency(pos.avg_cost)}</div></div>
-        <div><span class="metric-label">Market Value</span><div class="metric-value">${fmtCurrency(pos.market_value)}</div></div>
-        <div><span class="metric-label">Unreal. P&L</span><div class="metric-value ${pos.unrealized_pl >= 0 ? 'positive' : 'negative'}">${fmtCurrency(pos.unrealized_pl)}</div></div>
-        <div><span class="metric-label">Stop Price</span><div class="metric-value">${fmtCurrency(pos.stop_price)}</div></div>
-        <div><span class="metric-label">Weight</span><div class="metric-value">${fmtPct(pos.portfolio_weight)}</div></div>
-      </div>
-    `);
-  } catch (e) {
-    openDrawer("Error", e.message);
-  }
+function buildPortfolio(p, positions) {
+  const metrics = [
+    metric("Equity", fmtCurrency(p.equity)),
+    metric("Cash", fmtCurrency(p.cash)),
+    metric("Gross exposure", fmtCurrency(p.gross_exposure)),
+    metric("Drawdown", fmtPct(p.drawdown), p.drawdown > 0 ? "down" : ""),
+    metric("Open positions", fmtNum(p.positions_count)),
+  ].join("");
+
+  const header = `<div class="dthead" style="grid-template-columns:${COLS}">
+    <span>Symbol</span><span class="r-right">Qty</span><span class="r-right">Avg</span><span class="r-right">Price</span><span class="r-right">Mkt value</span><span class="r-right">Unreal. P&L</span><span class="r-right">Wt</span><span class="r-right">Actions</span></div>`;
+
+  const rows = positions.map((pos) => {
+    const f = symFresh(pos);
+    const sevCls = f.severity === "crit" ? "fresh-badge crit" : f.severity === "warn" ? "fresh-badge warn" : "fresh-badge";
+    const rowCls = f.stale ? (f.severity === "crit" ? "dtrow is-stale crit" : "dtrow is-stale") : "dtrow";
+    const upl = pos.unrealized_pl;
+    return `<div class="${rowCls}" style="grid-template-columns:${COLS}">
+      <span class="symcell"><span class="sym">${pos.symbol}</span><span class="${sevCls}">${f.stale ? "STALE" : "LIVE"}</span><span class="age">${ageLabel(f.age_minutes)}</span></span>
+      <span class="num">${fmtNum(pos.quantity)}</span>
+      <span class="num">${fmtPrice(pos.avg_cost)}</span>
+      <span class="num ink">${fmtPrice(pos.current_price)}</span>
+      <span class="num ink">${fmtCurrency(pos.market_value)}</span>
+      <span class="num ${upl >= 0 ? "up" : "down"}">${fmtCurrency(upl)}</span>
+      <span class="num">${fmtPct(pos.portfolio_weight)}</span>
+      <span class="row-acts"><button class="act-btn" data-stop="${pos.symbol}">Stop</button><button class="act-btn danger" data-flatten="${pos.symbol}">Flatten</button></span>
+    </div>`;
+  }).join("");
+
+  return `
+    <div class="metric-strip">${metrics}</div>
+    <div class="sec-head"><div class="sec-title">Positions</div><span class="sec-note">Dimmed rows price off <b>stale</b> Lake data — review before trading</span></div>
+    ${positions.length ? `<div class="dtable">${header}${rows}</div>` : emptyState("No positions")}`;
+}
+
+function metric(label, value, tone = "") {
+  return `<div class="metric"><span class="metric-label">${label}</span><span class="metric-value ${tone}">${value}</span></div>`;
+}
+
+function wire(positions) {
+  const byId = (s) => positions.find((p) => p.symbol === s) || { symbol: s };
+  document.querySelectorAll("[data-flatten]").forEach((b) => b.onclick = () => openFlatten(byId(b.dataset.flatten)));
+  document.querySelectorAll("[data-stop]").forEach((b) => b.onclick = () => openStop(byId(b.dataset.stop)));
+}
+
+function openFlatten(pos) {
+  showModal("Flatten " + pos.symbol,
+    intro(`Submits a closing order for the full ${fmtNum(pos.quantity)}-share ${pos.symbol} position. Rejected on stale data unless forced.`)
+      + fieldText("fl_reason", "Reason (required)", "Why flatten?"),
+    [
+      { label: "Cancel", class: "btn", onclick: closeModal },
+      { label: "Flatten position", class: "btn btn-danger", onclick: () => {
+          const reason = val("fl_reason"); if (!reason) return;
+          closeModal(); runWithToast(() => cmd.flatten(store.bookId, pos.position_id || pos.symbol, reason), "Flatten " + pos.symbol, renderPortfolio);
+        } },
+    ]);
+}
+
+function openStop(pos) {
+  showModal("Edit stop — " + pos.symbol,
+    fieldNumber("st_price", "Stop price", pos.stop_price ?? ""),
+    [
+      { label: "Cancel", class: "btn", onclick: closeModal },
+      { label: "Update stop", class: "btn btn-primary", onclick: () => {
+          const px = parseFloat(val("st_price")); if (!px) return;
+          closeModal(); runWithToast(() => cmd.setStop(store.bookId, pos.position_id || pos.symbol, px, "Stop update from Desk"), pos.symbol + " stop " + px, renderPortfolio);
+        } },
+    ]);
 }

@@ -1,36 +1,43 @@
 export function fmtDate(iso) {
   if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export function fmtDateTime(iso) {
   if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-export function fmtPct(v) {
-  if (v == null) return "—";
-  return `${(v * 100).toFixed(1)}%`;
+export function fmtTime(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
+
+export function fmtPct(v) { return v == null ? "—" : `${(v * 100).toFixed(1)}%`; }
 
 export function fmtCurrency(v) {
   if (v == null) return "—";
-  const abs = Math.abs(v).toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
-  return v < 0 ? `-${abs}` : abs;
+  const a = Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 0 });
+  return (v < 0 ? "-$" : "$") + a;
 }
 
-export function fmtNum(v) {
+export function fmtPrice(v) {
   if (v == null) return "—";
-  return Number(v).toLocaleString();
+  return "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export function chip(status) {
-  const map = {
-    healthy: "chip healthy", completed: "chip completed", succeeded: "chip succeeded",
-    failed: "chip failed", halted: "chip halted", running: "chip running", pending: "chip pending",
-    degraded: "chip warning", blocked: "chip blocked", ready: "chip ready",
-  };
-  return map[status] || "chip neutral";
+export function fmtNum(v) { return v == null ? "—" : Number(v).toLocaleString("en-US"); }
+
+/* Maps a status string to a chip tone class used by statusChip(). */
+export function chip(state) {
+  const s = String(state || "").toLowerCase();
+  const ok = ["healthy", "ready", "completed", "succeeded", "filled", "reachable", "enter", "clear"];
+  const warn = ["degraded", "attention", "partial", "running", "pending"];
+  const bad = ["halted", "failed", "blocked", "critical", "cancelled", "rejected", "down", "stale"];
+  const info = ["hold", "decision", "queued"];
+  if (ok.includes(s)) return "chip ok";
+  if (warn.includes(s)) return "chip warn";
+  if (bad.includes(s)) return "chip bad";
+  if (info.includes(s)) return "chip info";
+  return "chip dim";
 }

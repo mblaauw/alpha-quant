@@ -50,6 +50,7 @@ def _freshness_service() -> FreshnessService:  # noqa: B008
                 "mode": "rest",
                 "base_url": os.environ.get("ALPHA_QUANT_LAKE__BASE_URL", "http://localhost:8000"),
             },
+            dashboard={"host": "localhost", "port": 8501},
             freshness=FreshnessConfig(),
         )
     lake = create_alpha_lake_reader(config)

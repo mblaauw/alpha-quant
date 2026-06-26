@@ -22,7 +22,8 @@ const routes = {
 export function navigate(hash) {
   const route = hash.replace(/^#\/?/, "").split("?")[0] || "desk";
   store.route = route;
-  document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("active", a.getAttribute("href") === `#${route}`));
+  document.querySelectorAll("#tabs a").forEach((a) =>
+    a.classList.toggle("active", a.getAttribute("href") === `#${route}`));
   const render = routes[route];
   if (render) render();
 }
