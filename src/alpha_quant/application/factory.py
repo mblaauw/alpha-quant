@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -145,9 +145,7 @@ def seed_default_data(database_url: str | None = None) -> None:
                 Strategy(
                     strategy_id=str(uuid4()),
                     name="default",
-                    created_at=__import__("datetime").datetime.now(
-                        __import__("datetime").timezone.utc
-                    ),
+                    created_at=datetime.now(UTC),
                 )
             )
             session.commit()
@@ -161,9 +159,7 @@ def seed_default_data(database_url: str | None = None) -> None:
                     book_id=str(_UUID("00000000-0000-0000-0000-000000000001")),
                     name="default",
                     kind="paper",
-                    created_at=__import__("datetime").datetime.now(
-                        __import__("datetime").timezone.utc
-                    ),
+                    created_at=datetime.now(UTC),
                 )
             )
             session.commit()

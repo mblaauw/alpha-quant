@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
+from datetime import UTC, datetime
 from uuid import UUID
 
 from alpha_quant.application.factory import create_unit_of_work
@@ -48,9 +49,7 @@ def run_decision_handler(cmd: Command) -> tuple[CommandStatus, str | None, str |
                 run_kind=RunKind.DAILY,
                 strategy_version_id=UUID("00000000-0000-0000-0000-000000000001"),
                 portfolio_book_id=cmd.book_id or UUID("00000000-0000-0000-0000-000000000001"),
-                decision_as_of=__import__("datetime").datetime.now(
-                    __import__("datetime").timezone.utc
-                ),
+                decision_as_of=datetime.now(UTC),
                 resolved_snapshot_id="manual",
                 alpha_lake_api_version="1.0",
                 alpha_lake_contract_version="1.0",
