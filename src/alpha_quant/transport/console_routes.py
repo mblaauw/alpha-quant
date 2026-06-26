@@ -6,10 +6,18 @@ No route performs direct state mutation.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+import os
 
+from fastapi import APIRouter, Depends, Query
+
+from alpha_quant.application.config import load_config
+from alpha_quant.application.factory import (
+    create_alpha_lake_reader,
+    create_freshness_service,
+)
 from alpha_quant.application.query.command_center import CommandCenterService
 from alpha_quant.application.query.decisions import DecisionService
+from alpha_quant.application.query.freshness import FreshnessService
 from alpha_quant.application.query.journal import JournalService
 from alpha_quant.application.query.orders import OrderService
 from alpha_quant.application.query.portfolio import PortfolioService
@@ -19,6 +27,12 @@ from alpha_quant.application.query.system import SystemService
 from alpha_quant.transport.deps import svc_depends
 
 router = APIRouter(prefix="/v1/console", tags=["console"])
+
+
+def _freshness_service() -> FreshnessService:  # noqa: B008
+    config = load_config(os.environ.get("ALPHA_QUANT_CONFIG"))
+    lake = create_alpha_lake_reader(config)
+    return create_freshness_service(lake, config.freshness)  # type: ignore[return-value]
 
 
 @router.get("/context")
@@ -128,3 +142,8 @@ async def list_journal(
 @router.get("/system")
 async def get_system(svc: SystemService = svc_depends(SystemService)):
     return svc.full_status()
+
+
+@router.get("/freshness")
+async def get_freshness(svc: FreshnessService = Depends(_freshness_service)):
+    return svc.summary([])

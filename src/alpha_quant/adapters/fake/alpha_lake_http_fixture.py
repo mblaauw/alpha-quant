@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, override
 
@@ -128,6 +128,11 @@ class AlphaLakeHttpFixtureClient(AlphaLakeReadPort):
             except TypeError:
                 pass
         return None
+
+    @override
+    def get_freshness(self, symbols: list[str]) -> dict[str, datetime]:
+        now = datetime.now(UTC)
+        return {s: now for s in symbols}
 
     def _load_json(self, name: str) -> dict[str, Any] | None:
         path = self._root / f"{name}.json"

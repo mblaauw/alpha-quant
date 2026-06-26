@@ -56,3 +56,8 @@ timeout_s = 30
 host = "localhost"
 port = 8501
 refresh_seconds = 60
+
+[freshness]
+sla_minutes = 120
+critical_minutes = 1440
+gate_live_decisions = true

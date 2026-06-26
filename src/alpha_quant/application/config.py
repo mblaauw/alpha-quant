@@ -90,6 +90,14 @@ class DashboardConfig(FrozenModel):
     refresh_seconds: int = Field(default=60, ge=5, le=3600)
 
 
+class FreshnessConfig(FrozenModel):
+    """Data freshness SLA and gate configuration."""
+
+    sla_minutes: int = Field(default=120, ge=1, le=1440)
+    critical_minutes: int = Field(default=1440, ge=1, le=43200)
+    gate_live_decisions: bool = True
+
+
 class AppConfig(BaseSettings):
     """Top-level application configuration aggregating all sub-configs."""
 
@@ -127,6 +135,7 @@ class AppConfig(BaseSettings):
     risk: RiskConfig
     llm: AppLLMConfig
     dashboard: DashboardConfig
+    freshness: FreshnessConfig = FreshnessConfig()
 
 
 class ConfigError(Exception):

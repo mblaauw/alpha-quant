@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Any, override
 
 import httpx
@@ -109,6 +109,26 @@ class AlphaLakeRestClient(AlphaLakeReadPort):
     ) -> NeutralObservations:
         data = self._fetch_panel_data(symbols, as_of, snapshot_id)
         return _build_neutral_observations(data, symbols, as_of, snapshot_id)
+
+    @override
+    def get_freshness(self, symbols: list[str]) -> dict[str, datetime]:
+        try:
+            resp = self._client.get(
+                f"{self._base_url}/v1/bars/latest",
+                headers=self._headers,
+                params={"symbols": ",".join(symbols)},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                now = datetime.now(UTC)
+                return {
+                    sym: datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                    for sym, ts in data.get("bars", {}).items()
+                }
+        except httpx.HTTPError:
+            pass
+        now = datetime.now(UTC)
+        return {s: now for s in symbols}
 
     @override
     def close(self) -> None:
