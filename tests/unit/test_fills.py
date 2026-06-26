@@ -2,6 +2,8 @@
 
 from datetime import date, datetime
 
+import pytest
+
 from alpha_quant.domain.fills import (
     FillConfig,
     apply_corporate_action,
@@ -117,37 +119,21 @@ class TestFillEntryOrder:
         assert fill is not None
         assert fill.price > 100.0
 
-    def test_gap_at_threshold_passes(self) -> None:
+    @pytest.mark.parametrize(
+        ("open_v", "max_gap_pct", "expected"),
+        [
+            (100.5, 0.02, True),
+            (103.0, 0.02, False),
+            (100.5, 0.004, False),
+            (100.2, 0.001, False),
+        ],
+    )
+    def test_gap_threshold(self, open_v: float, max_gap_pct: float, expected: bool) -> None:
         order = _order()
-        bar = _bar(open_v=100.5)
-        fill = fill_entry_order(order, bar, prev_close=100.0)
-        assert fill is not None
-
-    def test_gap_above_threshold_fails(self) -> None:
-        order = _order()
-        bar = _bar(open_v=103.0)
-        fill = fill_entry_order(order, bar, prev_close=100.0)
-        assert fill is None  # 3% gap > 2% max_gap_pct
-
-    def test_gap_exactly_at_threshold_passes(self) -> None:
-        order = _order()
-        bar = _bar(open_v=100.5)
-        fill = fill_entry_order(order, bar, prev_close=100.0)
-        assert fill is not None
-
-    def test_gap_just_above_threshold_fails(self) -> None:
-        order = _order()
-        bar = _bar(open_v=100.5)
-        cfg = FillConfig(max_gap_pct=0.004)
+        bar = _bar(open_v=open_v)
+        cfg = FillConfig(max_gap_pct=max_gap_pct)
         fill = fill_entry_order(order, bar, prev_close=100.0, config=cfg)
-        assert fill is None
-
-    def test_gap_above_custom_threshold_fails(self) -> None:
-        order = _order()
-        bar = _bar(open_v=100.2)
-        cfg = FillConfig(max_gap_pct=0.001)
-        fill = fill_entry_order(order, bar, prev_close=100.0, config=cfg)
-        assert fill is None
+        assert (fill is not None) is expected
 
     def test_partial_fill_reduces_quantity(self) -> None:
         order = _order(quantity=100.0)

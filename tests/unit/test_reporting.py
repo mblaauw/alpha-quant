@@ -99,10 +99,3 @@ class TestGenerateMonthly:
         report = generate_monthly(ctxs, date(2026, 6, 30))
         assert "2026-06-01" in report.content
         assert "2026-06-30" in report.content
-
-
-class TestReportEntry:
-    def test_frozen(self) -> None:
-        r = ReportEntry(date=date(2026, 6, 11), report_type="weekly", content="# test")
-        assert r.report_type == "weekly"
-        assert r.content == "# test"

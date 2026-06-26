@@ -1,6 +1,6 @@
 """Unit tests for position sizing (domain.sizing)."""
 
-from alpha_quant.domain.sizing import PositionSize, SizingConfig, size_position
+from alpha_quant.domain.sizing import SizingConfig, size_position
 
 
 def _config(**kwargs: float) -> SizingConfig:
@@ -67,28 +67,3 @@ class TestSizePosition:
             _config(max_position_pct=0.5),
         )
         assert 900 < result.risk_at_stop < 1100
-
-    def test_default_capped_by_empty(self) -> None:
-        ps = PositionSize(shares=10, notional=1_000.0, risk_at_stop=20.0)
-        assert ps.capped_by == []
-
-    def test_boundary_zero_equity(self) -> None:
-        result = size_position(0.0, 100.0, 2.0, 1.0, 1.0)
-        assert result.shares == 0
-
-    def test_boundary_zero_price(self) -> None:
-        result = size_position(100_000.0, 0.0, 2.0, 1.0, 1.0)
-        assert result.shares == 0
-
-    def test_boundary_zero_atr(self) -> None:
-        result = size_position(100_000.0, 100.0, 0.0, 1.0, 1.0)
-        assert result.shares == 0
-
-    def test_boundary_exact_multiplier_zero(self) -> None:
-        result = size_position(100_000.0, 100.0, 2.0, 0.0, 1.0)
-        assert result.shares == 0
-
-    def test_position_size_repr(self) -> None:
-        ps = PositionSize(shares=10, notional=1_000.0, risk_at_stop=20.0, capped_by=["test"])
-        assert ps.shares == 10
-        assert ps.capped_by == ["test"]

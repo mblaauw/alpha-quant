@@ -71,6 +71,22 @@ jobs:
             exit 1
           fi
 
+      - name: Verify no selectolax dependency
+        run: |
+          if grep -q "selectolax" uv.lock; then
+            echo "::error::selectolax still present in uv.lock"
+            exit 1
+          fi
+
+      - name: Verify no provider API keys in .env.example
+        run: |
+          for key in EODHD TIINGO REDDIT; do
+            if grep -q "$key" .env.example; then
+              echo "::error::Provider env var $key still in .env.example"
+              exit 1
+            fi
+          done
+
       - name: Verify no API keys or secrets in source
         run: |
           RESULT=$(git grep -nE 'sk-[A-Za-z0-9]{20,}|pk-[A-Za-z0-9]{16,}' \

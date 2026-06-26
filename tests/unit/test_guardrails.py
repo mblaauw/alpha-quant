@@ -147,7 +147,7 @@ def test_no_alpha_lake_direct_import() -> None:
 
 def test_no_duckdb_for_market_facts() -> None:
     """Verify DuckDB is only used for local decision/paper state, not market facts."""
-    _ALLOWED_DUCKDB = frozenset({"store", "dashboard.py", "db.py", "event_sink.py"})
+    _ALLOWED_DUCKDB = frozenset({"store", "dashboard.py", "db.py", "event_sink.py"})  # noqa: N806
     errors: list[str] = []
     for path in SRC.rglob("*.py"):
         if path.name.startswith("."):
@@ -162,18 +162,3 @@ def test_no_duckdb_for_market_facts() -> None:
         "DuckDB imports found outside store/ and allowed files. "
         "Market facts must come from Alpha-Lake REST API:\n  " + "\n  ".join(errors)
     )
-
-
-def test_no_selectolax_in_lock() -> None:
-    """selectolax should not be in uv.lock."""
-    lock = Path(__file__).resolve().parents[2] / "uv.lock"
-    text = lock.read_text()
-    assert "selectolax" not in text, "selectolax still present in uv.lock"
-
-
-def test_no_provider_api_keys_in_env_example() -> None:
-    """No provider-specific data API key env vars."""
-    env = Path(__file__).resolve().parents[2] / ".env.example"
-    text = env.read_text()
-    for key in ("EODHD", "TIINGO", "REDDIT"):
-        assert key not in text, f"Provider env var {key} still in .env.example"

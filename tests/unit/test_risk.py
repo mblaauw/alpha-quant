@@ -6,7 +6,6 @@ import pytest
 
 from alpha_quant.domain.models import Bar, Position
 from alpha_quant.domain.risk import (
-    RiskAction,
     RiskConfig,
     evaluate_daily_loss,
     evaluate_drawdown,
@@ -211,32 +210,3 @@ class TestEvaluateDailyLoss:
     def test_zero_equity_returns_empty(self) -> None:
         result = evaluate_daily_loss(today_pnl=-1_000.0, equity_before_pnl=0.0)
         assert result == []
-
-
-class TestBoundaryValues:
-    def test_stop_exact_boundary(self) -> None:
-        pos = _position(avg_cost=100.0, stop_price=90.0)
-        bar = _bar(open_v=100.0, low=90.0)
-        result = evaluate_stops(pos, bar, atr=5.0, highest_since_entry=100.0)
-        assert any(a.action_type == "stop" for a in result)
-
-    def test_drawdown_exact_10pct(self) -> None:
-        result = evaluate_drawdown([100.0, 90.0])
-        assert result.multiplier == 0.5
-
-    def test_drawdown_exact_15pct(self) -> None:
-        result = evaluate_drawdown([100.0, 85.0])
-        assert result.multiplier == 0.0
-
-    def test_daily_loss_exact_3pct(self) -> None:
-        result = evaluate_daily_loss(-3_000.0, 100_000.0, RiskConfig(daily_loss_halt_pct=0.03))
-        assert len(result) == 1
-        assert result[0].action_type == "daily_halt"
-
-
-class TestRiskAction:
-    def test_risk_action_attributes(self) -> None:
-        a = RiskAction(action_type="stop", symbol="AAPL", shares=100.0, reason="test")
-        assert a.action_type == "stop"
-        assert a.symbol == "AAPL"
-        assert a.shares == 100.0

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -45,7 +45,7 @@ def engine():
 
 @pytest.fixture()
 def session(engine):
-    Session = create_session(engine)
+    Session = create_session(engine)  # noqa: N806
     s = Session()
     s.execute(
         text(
@@ -55,7 +55,7 @@ def session(engine):
             " projection.portfolio_current, projection.position_current,"
             " trade.portfolio_mark, trade.corporate_action_booking, trade.cash_ledger_entry,"
             " trade.paper_fill, trade.paper_order,"
-            " run.policy_evaluation, run.candidate_evaluation, run.alpha_lake_manifest, run.decision_run"
+            " run.policy_evaluation, run.candidate_evaluation, run.alpha_lake_manifest, run.decision_run"  # noqa: E501
             " CASCADE"
         )
     )
@@ -74,9 +74,9 @@ def book_id(session):
     bid = str(uuid4())
     session.execute(
         text(
-            "INSERT INTO core.portfolio_book (book_id, name, kind, created_at) VALUES (:bid, :n, :k, :now)"
+            "INSERT INTO core.portfolio_book (book_id, name, kind, created_at) VALUES (:bid, :n, :k, :now)"  # noqa: E501
         ),
-        {"bid": bid, "n": "test-book", "k": "backtest", "now": datetime.now(timezone.utc)},
+        {"bid": bid, "n": "test-book", "k": "backtest", "now": datetime.now(UTC)},
     )
     session.commit()
     return UUID(bid)
@@ -86,14 +86,14 @@ def book_id(session):
 def strategy_id(session):
     sid = str(uuid4())
     svid = str(uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     session.execute(
         text("INSERT INTO core.strategy (strategy_id, name, created_at) VALUES (:sid, :n, :now)"),
         {"sid": sid, "n": "test-strategy", "now": now},
     )
     session.execute(
         text(
-            "INSERT INTO core.strategy_version (strategy_version_id, strategy_id, version_label, config_json, config_hash, created_at) VALUES (:svid, :sid, :vl, :cj, :ch, :now)"
+            "INSERT INTO core.strategy_version (strategy_version_id, strategy_id, version_label, config_json, config_hash, created_at) VALUES (:svid, :sid, :vl, :cj, :ch, :now)"  # noqa: E501
         ),
         {"svid": svid, "sid": sid, "vl": "v1", "cj": "{}", "ch": "abc", "now": now},
     )
@@ -111,7 +111,7 @@ class TestHealthCheck:
 class TestRunLifecycle:
     def test_reserve_and_complete_run(self, store, session, book_id, strategy_id):
         _, svid = strategy_id
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         reservation = RunReservation(
             run_key="test-run-001",
             run_kind=RunKind.DAILY,
@@ -157,7 +157,7 @@ class TestRunLifecycle:
 class TestDecisionBatch:
     def test_commit_batch(self, store, session, book_id, strategy_id):
         _, svid = strategy_id
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         run = store.reserve_run(
             RunReservation(
                 run_key="batch-test",
@@ -222,7 +222,7 @@ class TestDecisionBatch:
 class TestFills:
     def test_book_fill_idempotent(self, store, session, book_id, strategy_id):
         _, svid = strategy_id
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         run = store.reserve_run(
             RunReservation(
                 run_key="fill-test",
@@ -249,7 +249,7 @@ class TestFills:
         order_id = uuid4()
         session.execute(
             text(
-                "INSERT INTO trade.paper_order (order_id, decision_run_id, portfolio_book_id, security_id, symbol, side, quantity, status, idempotency_key) VALUES (:oid, :rid, :pbid, :sid, :sym, :s, :q, :st, :ik)"
+                "INSERT INTO trade.paper_order (order_id, decision_run_id, portfolio_book_id, security_id, symbol, side, quantity, status, idempotency_key) VALUES (:oid, :rid, :pbid, :sid, :sym, :s, :q, :st, :ik)"  # noqa: E501
             ),
             {
                 "oid": str(order_id),
@@ -320,12 +320,12 @@ class TestPortfolioMarks:
         mark = PortfolioMark(
             mark_id=uuid4(),
             portfolio_book_id=book_id,
-            effective_date=datetime.now(timezone.utc).date(),
+            effective_date=datetime.now(UTC).date(),
             cash=Decimal("100000"),
             equity=Decimal("150000"),
             gross_exposure=Decimal("50000"),
             regime="bull",
-            mark_as_of=datetime.now(timezone.utc),
+            mark_as_of=datetime.now(UTC),
         )
         store.save_portfolio_mark(mark)
         session.commit()

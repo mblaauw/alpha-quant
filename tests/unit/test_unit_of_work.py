@@ -1,18 +1,14 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
+import sqlalchemy as sa
 
 from alpha_quant.adapters.postgres import create_engine, create_session
 from alpha_quant.adapters.postgres.engine import init_schema
 from alpha_quant.adapters.postgres.unit_of_work import OperationalUnitOfWork
-from alpha_quant.contracts.operational import (
-    HaltCommand,
-    HaltReason,
-    RunKind,
-    RunReservation,
-)
 
 
 @pytest.fixture(scope="module")
@@ -27,18 +23,19 @@ def engine():
 
 @pytest.fixture()
 def read_session(engine):
-    Session = create_session(engine)
+    Session = create_session(engine)  # noqa: N806
     s = Session()
     s.execute(
-        __import__("sqlalchemy").text(
+        sa.text(
             "TRUNCATE TABLE"
             " ops.current_halt, ops.run_lock_audit,"
             " audit.halt_transition, audit.risk_event, audit.audit_event,"
             " projection.portfolio_current, projection.position_current,"
             " trade.portfolio_mark, trade.corporate_action_booking, trade.cash_ledger_entry,"
             " trade.paper_fill, trade.paper_order,"
-            " run.policy_evaluation, run.candidate_evaluation, run.alpha_lake_manifest, run.decision_run,"
-            " core.strategy_version, core.strategy, core.portfolio_book, core.security_reference, core.execution_profile"
+            " run.policy_evaluation, run.candidate_evaluation, run.alpha_lake_manifest,"
+            " run.decision_run, core.strategy_version, core.strategy,"
+            " core.portfolio_book, core.security_reference, core.execution_profile"
             " CASCADE"
         )
     )
@@ -57,7 +54,7 @@ class TestUnitOfWork:
 
         with uow as unit:
             unit.session.execute(
-                __import__("sqlalchemy").text(
+                sa.text(
                     "INSERT INTO core.portfolio_book (book_id, name, kind, created_at)"
                     " VALUES (:bid, :n, :k, :now)"
                 ),
@@ -65,14 +62,12 @@ class TestUnitOfWork:
                     "bid": bid,
                     "n": "uow-test",
                     "k": "paper",
-                    "now": __import__("datetime").datetime.now(__import__("datetime").timezone.utc),
+                    "now": datetime.now(UTC),
                 },
             )
 
         row = read_session.execute(
-            __import__("sqlalchemy").text(
-                "SELECT name FROM core.portfolio_book WHERE book_id = :bid"
-            ),
+            sa.text("SELECT name FROM core.portfolio_book WHERE book_id = :bid"),
             {"bid": bid},
         ).fetchone()
         assert row is not None
@@ -85,28 +80,23 @@ class TestUnitOfWork:
         uow = OperationalUnitOfWork(factory)
         bid = str(uuid4())
 
-        with pytest.raises(RuntimeError):
-            with uow as unit:
-                unit.session.execute(
-                    __import__("sqlalchemy").text(
-                        "INSERT INTO core.portfolio_book (book_id, name, kind, created_at)"
-                        " VALUES (:bid, :n, :k, :now)"
-                    ),
-                    {
-                        "bid": bid,
-                        "n": "should-rollback",
-                        "k": "paper",
-                        "now": __import__("datetime").datetime.now(
-                            __import__("datetime").timezone.utc
-                        ),
-                    },
-                )
-                raise RuntimeError("force rollback")
+        with pytest.raises(RuntimeError), uow as unit:
+            unit.session.execute(
+                sa.text(
+                    "INSERT INTO core.portfolio_book (book_id, name, kind, created_at)"
+                    " VALUES (:bid, :n, :k, :now)"
+                ),
+                {
+                    "bid": bid,
+                    "n": "should-rollback",
+                    "k": "paper",
+                    "now": __import__("datetime").datetime.now(__import__("datetime").timezone.utc),
+                },
+            )
+            raise RuntimeError("force rollback")
 
         row = read_session.execute(
-            __import__("sqlalchemy").text(
-                "SELECT name FROM core.portfolio_book WHERE book_id = :bid"
-            ),
+            sa.text("SELECT name FROM core.portfolio_book WHERE book_id = :bid"),
             {"bid": bid},
         ).fetchone()
         assert row is None, "rollback should have prevented commit"

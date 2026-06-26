@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from alpha_quant.adapters.fake.canned_llm import CannedLLM

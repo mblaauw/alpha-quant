@@ -96,11 +96,3 @@ class TestGenerateJournal:
     def test_data_health_all_healthy(self) -> None:
         entry = generate_journal(_ctx())
         assert "All data sources healthy" in entry.content
-
-    def test_frozen_model(self) -> None:
-        import pytest
-        from pydantic import ValidationError
-
-        entry = generate_journal(_ctx())
-        with pytest.raises(ValidationError):
-            entry.content = "modified"

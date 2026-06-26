@@ -12,7 +12,7 @@ from alpha_quant.domain.events import (
     SourceDegraded,
 )
 from alpha_quant.domain.models import Position
-from alpha_quant.domain.narration import PositionNarration, build
+from alpha_quant.domain.narration import build
 
 
 def _event(**kwargs: object) -> dict:
@@ -220,18 +220,3 @@ class TestBuild:
         )
         assert ctx.equity == 100_000.12
         assert ctx.cash == 90_000.57
-
-
-class TestPositionNarration:
-    def test_frozen(self) -> None:
-        pn = PositionNarration(
-            symbol="AAPL",
-            shares=100.0,
-            entry_price=150.0,
-            current_price=155.0,
-            avg_cost=150.0,
-            unrealized_pl=500.0,
-            stop_price=140.0,
-            risk_pct=2.0,
-        )
-        assert pn.symbol == "AAPL"

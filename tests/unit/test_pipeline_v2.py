@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from unittest.mock import MagicMock
 
+from alpha_quant.application.pipeline_v2 import run_v2
 from alpha_quant.contracts.alpha_lake import (
     AlphaLakeHealth,
     BarObservation,
@@ -14,15 +15,14 @@ from alpha_quant.contracts.alpha_lake import (
     SymbolObservations,
     TechnicalObservations,
 )
-from alpha_quant.ports.alpha_lake import AlphaLakeReadPort
-from alpha_quant.application.pipeline_v2 import PipelineConfig, run_v2
 from alpha_quant.domain.models import PortfolioSnapshot, Position
+from alpha_quant.ports.alpha_lake import AlphaLakeReadPort
 
 
 def _mock_store(**overrides: object) -> MagicMock:
     store = MagicMock()
     store.load_positions.return_value = overrides.get("positions", [])
-    store.load_latest_portfolio_snapshot.return_value = overrides.get("latest_snapshot", None)
+    store.load_latest_portfolio_snapshot.return_value = overrides.get("latest_snapshot")
     store.load_portfolio_snapshots.return_value = overrides.get("snapshots", [])
     store.save_position = MagicMock()
     store.save_fill = MagicMock()
@@ -318,4 +318,4 @@ def test_run_v2_regime_change_emits_event() -> None:
     )
 
     assert result.date == date(2026, 1, 2)
-    getattr(store, "save_portfolio_snapshot").assert_called()
+    store.save_portfolio_snapshot.assert_called()

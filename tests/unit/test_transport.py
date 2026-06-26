@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
-from pytest import MonkeyPatch
 
 from alpha_quant.transport.app import app
 
