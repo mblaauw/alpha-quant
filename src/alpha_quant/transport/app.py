@@ -12,7 +12,6 @@ from fastapi.staticfiles import StaticFiles
 
 from alpha_quant.transport.commands import router as commands_router
 from alpha_quant.transport.console_routes import router as console_router
-from alpha_quant.transport.dashboard import router as dashboard_router
 from alpha_quant.transport.health import router as health_router
 
 logger = structlog.get_logger()
