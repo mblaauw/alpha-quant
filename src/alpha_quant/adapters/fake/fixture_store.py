@@ -1,179 +1,130 @@
+"""FixtureStore — in-memory DuckDB for deterministic testing.
+
+Stores state in an in-memory DuckDB database, reusing the same mixins
+as CanonicalStore. This ensures fixture mode exercises the same code
+paths as live mode (ADR-0029).
+"""
+
 from __future__ import annotations
 
 from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import date, datetime
-from typing import Self, override
+from typing import Self
 
-from alpha_quant.domain.events import DomainEvent
-from alpha_quant.domain.journal import JournalEntry
-from alpha_quant.domain.models import (
-    Decision,
-    Fill,
-    IndicatorState,
-    Order,
-    PortfolioSnapshot,
-    Position,
-)
-from alpha_quant.domain.reporting import ReportEntry
+import duckdb
+
+from alpha_quant.application.store.admin_store import AdminStoreMixin
+from alpha_quant.application.store.decision_store import DecisionStoreMixin
+from alpha_quant.application.store.event_store import EventStoreMixin
+from alpha_quant.application.store.indicator_store import IndicatorStoreMixin
+from alpha_quant.application.store.journal_store import JournalStoreMixin
+from alpha_quant.application.store.order_store import OrderStoreMixin
+from alpha_quant.application.store.position_store import PositionStoreMixin
 from alpha_quant.ports.store import Store
 
 
-class FixtureStore(Store):
+class FixtureStore(
+    Store,
+    DecisionStoreMixin,
+    OrderStoreMixin,
+    PositionStoreMixin,
+    EventStoreMixin,
+    IndicatorStoreMixin,
+    JournalStoreMixin,
+    AdminStoreMixin,
+):
     def __init__(self) -> None:
-        self._orders: dict[str, Order] = {}
-        self._fills: dict[str, list[Fill]] = {}
-        self._positions: list[Position] = []
-        self._events: list[DomainEvent] = []
-        self._portfolio_snapshots: list[PortfolioSnapshot] = []
-        self._journals: dict[date, JournalEntry] = {}
-        self._reports: dict[tuple[date, str], ReportEntry] = {}
-        self._decisions: dict[str, list[Decision]] = {}
-        self._indicator_states: dict[tuple[str, date], IndicatorState] = {}
-        self._quarantine: list[dict[str, object]] = []
-        self._runs: dict[str, str] = {}
+        self._state_conn = duckdb.connect(":memory:")
+        self._init_schema()
+
+    def _init_schema(self) -> None:
+        conn = self._state_conn
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS decisions ("
+            "  decision_id VARCHAR, run_id VARCHAR, symbol VARCHAR NOT NULL,"
+            "  decision_date DATE NOT NULL, action VARCHAR NOT NULL,"
+            "  confidence DOUBLE NOT NULL, reasons JSON, candidate_json JSON,"
+            "  position_json JSON, order_json JSON, risk_results JSON,"
+            "  mechanism_results JSON, PRIMARY KEY (symbol, decision_date)"
+            ")"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS orders ("
+            "  order_id VARCHAR PRIMARY KEY, symbol VARCHAR NOT NULL,"
+            "  action VARCHAR NOT NULL, quantity DOUBLE NOT NULL,"
+            "  order_type VARCHAR NOT NULL, limit_price DOUBLE, status VARCHAR NOT NULL,"
+            "  submitted_at TIMESTAMP, fill_date TIMESTAMP,"
+            "  filled_quantity DOUBLE, avg_fill_price DOUBLE"
+            ")"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS fills ("
+            "  fill_id VARCHAR PRIMARY KEY, order_id VARCHAR NOT NULL,"
+            "  symbol VARCHAR NOT NULL, quantity DOUBLE NOT NULL,"
+            "  price DOUBLE NOT NULL, filled_at TIMESTAMP NOT NULL, fee DOUBLE"
+            ")"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS positions ("
+            "  symbol VARCHAR PRIMARY KEY, quantity DOUBLE NOT NULL,"
+            "  entry_price DOUBLE, avg_cost DOUBLE NOT NULL, current_price DOUBLE,"
+            "  stop_price DOUBLE, trail_price DOUBLE, market_value DOUBLE,"
+            "  unrealized_pl DOUBLE, realized_pl DOUBLE, sector VARCHAR,"
+            "  decision_id VARCHAR, entry_date DATE,"
+            "  high_since_entry DOUBLE, partial_taken BOOLEAN NOT NULL DEFAULT FALSE"
+            ")"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS equity_curve ("
+            "  equity_date DATE NOT NULL, equity DOUBLE NOT NULL,"
+            "  cash DOUBLE NOT NULL DEFAULT 0, regime VARCHAR NOT NULL DEFAULT 'CAUTION',"
+            "  book VARCHAR NOT NULL DEFAULT 'PAPER', PRIMARY KEY (equity_date, book)"
+            ")"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS events ("
+            "  event_id VARCHAR PRIMARY KEY, event_type VARCHAR NOT NULL,"
+            "  timestamp TIMESTAMP NOT NULL, run_id VARCHAR NOT NULL,"
+            "  payload JSON NOT NULL"
+            ")"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS indicator_state ("
+            "  symbol VARCHAR NOT NULL, effective_date DATE NOT NULL,"
+            "  data JSON, PRIMARY KEY (symbol, effective_date)"
+            ")"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS quarantine ("
+            "  symbol VARCHAR NOT NULL, reason VARCHAR NOT NULL,"
+            "  quarantined_date DATE NOT NULL, cleared_date DATE,"
+            "  severity VARCHAR NOT NULL DEFAULT 'QUARANTINE',"
+            "  PRIMARY KEY (symbol, quarantined_date)"
+            ")"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS journal_entries ("
+            "  entry_date DATE PRIMARY KEY, content TEXT NOT NULL"
+            ")"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS reports ("
+            "  report_date DATE NOT NULL, report_type VARCHAR NOT NULL,"
+            "  content TEXT NOT NULL, PRIMARY KEY (report_date, report_type)"
+            ")"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS runs ("
+            "  run_id VARCHAR PRIMARY KEY, run_type VARCHAR NOT NULL,"
+            "  config_hash VARCHAR NOT NULL, fixture_version VARCHAR,"
+            "  start_ts TIMESTAMP NOT NULL, end_ts TIMESTAMP,"
+            "  status VARCHAR NOT NULL DEFAULT 'running', manifest_hash VARCHAR"
+            ")"
+        )
 
     @contextmanager
     def transaction(self) -> Generator[Self]:
         yield self
 
-    @override
-    def save_decision(self, decision: Decision) -> None:
-        self._decisions.setdefault(decision.symbol, []).append(decision)
-
-    @override
-    def load_decisions(self, symbol: str, since: date) -> list[Decision]:
-        return [d for d in self._decisions.get(symbol, []) if d.date >= since]
-
-    @override
-    def save_order(self, order: Order) -> None:
-        self._orders[order.order_id] = order
-
-    @override
-    def load_order(self, order_id: str) -> Order | None:
-        return self._orders.get(order_id)
-
-    @override
-    def save_fill(self, fill: Fill) -> None:
-        self._fills.setdefault(fill.order_id, []).append(fill)
-
-    @override
-    def load_fills(self, order_id: str) -> list[Fill]:
-        return self._fills.get(order_id, [])
-
-    @override
-    def save_position(self, position: Position) -> None:
-        existing = [i for i, p in enumerate(self._positions) if p.symbol == position.symbol]
-        if existing:
-            self._positions[existing[0]] = position
-        else:
-            self._positions.append(position)
-
-    @override
-    def load_positions(self) -> list[Position]:
-        return list(self._positions)
-
-    @override
-    def save_event(self, event: DomainEvent) -> None:
-        self._events.append(event)
-
-    @override
-    def load_events(
-        self,
-        event_type: str | None = None,
-        since: datetime | None = None,
-    ) -> list[DomainEvent]:
-        result = list(self._events)
-        if event_type:
-            result = [e for e in result if e.event_type == event_type]
-        if since:
-            result = [e for e in result if e.timestamp >= since]
-        return result
-
-    @override
-    def save_indicator_state(self, state: IndicatorState) -> None:
-        self._indicator_states[(state.symbol, state.date)] = state
-
-    @override
-    def load_indicator_state(self, symbol: str, dt: date) -> IndicatorState | None:
-        return self._indicator_states.get((symbol, dt))
-
-    @override
-    def save_portfolio_snapshot(self, snapshot: PortfolioSnapshot) -> None:
-        self._portfolio_snapshots.append(snapshot)
-
-    @override
-    def load_latest_portfolio_snapshot(self, book: str = "PAPER") -> PortfolioSnapshot | None:
-        matching = [s for s in self._portfolio_snapshots if s.book == book]
-        if not matching:
-            return None
-        return max(matching, key=lambda s: s.date)
-
-    @override
-    def load_portfolio_snapshots(
-        self, book: str = "PAPER", limit: int = 500
-    ) -> list[PortfolioSnapshot]:
-        matching = [s for s in self._portfolio_snapshots if s.book == book]
-        return sorted(matching, key=lambda s: s.date)[:limit]
-
-    @override
-    def save_journal(self, entry: JournalEntry) -> None:
-        self._journals[entry.date] = entry
-
-    @override
-    def load_journal(self, dt: date) -> JournalEntry | None:
-        return self._journals.get(dt)
-
-    @override
-    def save_report(self, report: ReportEntry) -> None:
-        self._reports[(report.date, report.report_type)] = report
-
-    @override
-    def load_report(self, dt: date, report_type: str) -> ReportEntry | None:
-        return self._reports.get((dt, report_type))
-
-    @override
-    def add_quarantine(self, symbol: str, reason: str, severity: str = "QUARANTINE") -> None:
-        self._quarantine.append(
-            {
-                "symbol": symbol,
-                "reason": reason,
-                "severity": severity,
-                "quarantined_date": date.today(),
-                "cleared_date": None,
-            }
-        )
-
-    @override
-    def list_quarantine(self, cleared: bool = False) -> list[dict[str, object]]:
-        if cleared:
-            return [q for q in self._quarantine if q.get("cleared_date") is not None]
-        return [q for q in self._quarantine if q.get("cleared_date") is None]
-
-    @override
-    def clear_quarantine(self, symbol: str) -> None:
-        for q in self._quarantine:
-            if q["symbol"] == symbol:
-                q["cleared_date"] = date.today()
-
-    _run_counter: int = 0
-
-    @override
-    def register_run(self, run_type: str, config_hash: str, fixture_version: str = "") -> str:
-        FixtureStore._run_counter += 1
-        run_id = f"fixture-run-{FixtureStore._run_counter}"
-        self._runs[run_id] = run_type
-        return run_id
-
-    @override
-    def complete_run(self, run_id: str, status: str = "completed", manifest_hash: str = "") -> None:
-        if run_id in self._runs:
-            self._runs[run_id] = status
-
-    @override
-    def list_runs(self, since_date: date | None = None) -> list[dict[str, object]]:
-        return [{"run_id": rid, "run_type": rt} for rid, rt in self._runs.items()]
-
-    @override
     def close(self) -> None:
-        pass
+        self._state_conn.close()

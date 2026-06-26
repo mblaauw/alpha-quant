@@ -6,7 +6,6 @@ and provides shared DuckDB connection setup + schema initialization.
 
 from __future__ import annotations
 
-from datetime import date
 from pathlib import Path
 
 import duckdb
@@ -15,10 +14,10 @@ import structlog
 from alpha_quant.application.store.admin_store import AdminStoreMixin
 from alpha_quant.application.store.decision_store import DecisionStoreMixin
 from alpha_quant.application.store.event_store import EventStoreMixin
+from alpha_quant.application.store.indicator_store import IndicatorStoreMixin
 from alpha_quant.application.store.journal_store import JournalStoreMixin
 from alpha_quant.application.store.order_store import OrderStoreMixin
 from alpha_quant.application.store.position_store import PositionStoreMixin
-from alpha_quant.domain.models import IndicatorState
 from alpha_quant.ports.store import Store
 
 logger = structlog.get_logger()
@@ -30,6 +29,7 @@ class CanonicalStore(
     OrderStoreMixin,
     PositionStoreMixin,
     EventStoreMixin,
+    IndicatorStoreMixin,
     JournalStoreMixin,
     AdminStoreMixin,
 ):
@@ -218,24 +218,3 @@ class CanonicalStore(
             ")"
         )
         conn.commit()
-
-    def save_indicator_state(self, state: IndicatorState) -> None:
-        import json
-
-        cur = self._state_conn.execute(
-            "INSERT OR REPLACE INTO indicator_state (symbol, effective_date, data) "
-            "VALUES (?, ?, ?)",
-            [state.symbol, str(state.date), json.dumps(state.model_dump(mode="json"))],
-        )
-        cur.close()
-
-    def load_indicator_state(self, symbol: str, dt: date) -> IndicatorState | None:
-        cur = self._state_conn.execute(
-            "SELECT data FROM indicator_state WHERE symbol = ? AND effective_date = ?",
-            [symbol, str(dt)],
-        )
-        row = cur.fetchone()
-        cur.close()
-        if row:
-            return IndicatorState.model_validate(row[0])
-        return None
