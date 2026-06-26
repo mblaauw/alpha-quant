@@ -1,100 +1,120 @@
-import { apiGet } from "../api.js";
-import { showCommandConfirm } from "../commands.js";
-import { loading } from "../components/empty_state.js";
+import store from "../state.js";
+import { get } from "../api.js";
+import { fmtDateTime } from "../formatters.js";
+import { statusChip } from "../components/status.js";
+import { showModal, closeModal } from "../components/modal.js";
+import { showBanner } from "../components/banner.js";
+import { submitCommand, generateKey } from "../commands.js";
+import { emptyState } from "../components/empty_state.js";
+import { errorState } from "../components/error_state.js";
 
-export async function renderRisk(container) {
-  container.innerHTML = loading("Loading risk data...");
+export async function renderRisk() {
+  const view = document.getElementById("view");
+  view.innerHTML = `<div class="skeleton" style="height:200px"></div>`;
   try {
-    const risk = await apiGet("/v1/dashboard/risk");
-    const halts = await apiGet("/v1/dashboard/halts");
+    const data = await get("/v1/console/risk");
+    view.innerHTML = buildRisk(data);
+    document.getElementById("halt-btn")?.addEventListener("click", openHaltModal);
+    document.getElementById("resume-btn")?.addEventListener("click", openResumeModal);
+  } catch (e) {
+    view.innerHTML = errorState("Failed to load risk", e.message);
+  }
+}
 
-    const halted = risk.halted || halts.halted;
-    const halt = risk.halt || halts.halt;
-    const nearStop = risk.near_stop || [];
-
-    container.innerHTML = `
-      <h2 style="margin-bottom:16px">Risk &amp; Halts</h2>
-
-      <div class="metric-grid">
-        <div class="card metric-card">
-          <div class="metric-label">System Status</div>
-          <div class="metric-value ${halted ? "negative" : "positive"}">${halted ? "HALTED" : "Ready"}</div>
+function buildRisk(data) {
+  const state = data.halted ? "halted" : data.degraded ? "attention" : "ready";
+  const haltBtns = data.halted
+    ? `<button id="resume-btn" class="btn" style="border-color:var(--aq-positive);color:var(--aq-positive)">Resume</button>`
+    : `<button id="halt-btn" class="btn btn-danger">Create Halt</button>`;
+  return `
+    <div class="card" style="margin-bottom:1rem">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:1rem">
+          ${statusChip(state.toUpperCase(), state)}
+          ${data.halt_reason ? `<span style="color:var(--aq-negative)">${data.halt_reason}</span>` : ""}
         </div>
-        <div class="card metric-card">
-          <div class="metric-label">Positions</div>
-          <div class="metric-value">${risk.positions_count || 0}</div>
-        </div>
-        <div class="card metric-card">
-          <div class="metric-label">Near Stop</div>
-          <div class="metric-value ${nearStop.length > 0 ? "warning" : ""}">${nearStop.length}</div>
-        </div>
+        ${haltBtns}
       </div>
-
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-header">Halt State</div>
-        <div class="card-body">
-          ${halted ? `
-            <div class="kv-list">
-              <div class="kv-item"><span class="kv-key">Reason</span><span class="kv-value">${halt?.reason || "Unknown"}</span></div>
-              <div class="kv-item"><span class="kv-key">Started</span><span class="kv-value">${halt?.created_at || "-"}</span></div>
-            </div>
-            <button class="btn btn-primary" style="margin-top:12px" onclick="window.__resumeSystem()">▶ Resume System</button>
-          ` : `
-            <div class="empty-state"><p>System is operational. No active halt.</p></div>
-            <button class="btn btn-danger" style="margin-top:12px" onclick="window.__haltSystem()">⏹ Halt System</button>
-          `}
-        </div>
-      </div>
-
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-header">Positions Near Stop (${nearStop.length})</div>
-        <div class="card-body">
-          ${nearStop.length ? `
-            <table class="data-table">
-              <thead><tr><th>Symbol</th><th>Dist to Stop %</th></tr></thead>
-              <tbody>
-                ${nearStop.map(n => `<tr><td>${n.symbol}</td><td class="warning">${n.dist_to_stop_pct}%</td></tr>`).join("")}
-              </tbody>
-            </table>
-          ` : `<p>No positions near stop.</p>`}
-        </div>
-      </div>
-
+    </div>
+    <div class="grid-3">
       <div class="card">
-        <div class="card-header">Recent Risk Events</div>
-        <div class="card-body">
-          ${(risk.recent_risk_events || []).length ? `
-            <table class="data-table">
-              <thead><tr><th>Event</th><th>Timestamp</th></tr></thead>
-              <tbody>
-                ${risk.recent_risk_events.map(e => `<tr><td>${e.event_type || e.reason || "-"}</td><td>${e.created_at || e.timestamp || "-"}</td></tr>`).join("")}
-              </tbody>
-            </table>
-          ` : `<p>No recent risk events.</p>`}
-        </div>
+        <div class="card-header">Exposure</div>
+        ${data.exposure ? `<div>Gross: ${data.exposure.gross}%</div><div>Net: ${data.exposure.net}%</div>` : emptyState("No data")}
       </div>
-    `;
+      <div class="card">
+        <div class="card-header">Drawdown</div>
+        ${data.drawdown != null ? `${data.drawdown}%` : emptyState("No data")}
+      </div>
+      <div class="card">
+        <div class="card-header">Risk Events</div>
+        ${(data.events || []).slice(0, 5).map(e => `<div style="font-size:0.8rem;padding:2px 0">${e.type} — ${fmtDateTime(e.timestamp)}</div>`).join("") || emptyState("No recent events")}
+      </div>
+    </div>
+  `;
+}
 
-    window.__haltSystem = () => {
-      showCommandConfirm({
-        type: "halt.create",
-        title: "Halt System",
-        description: "Prevent new decision cycles and paper executions.",
-        fields: [{ name: "reason", label: "Reason", type: "text", required: true }],
-        danger: true,
-      });
-    };
+function openHaltModal() {
+  showModal(
+    "Create Operational Halt",
+    `<p style="color:var(--aq-negative);margin-bottom:0.75rem">This will block decision runs and paper execution.</p>
+     <div style="margin-bottom:0.75rem">
+       <label class="metric-label">Reason (required)</label>
+       <input id="halt-reason" style="display:block;margin-top:4px;width:100%;font-family:var(--aq-font-ui);background:var(--aq-paper);color:var(--aq-ink);border:1px solid var(--aq-rule);border-radius:var(--aq-radius);padding:6px 8px" placeholder="Why is the system halted?">
+     </div>`,
+    [
+      { label: "Cancel", class: "btn", onclick: closeModal },
+      { label: "● Create Halt", class: "btn btn-danger", onclick: executeHalt },
+    ],
+  );
+}
 
-    window.__resumeSystem = () => {
-      showCommandConfirm({
-        type: "halt.resume",
-        title: "Resume System",
-        description: "Re-enable decision cycles and paper executions.",
-        fields: [{ name: "reason", label: "Reason", type: "text", required: true }],
-      });
-    };
+async function executeHalt() {
+  const reason = document.getElementById("halt-reason")?.value;
+  if (!reason) { showBanner("Halt reason is required.", "blocking"); return; }
+  closeModal();
+  showBanner("Submitting halt...", "info");
+  try {
+    const result = await submitCommand("halt.create", {}, {
+      idempotency_key: generateKey(),
+      book_id: store.bookId,
+      reason,
+    });
+    showBanner(`Halt created: ${result.status}`, "warning");
+    await renderRisk();
+  } catch (e) {
+    showBanner("Halt failed: " + e.message, "blocking");
+  }
+}
 
-  } catch (err) {
-    container.innerHTML = `<div class="error-state"><h3>Failed to load risk data</h3><p>${err.message}</p></div>`;
+function openResumeModal() {
+  showModal(
+    "Resume Operations",
+    `<p>This will clear the active halt and resume decision runs.</p>
+     <div style="margin-bottom:0.75rem">
+       <label class="metric-label">Reason (required)</label>
+       <input id="resume-reason" style="display:block;margin-top:4px;width:100%;font-family:var(--aq-font-ui);background:var(--aq-paper);color:var(--aq-ink);border:1px solid var(--aq-rule);border-radius:var(--aq-radius);padding:6px 8px" placeholder="Why is the halt being cleared?">
+     </div>`,
+    [
+      { label: "Cancel", class: "btn", onclick: closeModal },
+      { label: "✓ Resume", class: "btn", onclick: executeResume, style: "border-color:var(--aq-positive);color:var(--aq-positive)" },
+    ],
+  );
+}
+
+async function executeResume() {
+  const reason = document.getElementById("resume-reason")?.value;
+  if (!reason) { showBanner("Resume reason is required.", "blocking"); return; }
+  closeModal();
+  showBanner("Submitting resume...", "info");
+  try {
+    const result = await submitCommand("halt.resume", {}, {
+      idempotency_key: generateKey(),
+      book_id: store.bookId,
+      reason,
+    });
+    showBanner(`Resumed: ${result.status}`, "info");
+    await renderRisk();
+  } catch (e) {
+    showBanner("Resume failed: " + e.message, "blocking");
   }
 }

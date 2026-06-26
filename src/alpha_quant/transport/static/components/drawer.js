@@ -1,20 +1,17 @@
-const drawer = document.getElementById("drawer");
-
-export function openDrawer(title, bodyHtml) {
-  if (!drawer) return;
-  drawer.innerHTML = `
-    <div class="drawer-header">
-      <h3>${title}</h3>
-      <button class="drawer-close" onclick="window.__closeDrawer()">×</button>
-    </div>
-    <div class="drawer-body">${bodyHtml}</div>
-  `;
-  drawer.classList.remove("hidden");
-  window.__closeDrawer = closeDrawer;
+export function openDrawer(title, content) {
+  document.getElementById("drawer-title").textContent = title;
+  document.getElementById("drawer-body").innerHTML = content;
+  document.getElementById("drawer").classList.add("open");
+  document.getElementById("drawer-overlay").classList.add("open");
 }
 
 export function closeDrawer() {
-  if (!drawer) return;
-  drawer.classList.add("hidden");
-  drawer.innerHTML = "";
+  document.getElementById("drawer").classList.remove("open");
+  document.getElementById("drawer-overlay").classList.remove("open");
 }
+
+document.addEventListener("click", (e) => {
+  if (e.target.closest("#drawer-overlay")) closeDrawer();
+  if (e.target.closest("#drawer-close-btn")) closeDrawer();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });

@@ -1,3 +1,3 @@
 export function tooltip(text) {
-  return ` data-tooltip="${text.replace(/"/g, "&quot;")}"`;
+  return `<span class="tooltip">${text}</span>`;
 }

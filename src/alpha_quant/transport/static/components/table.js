@@ -1,7 +1,6 @@
-export function dataTable(headers, rows, options = {}) {
+export function renderTable(headers, rows) {
+  if (!rows || rows.length === 0) return "";
   const thead = headers.map(h => `<th>${h}</th>`).join("");
-  const tbody = rows.map(row =>
-    `<tr${options.clickable ? ' class="clickable"' : ""}>${row.map(c => `<td>${c}</td>`).join("")}</tr>`
-  ).join("");
-  return `<table class="data-table"><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table>`;
+  const tbody = rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join("");
+  return `<table><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table>`;
 }

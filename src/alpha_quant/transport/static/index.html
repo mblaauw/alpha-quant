@@ -3,55 +3,49 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alpha Quant</title>
+<title>Alpha-Quant Desk</title>
 <link rel="stylesheet" href="/static/styles.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz@8..60&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div id="shell">
-    <header id="topbar">
-      <div class="topbar-left">
-        <span class="topbar-brand">αQ</span>
-        <span class="topbar-separator"></span>
-        <select id="book-selector" class="topbar-select" title="Active book"></select>
-        <span id="mode-badge" class="badge badge-paper">PAPER</span>
-      </div>
-      <div class="topbar-center">
-        <span id="as-of-label" class="topbar-meta"></span>
-        <span id="snapshot-label" class="topbar-meta"></span>
-      </div>
-      <div class="topbar-right">
-        <span id="lake-badge" class="badge badge-healthy" title="Alpha-Lake status">Lake</span>
-        <span id="ops-badge" class="badge badge-healthy" title="Operational status">Ops</span>
-        <button id="theme-toggle" class="icon-btn" title="Toggle theme">☾</button>
-        <button id="run-btn" class="btn btn-primary" title="Run decision cycle">▶ Run</button>
-      </div>
-    </header>
+  <header id="topbar">
+    <span class="topbar-brand">Alpha-Quant Desk</span>
+    <span class="topbar-sep"></span>
+    <select id="book-selector" class="topbar-select" title="Active book">
+      <option value="">Loading...</option>
+    </select>
+    <span id="mode-badge" class="chip chip-neutral">PAPER</span>
+    <span class="topbar-sep"></span>
+    <span id="ops-status" class="topbar-meta"><span class="dot inactive"></span>Checking...</span>
+    <span class="topbar-right">
+      <span id="last-run-label" class="topbar-meta"></span>
+      <span id="snapshot-label" class="topbar-meta"></span>
+      <span id="lake-health" class="topbar-meta"><span class="dot inactive"></span>Lake</span>
+      <button id="theme-toggle" class="icon-btn" title="Toggle theme">☾</button>
+      <button id="run-btn" class="btn btn-primary">▶ Run Decision Cycle</button>
+    </span>
+  </header>
 
-    <div id="global-banner"></div>
+  <div id="global-banner"></div>
 
-    <div id="layout">
-      <nav id="sidebar">
-        <ul>
-          <li data-route="command-center" class="active"><a href="#command-center">Command Center</a></li>
-          <li data-route="decisions"><a href="#decisions">Decisions</a></li>
-          <li data-route="portfolio"><a href="#portfolio">Portfolio</a></li>
-          <li data-route="orders"><a href="#orders">Orders &amp; Fills</a></li>
-          <li data-route="risk"><a href="#risk">Risk &amp; Halts</a></li>
-          <li data-route="runs"><a href="#runs">Runs</a></li>
-          <li data-route="journal"><a href="#journal">Journal</a></li>
-          <li data-route="reports"><a href="#reports">Reports</a></li>
-          <li data-route="system"><a href="#system">System</a></li>
-        </ul>
-      </nav>
+  <nav id="tabs">
+    <a href="#desk" class="active">Desk</a>
+    <a href="#portfolio">Portfolio</a>
+    <a href="#decisions">Decisions</a>
+    <a href="#orders">Orders</a>
+    <a href="#risk">Risk</a>
+    <a href="#runs">Runs</a>
+    <a href="#journal">Journal</a>
+    <a href="#system">System</a>
+  </nav>
 
-      <main id="content">
-        <div id="view" class="view-container"></div>
-        <div id="drawer" class="drawer hidden"></div>
-      </main>
-    </div>
-  </div>
+  <main id="content"><div id="view"></div></main>
 
-  <dialog id="modal"></dialog>
+  <div id="drawer-overlay"></div>
+  <aside id="drawer"><div id="drawer-header"><span id="drawer-title"></span><button class="drawer-close" id="drawer-close-btn">✕</button></div><div id="drawer-body"></div></aside>
+
+  <dialog id="modal"><div class="modal-header"><span class="modal-title" id="modal-title"></span><button class="drawer-close" id="modal-close-btn">✕</button></div><div class="modal-body" id="modal-body"></div><div class="modal-actions" id="modal-actions"></div></dialog>
 
   <script type="module" src="/static/app.js"></script>
 </body>
