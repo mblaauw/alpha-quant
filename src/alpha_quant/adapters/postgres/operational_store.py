@@ -792,6 +792,92 @@ class PostgresOperationalStore:
         ).fetchone()
         return row._mapping["cnt"] if row else 0
 
+    # --- Operator command handlers ---
+
+    def cancel_order(self, order_id: UUID, reason: str | None = None) -> None:
+        from alpha_quant.contracts.operational import OrderStatus
+
+        status = OrderStatus.CANCELLED.value
+        self.session.execute(
+            text("UPDATE trade.paper_order SET status = :s WHERE order_id = :oid"),
+            {"s": status, "oid": str(order_id)},
+        )
+        self.session.execute(
+            text("""
+                INSERT INTO audit.audit_event
+                    (event_id, decision_run_id, event_type, payload_json, created_at)
+                VALUES (:eid, :rid, :et, :pj, :now)
+            """),
+            {
+                "eid": str(uuid4()),
+                "rid": "",
+                "et": "order.cancelled",
+                "pj": f'{{"order_id": "{order_id}", "reason": "{reason or ""}"}}',
+                "now": datetime.now(UTC),
+            },
+        )
+
+    def create_order(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        order_type: str,
+        book_id: UUID,
+        limit_price: float | None = None,
+        decision_id: str | None = None,
+    ) -> str:
+        from alpha_quant.contracts.operational import OrderStatus
+
+        order_id = str(uuid4())
+        status = OrderStatus.PENDING.value
+        self.session.execute(
+            text("""
+                INSERT INTO trade.paper_order
+                    (order_id, decision_run_id, portfolio_book_id, security_id,
+                     symbol, side, quantity, status, idempotency_key,
+                     limit_price, submitted_at)
+                VALUES
+                    (:oid, :rid, :pbid, :sid,
+                     :sym, :sd, :qty, :st, :ik,
+                     :lp, :now)
+            """),
+            {
+                "oid": order_id,
+                "rid": decision_id or "",
+                "pbid": str(book_id),
+                "sid": symbol,
+                "sym": symbol,
+                "sd": side,
+                "qty": str(quantity),
+                "st": status,
+                "ik": str(uuid4()),
+                "lp": str(limit_price) if limit_price is not None else None,
+                "now": datetime.now(UTC),
+            },
+        )
+        return order_id
+
+    def update_position_stop(self, symbol: str, stop_price: float, book_id: UUID) -> None:
+        self.session.execute(
+            text("""
+                UPDATE projection.position_current
+                SET stop_price = :sp
+                WHERE symbol = :sym AND book_id = :bid
+            """),
+            {"sp": str(stop_price), "sym": symbol, "bid": str(book_id)},
+        )
+
+    def mark_operator_excluded(self, decision_id: str, reason: str | None = None) -> None:
+        self.session.execute(
+            text("""
+                UPDATE run.candidate_evaluation
+                SET blocked = TRUE, block_reason = :br
+                WHERE candidate_id = :cid
+            """),
+            {"cid": decision_id, "br": reason or "operator_excluded"},
+        )
+
     def _row_to_command(self, r: Any) -> Command:
         return Command(
             command_id=UUID(r._mapping["command_id"]),
