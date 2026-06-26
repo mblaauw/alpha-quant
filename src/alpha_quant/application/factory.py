@@ -154,9 +154,11 @@ def seed_default_data(database_url: str | None = None) -> None:
 
         existing_book = session.query(PortfolioBook).filter(PortfolioBook.name == "default").first()
         if existing_book is None:
+            from uuid import UUID as _UUID
+
             session.add(
                 PortfolioBook(
-                    book_id=str(uuid4()),
+                    book_id=str(_UUID("00000000-0000-0000-0000-000000000001")),
                     name="default",
                     kind="paper",
                     created_at=__import__("datetime").datetime.now(
