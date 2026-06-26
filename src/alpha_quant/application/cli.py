@@ -757,23 +757,30 @@ def worker(
     import time
 
     import structlog
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session, sessionmaker
 
     from alpha_quant.application.commands import dispatch
-    from alpha_quant.application.factory import create_unit_of_work
+    from alpha_quant.application.factory import DEFAULT_DATABASE_URL
 
     logger = structlog.get_logger("alpha_quant.worker")
     log = logger.info
 
+    engine = create_engine(DEFAULT_DATABASE_URL, pool_size=2, max_overflow=4, pool_pre_ping=True)
+    session_factory: sessionmaker[Session] = sessionmaker(bind=engine)
+
     def _claim() -> object | None:
-        uow = create_unit_of_work()
+        from alpha_quant.adapters.postgres.unit_of_work import OperationalUnitOfWork
+
+        uow = OperationalUnitOfWork(session_factory)
         with uow:
             cmd = uow.store.claim_command()
             if cmd is None:
                 return None
             log("claimed_command", command_id=str(cmd.command_id), type=cmd.type)
-            result = dispatch(cmd)
-            log("completed_command", command_id=str(result.command_id), status=result.status.value)
-            return result
+        result = dispatch(cmd)
+        log("completed_command", command_id=str(result.command_id), status=result.status.value)
+        return result
 
     log("worker_started", poll_interval=poll_interval, one_shot=one_shot)
     while True:
