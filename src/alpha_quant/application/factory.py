@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -25,7 +26,10 @@ from alpha_quant.ports.llm import LLM
 from alpha_quant.ports.llm import LLMConfig as PortLLMConfig
 from alpha_quant.ports.store import Store
 
-DEFAULT_DATABASE_URL = "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant"
+DEFAULT_DATABASE_URL = (
+    os.environ.get("DATABASE_URL")
+    or "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant"
+)
 
 
 # -- Factory functions for the Alpha-Lake reader --

@@ -333,7 +333,7 @@ class AuditEvent(Base):
     __table_args__ = {"schema": "audit"}
 
     event_id: Mapped[str] = pk_uuid()
-    decision_run_id: Mapped[str] = fk("run.decision_run.decision_run_id")
+    decision_run_id: Mapped[str] = fk_opt("run.decision_run.decision_run_id")
     event_type: Mapped[str] = str_64()
     payload_json: Mapped[str] = text_field()
     created_at: Mapped[datetime] = dt_field()
