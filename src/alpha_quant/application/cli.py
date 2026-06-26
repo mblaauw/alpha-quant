@@ -226,6 +226,9 @@ def run(
         "Daily Pipeline Run (Alpha-Lake)",
         [("Mode", f"[cyan]{mode}[/cyan]"), ("Adapters", type(alpha_lake).__name__)],
     )
+    staleness_days = (
+        int(config.data.staleness_halt_hours / 24) if config.data.staleness_halt_hours else None
+    )
     result = run_v2(
         run_date=run_date,
         store=store,
@@ -237,6 +240,7 @@ def run(
         sizing_config=sizing_config,
         prev_equity=prev_equity,
         prev_regime=prev_regime,
+        staleness_days=staleness_days,
     )
 
     status_text = "completed"

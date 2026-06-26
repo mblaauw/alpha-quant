@@ -236,12 +236,13 @@ def run_v2(
     store: Store,
     universe: list[str],
     alpha_lake: AlphaLakeReadPort,
-    config: PipelineConfig | None = None,
-    fill_config: FillConfig | None = None,
-    risk_config: RiskConfig | None = None,
-    sizing_config: SizingConfig | None = None,
+    config: PipelineConfig,
+    fill_config: FillConfig,
+    risk_config: RiskConfig,
+    sizing_config: SizingConfig,
     prev_equity: float | None = None,
-    prev_regime: str = "CAUTION",
+    prev_regime: str | None = None,
+    staleness_days: int | None = None,
 ) -> RunResult:
     cfg = config or PipelineConfig()
     fc = fill_config or FillConfig()
@@ -507,6 +508,22 @@ def run_v2(
             so = obs.per_symbol.get(symbol)
             if so is None or not so.bars:
                 continue
+
+            if staleness_days is not None and so.bars:
+                last_bar_date = so.bars[-1].effective_date
+                age_days = (run_date - last_bar_date).days
+                if age_days > staleness_days:
+                    events.append(
+                        CandidateBlocked(
+                            run_id=run_id,
+                            source="pipeline",
+                            symbol=symbol,
+                            reason=f"stale_data_{age_days}d",
+                            gate="freshness",
+                        )
+                    )
+                    continue
+
             ctx = DecisionContext(obs, symbol)
 
             cand = _evaluate_candidate(

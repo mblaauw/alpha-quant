@@ -30,7 +30,13 @@ router = APIRouter(prefix="/v1/console", tags=["console"])
 
 
 def _freshness_service() -> FreshnessService:  # noqa: B008
-    config = load_config(os.environ.get("ALPHA_QUANT_CONFIG"))
+    cfg_path = os.environ.get("ALPHA_QUANT_CONFIG")
+    if cfg_path:
+        config = load_config(cfg_path)
+    else:
+        from alpha_quant.application.config import AppConfig
+
+        config = AppConfig()
     lake = create_alpha_lake_reader(config)
     return create_freshness_service(lake, config.freshness)  # type: ignore[return-value]
 
@@ -41,8 +47,13 @@ async def get_context(svc: SystemService = svc_depends(SystemService)):
 
 
 @router.get("/desk")
-async def get_desk(svc: CommandCenterService = svc_depends(CommandCenterService)):
-    return svc.summary()
+async def get_desk(
+    svc: CommandCenterService = svc_depends(CommandCenterService),
+    freshness: FreshnessService = Depends(_freshness_service),
+):
+    result = svc.summary()
+    result["freshness_summary"] = freshness.summary([])
+    return result
 
 
 @router.get("/portfolio")
@@ -54,16 +65,27 @@ async def get_portfolio(svc: PortfolioService = svc_depends(PortfolioService)):
 async def list_positions(
     book_id: str | None = Query(None),
     svc: PortfolioService = svc_depends(PortfolioService),
+    freshness: FreshnessService = Depends(_freshness_service),
 ):
-    return {"items": svc.list_positions(book_id=book_id)}
+    items = svc.list_positions(book_id=book_id)
+    symbols = [p.get("symbol", "") for p in items if p.get("symbol")]
+    freshness_map = {f["symbol"]: f for f in freshness.for_symbols(symbols)}
+    for item in items:
+        sym = item.get("symbol", "")
+        item["freshness"] = freshness_map.get(sym)
+    return {"items": items}
 
 
 @router.get("/positions/{position_id}")
 async def get_position(
     position_id: str,
     svc: PortfolioService = svc_depends(PortfolioService),
+    freshness: FreshnessService = Depends(_freshness_service),
 ):
-    return svc.get_position(position_id)
+    result = svc.get_position(position_id)
+    if result and result.get("symbol"):
+        result["freshness"] = freshness.for_symbol(result["symbol"])
+    return result
 
 
 @router.get("/decisions")
@@ -75,10 +97,22 @@ async def list_decisions(
     symbol: str | None = Query(None, max_length=10),
     run_id: str | None = Query(None, max_length=100),
     svc: DecisionService = svc_depends(DecisionService),
+    freshness: FreshnessService = Depends(_freshness_service),
 ):
-    return svc.list_decisions(
+    result = svc.list_decisions(
         book_id=book_id, cursor=cursor, limit=limit, sort=sort, symbol=symbol, run_id=run_id
     )
+    items = result.get("items", [])
+    symbols = [d.get("symbol", "") for d in items if d.get("symbol")]
+    freshness_map = {f["symbol"]: f for f in freshness.for_symbols(symbols)}
+    for item in items:
+        sym = item.get("symbol", "")
+        f = freshness_map.get(sym)
+        item["freshness"] = f
+        if f and f.get("stale") and item.get("decision") in ("enter", "eligible", None):
+            item["decision"] = "blocked"
+            item["reason"] = f"Stale market data — {f['age_minutes']}m old"
+    return result
 
 
 @router.get("/decisions/{decision_id}")
