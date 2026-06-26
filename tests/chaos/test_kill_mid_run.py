@@ -11,7 +11,8 @@ import sys
 import time
 from pathlib import Path
 
-# Point to a temp data directory for isolation
+import pytest
+
 DATA_DIR = Path("/tmp/alpha-quant-chaos-kill")
 
 
@@ -29,7 +30,7 @@ def _run_and_kill() -> bool:
     env["ALPHA_QUANT_DEV"] = "1"
 
     proc = subprocess.Popen(
-        [sys.executable, "-m", "app.cli", "run", "--mode", "fixture"],
+        [sys.executable, "-m", "alpha_quant.application.cli", "run", "--mode", "fixture"],
         cwd=str(DATA_DIR),
         env=env,
         stdout=subprocess.DEVNULL,
@@ -51,7 +52,7 @@ def _verify_idempotent() -> bool:
     env["ALPHA_QUANT_DEV"] = "1"
 
     result = subprocess.run(
-        [sys.executable, "-m", "app.cli", "run", "--mode", "fixture"],
+        [sys.executable, "-m", "alpha_quant.application.cli", "run", "--mode", "fixture"],
         cwd=str(DATA_DIR),
         env=env,
         capture_output=True,
@@ -61,6 +62,7 @@ def _verify_idempotent() -> bool:
     return result.returncode == 0
 
 
+@pytest.mark.chaos
 def test_kill_mid_run() -> None:
     _setup()
     started = _run_and_kill()

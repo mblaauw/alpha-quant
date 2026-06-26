@@ -6,7 +6,7 @@ from typing import Any, override
 
 import duckdb
 
-from alpha_quant.domain.events import DomainEvent
+from alpha_quant.domain.events import BaseDomainEvent, DomainEvent
 from alpha_quant.ports.store import EventStore
 
 
@@ -50,10 +50,8 @@ class EventStoreMixin(EventStore):
             params,
         ).fetchall()
 
-        from alpha_quant.domain.events import DomainEvent as DomainEventType
-
         results: list[DomainEvent] = []
         for (payload_json,) in rows:
             payload = json.loads(payload_json)
-            results.append(DomainEventType.model_validate(payload))
+            results.append(BaseDomainEvent.model_validate(payload))
         return results

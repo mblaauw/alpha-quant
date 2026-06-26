@@ -33,6 +33,18 @@ app = typer.Typer(
 
 RELATIVE_DATE_RE = re.compile(r"^(\d+)([dmy])\s*$")
 
+DEFAULT_DATABASE_URL = "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant"
+
+
+def _database_url_opt() -> str:  # noqa: B008
+    return typer.Option(
+        DEFAULT_DATABASE_URL,
+        "--database-url",
+        "-d",
+        envvar="DATABASE_URL",
+        help="PostgreSQL connection string",
+    )
+
 
 def _configure_logging() -> None:
     is_dev = (
@@ -663,13 +675,7 @@ def backup(
 
 @app.command(rich_help_panel="Database")
 def db_health(
-    database_url: str = typer.Option(  # noqa: B008
-        "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant",
-        "--database-url",
-        "-d",
-        envvar="DATABASE_URL",
-        help="PostgreSQL connection string",
-    ),
+    database_url: str = _database_url_opt(),
 ) -> None:
     """Check PostgreSQL database connectivity."""
     from alpha_quant.adapters.postgres import create_engine
@@ -688,13 +694,7 @@ def db_health(
 
 @app.command(rich_help_panel="Database")
 def db_migrate(
-    database_url: str = typer.Option(  # noqa: B008
-        "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant",
-        "--database-url",
-        "-d",
-        envvar="DATABASE_URL",
-        help="PostgreSQL connection string",
-    ),
+    database_url: str = _database_url_opt(),
 ) -> None:
     """Run pending Alembic migrations."""
     from alpha_quant.application.factory import run_migrations
@@ -705,13 +705,7 @@ def db_migrate(
 
 @app.command(rich_help_panel="Database")
 def db_seed(
-    database_url: str = typer.Option(  # noqa: B008
-        "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant",
-        "--database-url",
-        "-d",
-        envvar="DATABASE_URL",
-        help="PostgreSQL connection string",
-    ),
+    database_url: str = _database_url_opt(),
 ) -> None:
     """Seed default strategy and portfolio book records."""
     from alpha_quant.application.factory import seed_default_data
@@ -727,13 +721,7 @@ def db_import(
         "--duckdb-path",
         help="Path to legacy DuckDB state database",
     ),
-    database_url: str = typer.Option(  # noqa: B008
-        "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant",
-        "--database-url",
-        "-d",
-        envvar="DATABASE_URL",
-        help="PostgreSQL connection string",
-    ),
+    database_url: str = _database_url_opt(),
 ) -> None:
     """Import legacy DuckDB state into PostgreSQL operational store."""
     from alpha_quant.application.import_legacy_duckdb import run_import

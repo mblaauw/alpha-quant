@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
+
+from alpha_quant.domain._base import FrozenModel
 
 
-class SizingConfig(BaseModel):
-    model_config = ConfigDict(frozen=True)
+class SizingConfig(FrozenModel):
     risk_per_trade_pct: float = 0.01
     max_position_pct: float = 0.15
     stop_atr_mult: float = 2.0
 
 
-class PositionSize(BaseModel):
-    model_config = ConfigDict(frozen=True)
+class PositionSize(FrozenModel):
     shares: int
     notional: float
     risk_at_stop: float

@@ -5,9 +5,13 @@ from typing import cast, override
 
 import duckdb
 
+from alpha_quant.application.store._crud import save_row
 from alpha_quant.domain.journal import JournalEntry
 from alpha_quant.domain.reporting import ReportEntry, ReportType
 from alpha_quant.ports.store import JournalStore
+
+JOURNAL_COLS = ["entry_date", "content"]
+REPORT_COLS = ["report_date", "report_type", "content"]
 
 
 class JournalStoreMixin(JournalStore):
@@ -15,9 +19,14 @@ class JournalStoreMixin(JournalStore):
 
     @override
     def save_journal(self, entry: JournalEntry) -> None:
-        self._state_conn.execute(
-            "INSERT OR REPLACE INTO journal_entries (entry_date, content) VALUES (?, ?)",
-            [entry.date.isoformat(), entry.content],
+        save_row(
+            self._state_conn,
+            "journal_entries",
+            JOURNAL_COLS,
+            [
+                entry.date.isoformat(),
+                entry.content,
+            ],
         )
 
     @override
@@ -32,9 +41,15 @@ class JournalStoreMixin(JournalStore):
 
     @override
     def save_report(self, report: ReportEntry) -> None:
-        self._state_conn.execute(
-            "INSERT OR REPLACE INTO reports (report_date, report_type, content) VALUES (?, ?, ?)",
-            [report.date.isoformat(), report.report_type, report.content],
+        save_row(
+            self._state_conn,
+            "reports",
+            REPORT_COLS,
+            [
+                report.date.isoformat(),
+                report.report_type,
+                report.content,
+            ],
         )
 
     @override

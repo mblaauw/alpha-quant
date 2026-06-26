@@ -5,14 +5,13 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import Field, model_validator
 
+from alpha_quant.domain._base import FrozenModel
 from alpha_quant.domain.regime import Regime
 
 
-class Bar(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class Bar(FrozenModel):
     symbol: str
     date: date
     open: float
@@ -40,9 +39,7 @@ class Bar(BaseModel):
         return self
 
 
-class Quote(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class Quote(FrozenModel):
     symbol: str
     timestamp: datetime
     price: float | None = None
@@ -62,9 +59,7 @@ class Quote(BaseModel):
         return self
 
 
-class FundamentalsSnapshot(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class FundamentalsSnapshot(FrozenModel):
     symbol: str
     as_of_date: date
     market_cap: float | None = None
@@ -84,9 +79,7 @@ class FundamentalsSnapshot(BaseModel):
     adapter: str | None = None
 
 
-class Candidate(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class Candidate(FrozenModel):
     symbol: str
     date: date
     scores: dict[str, float]
@@ -103,9 +96,7 @@ class Candidate(BaseModel):
         return self
 
 
-class Order(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class Order(FrozenModel):
     order_id: str
     symbol: str
     action: Literal["buy", "sell"]
@@ -131,9 +122,7 @@ class Order(BaseModel):
         return self
 
 
-class Fill(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class Fill(FrozenModel):
     fill_id: str
     order_id: str
     symbol: str
@@ -143,9 +132,7 @@ class Fill(BaseModel):
     fee: float | None = None
 
 
-class Position(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class Position(FrozenModel):
     symbol: str
     quantity: float
     entry_price: float | None = None
@@ -163,9 +150,7 @@ class Position(BaseModel):
     partial_taken: bool = False
 
 
-class Decision(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class Decision(FrozenModel):
     decision_id: str | None = None
     run_id: str | None = None
     symbol: str
@@ -180,9 +165,7 @@ class Decision(BaseModel):
     mechanism_results: dict[str, float] = Field(default_factory=dict)
 
 
-class CorporateAction(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class CorporateAction(FrozenModel):
     symbol: str
     effective_date: date
     action_type: str
@@ -192,18 +175,14 @@ class CorporateAction(BaseModel):
     adapter: str | None = None
 
 
-class IndicatorState(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class IndicatorState(FrozenModel):
     symbol: str
     date: date
     values: dict[str, float]
     status: str = "valid"
 
 
-class PortfolioSnapshot(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class PortfolioSnapshot(FrozenModel):
     date: date
     cash: float
     equity: float

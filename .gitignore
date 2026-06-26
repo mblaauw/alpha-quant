@@ -27,6 +27,10 @@ data.bak/
 **/.coverage
 htmlcov/
 
+# OpenCode vendored deps (60MB+)
+.opencode/node_modules/
+.opencode/package-lock.json
+
 # Global tool files, not project code
 .agents/
 

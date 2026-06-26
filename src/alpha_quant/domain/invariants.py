@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
-
+from alpha_quant.domain._base import FrozenModel
 from alpha_quant.domain.models import Position
 
 
-class InvariantViolation(BaseModel):
-    model_config = ConfigDict(frozen=True)
+class InvariantViolation(FrozenModel):
     check: str
     detail: str
 

@@ -2,35 +2,27 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from alpha_quant.domain._base import FrozenModel
 from alpha_quant.domain.risk import RiskConfig
 
 
-class BootstrapConfig(BaseModel):
-    model_config = ConfigDict(frozen=True)
+class BootstrapConfig(FrozenModel):
     """Configuration for initial data bootstrap (symbol list, history length)."""
 
     symbols: list[str]
-    history_years: int = 3
+    history_years: int = Field(default=3, ge=1, le=20)
     include_benchmarks: list[str] = ["SPY", "^VIX"]
 
-    @field_validator("history_years")
-    @classmethod
-    def _history_years_bounds(cls, v: int) -> int:
-        if not 1 <= v <= 20:
-            raise ValueError("history_years must be between 1 and 20")
-        return v
 
-
-class DataConfig(BaseModel):
-    model_config = ConfigDict(frozen=True)
+class DataConfig(FrozenModel):
     """Data source configuration — fixture vs live, staleness thresholds."""
 
     mode: str = "fixture"
     indicator_state: bool = True
-    staleness_halt_hours: int = 30
+    staleness_halt_hours: int = Field(default=30, ge=1, le=168)
     fixture_version: str = "v1"
 
     @field_validator("mode")
@@ -40,16 +32,8 @@ class DataConfig(BaseModel):
             raise ValueError("mode must be 'fixture' or 'live'")
         return v
 
-    @field_validator("staleness_halt_hours")
-    @classmethod
-    def _staleness_halt_hours_bounds(cls, v: int) -> int:
-        if not 1 <= v <= 168:
-            raise ValueError("staleness_halt_hours must be between 1 and 168")
-        return v
 
-
-class LakeConfig(BaseModel):
-    model_config = ConfigDict(frozen=True)
+class LakeConfig(FrozenModel):
     """Alpha-Lake data-plane configuration."""
 
     mode: str = "fixture"
@@ -58,7 +42,7 @@ class LakeConfig(BaseModel):
     api_key_env: str = "ALPHA_LAKE_API_KEY"
     snapshot_id: str = ""
     price_mode: str = "split_adjusted"
-    max_lookback_days: int = 1095
+    max_lookback_days: int = Field(default=1095, ge=1, le=3650)
     fixture_version: str = "v1"
 
     @field_validator("mode")
@@ -68,29 +52,13 @@ class LakeConfig(BaseModel):
             raise ValueError("mode must be 'in_process', 'rest', or 'fixture'")
         return v
 
-    @field_validator("max_lookback_days")
-    @classmethod
-    def _max_lookback_days_bounds(cls, v: int) -> int:
-        if not 1 <= v <= 3650:
-            raise ValueError("max_lookback_days must be between 1 and 3650")
-        return v
 
-
-class PortfolioConfig(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    max_positions: int = 8
+class PortfolioConfig(FrozenModel):
+    max_positions: int = Field(default=8, ge=1, le=100)
     max_position_pct: float = 0.15
     max_gross_exposure: float = 0.80
     risk_per_trade_pct: float = 0.01
     max_sector_positions: int = 2
-
-    @field_validator("max_positions")
-    @classmethod
-    def _max_positions_bounds(cls, v: int) -> int:
-        if not 1 <= v <= 100:
-            raise ValueError("max_positions must be between 1 and 100")
-        return v
 
     @field_validator("max_position_pct", "max_gross_exposure", "risk_per_trade_pct")
     @classmethod
@@ -100,66 +68,26 @@ class PortfolioConfig(BaseModel):
         return v
 
 
-class PaperConfig(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    starting_equity: float = 100_000.0
-    slippage_bps: int = 5
+class PaperConfig(FrozenModel):
+    starting_equity: float = Field(default=100_000.0, ge=1_000, le=100_000_000)
+    slippage_bps: int = Field(default=5, ge=0, le=100)
     spread_model: str = "half_spread_estimate"
 
-    @field_validator("starting_equity")
-    @classmethod
-    def _starting_equity_bounds(cls, v: float) -> float:
-        if not 1_000 <= v <= 100_000_000:
-            raise ValueError("starting_equity must be between 1_000 and 100_000_000")
-        return v
 
-    @field_validator("slippage_bps")
-    @classmethod
-    def _slippage_bps_bounds(cls, v: int) -> int:
-        if not 0 <= v <= 100:
-            raise ValueError("slippage_bps must be between 0 and 100")
-        return v
-
-
-class AppLLMConfig(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class AppLLMConfig(FrozenModel):
     provider: str = "openrouter"
     model: str = "anthropic/claude-sonnet-4"
     base_url: str = ""
     api_key: SecretStr = SecretStr("")
-    timeout_s: int = 30
-
-    @field_validator("timeout_s")
-    @classmethod
-    def _timeout_s_bounds(cls, v: int) -> int:
-        if not 1 <= v <= 300:
-            raise ValueError("timeout_s must be between 1 and 300")
-        return v
+    timeout_s: int = Field(default=30, ge=1, le=300)
 
 
-class DashboardConfig(BaseModel):
-    model_config = ConfigDict(frozen=True)
+class DashboardConfig(FrozenModel):
     """Streamlit dashboard configuration — refresh interval, display options."""
 
     host: str = "localhost"
-    port: int = 8501
-    refresh_seconds: int = 60
-
-    @field_validator("port")
-    @classmethod
-    def _port_bounds(cls, v: int) -> int:
-        if not 1024 <= v <= 65535:
-            raise ValueError("port must be between 1024 and 65535")
-        return v
-
-    @field_validator("refresh_seconds")
-    @classmethod
-    def _refresh_seconds_bounds(cls, v: int) -> int:
-        if not 5 <= v <= 3600:
-            raise ValueError("refresh_seconds must be between 5 and 3600")
-        return v
+    port: int = Field(default=8501, ge=1024, le=65535)
+    refresh_seconds: int = Field(default=60, ge=5, le=3600)
 
 
 class AppConfig(BaseSettings):

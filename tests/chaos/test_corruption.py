@@ -9,6 +9,8 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
+
 DATA_DIR = Path("/tmp/alpha-quant-chaos-corruption")
 
 
@@ -21,7 +23,7 @@ def _setup() -> None:
     env = os.environ.copy()
     env["ALPHA_QUANT_DEV"] = "1"
     subprocess.run(
-        [sys.executable, "-m", "app.cli", "run", "--mode", "fixture"],
+        [sys.executable, "-m", "alpha_quant.application.cli", "run", "--mode", "fixture"],
         cwd=str(DATA_DIR),
         env=env,
         capture_output=True,
@@ -39,7 +41,7 @@ def _run_after_corruption() -> int:
     env = os.environ.copy()
     env["ALPHA_QUANT_DEV"] = "1"
     result = subprocess.run(
-        [sys.executable, "-m", "app.cli", "run", "--mode", "fixture"],
+        [sys.executable, "-m", "alpha_quant.application.cli", "run", "--mode", "fixture"],
         cwd=str(DATA_DIR),
         env=env,
         capture_output=True,
@@ -49,6 +51,7 @@ def _run_after_corruption() -> int:
     return result.returncode
 
 
+@pytest.mark.chaos
 def test_corruption_detected() -> None:
     _setup()
     _corrupt_db()

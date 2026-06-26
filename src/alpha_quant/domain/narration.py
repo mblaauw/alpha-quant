@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel, ConfigDict
-
+from alpha_quant.domain._base import FrozenModel
 from alpha_quant.domain.events import (
     BaseDomainEvent,
     CandidateBlocked,
@@ -16,9 +15,7 @@ from alpha_quant.domain.events import (
 from alpha_quant.domain.models import Position
 
 
-class PositionNarration(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class PositionNarration(FrozenModel):
     symbol: str
     shares: float
     entry_price: float | None
@@ -29,9 +26,7 @@ class PositionNarration(BaseModel):
     risk_pct: float | None
 
 
-class NarrationContext(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class NarrationContext(FrozenModel):
     date: date
     regime: str
     data_health: dict[str, bool]

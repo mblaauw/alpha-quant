@@ -5,8 +5,9 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import Field
 
+from alpha_quant.domain._base import FrozenModel
 from alpha_quant.domain.models import Bar, Position
 
 ActionType = Literal[
@@ -19,40 +20,17 @@ ActionType = Literal[
 ]
 
 
-class RiskConfig(BaseModel):
-    model_config = ConfigDict(frozen=True)
-    stop_atr_mult: float = 2.0
-    trail_after_r: float = 1.0
-    partial_take_at_r: float = 2.0
-    time_stop_days: int = 30
+class RiskConfig(FrozenModel):
+    stop_atr_mult: float = Field(default=2.0, ge=0.1, le=10)
+    trail_after_r: float = Field(default=1.0, ge=0.1, le=10)
+    partial_take_at_r: float = Field(default=2.0, ge=0.1, le=10)
+    time_stop_days: int = Field(default=30, ge=1, le=365)
     dd_ladder: list[tuple[float, float]] = Field(default_factory=lambda: [(0.10, 0.5), (0.15, 0.0)])
     dd_window_days: int = 0
-    daily_loss_halt_pct: float = 0.03
-
-    @field_validator("stop_atr_mult", "trail_after_r", "partial_take_at_r")
-    @classmethod
-    def _r_multiple_bounds(cls, v: float) -> float:
-        if not 0.1 <= v <= 10:
-            raise ValueError("R-multiple must be between 0.1 and 10")
-        return v
-
-    @field_validator("time_stop_days")
-    @classmethod
-    def _time_stop_days_bounds(cls, v: int) -> int:
-        if not 1 <= v <= 365:
-            raise ValueError("time_stop_days must be between 1 and 365")
-        return v
-
-    @field_validator("daily_loss_halt_pct")
-    @classmethod
-    def _daily_loss_halt_pct_bounds(cls, v: float) -> float:
-        if not 0.0 <= v <= 1.0:
-            raise ValueError("daily_loss_halt_pct must be between 0.0 and 1.0")
-        return v
+    daily_loss_halt_pct: float = Field(default=0.03, ge=0.0, le=1.0)
 
 
-class RiskAction(BaseModel):
-    model_config = ConfigDict(frozen=True)
+class RiskAction(FrozenModel):
     action_type: ActionType
     symbol: str
     shares: float  # 0 = full exit, >0 = partial reduce
@@ -60,8 +38,7 @@ class RiskAction(BaseModel):
     price: float | None = None  # new stop price for trail_stop
 
 
-class DrawdownVerdict(BaseModel):
-    model_config = ConfigDict(frozen=True)
+class DrawdownVerdict(FrozenModel):
     multiplier: float
     actions: list[RiskAction] = Field(default_factory=list)
 

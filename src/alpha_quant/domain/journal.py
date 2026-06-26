@@ -4,14 +4,11 @@ from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel, ConfigDict
-
+from alpha_quant.domain._base import FrozenModel
 from alpha_quant.domain.narration import NarrationContext
 
 
-class JournalEntry(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class JournalEntry(FrozenModel):
     date: date
     content: str
 

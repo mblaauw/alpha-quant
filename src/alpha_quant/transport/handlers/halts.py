@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
 from alpha_quant.application.query.risk import RiskService
+from alpha_quant.transport.deps import svc_depends
 
 router = APIRouter(tags=["halts"])
 
 
-def _svc() -> RiskService:
-    return RiskService()
-
-
 @router.get("/halts")
-async def get_halts(svc: RiskService = Depends(_svc)):
+async def get_halts(svc: RiskService = svc_depends(RiskService)):
     return svc.halt_state()

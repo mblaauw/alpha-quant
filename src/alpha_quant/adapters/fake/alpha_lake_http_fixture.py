@@ -6,20 +6,18 @@ from pathlib import Path
 from typing import Any, override
 
 from alpha_quant.adapters._parse import (
-    opt_float,
-    parse_date,
+    parse_bar_obs,
+    parse_earnings_obs,
+    parse_fundamental_obs,
+    parse_insider_obs,
+    parse_mention_obs,
     parse_symbol_observations,
 )
 from alpha_quant.contracts.alpha_lake import (
     AlphaLakeContract,
     AlphaLakeHealth,
-    BarObservation,
     DecisionPanel,
-    EarningsEvent,
-    FundamentalMetric,
-    InsiderTransaction,
     MarketObservations,
-    MentionObservation,
     NeutralObservations,
     SymbolObservations,
     SymbolPanel,
@@ -150,12 +148,12 @@ def _legacy_panel(
 
     panels: dict[str, SymbolPanel] = {}
     for symbol, raw in data.get("panels", {}).items():
-        bars = [_legacy_parse_bar(b) for b in raw.get("bars", [])]
+        bars = [parse_bar_obs(b) for b in raw.get("bars", [])]
         indicators = _legacy_parse_indicators(raw.get("indicators", {}))
-        fundamentals = [_legacy_parse_fundamental(m) for m in raw.get("fundamentals", [])]
-        insider = [_legacy_parse_insider(t) for t in raw.get("insider_transactions", [])]
-        earnings = [_legacy_parse_earnings(e) for e in raw.get("earnings_events", [])]
-        mentions = [_legacy_parse_mention(m) for m in raw.get("attention_mentions", [])]
+        fundamentals = [parse_fundamental_obs(m) for m in raw.get("fundamentals", [])]
+        insider = [parse_insider_obs(t) for t in raw.get("insider_transactions", [])]
+        earnings = [parse_earnings_obs(e) for e in raw.get("earnings_events", [])]
+        mentions = [parse_mention_obs(m) for m in raw.get("attention_mentions", [])]
         panels[symbol] = SymbolPanel(
             symbol=symbol,
             bars=bars,
@@ -171,18 +169,6 @@ def _legacy_panel(
         snapshot_id=snapshot_id,
         symbols=symbols,
         panels=panels,
-    )
-
-
-def _legacy_parse_bar(row: dict[str, Any]) -> BarObservation:
-    return BarObservation(
-        effective_date=parse_date(row.get("effective_date") or row.get("date")),
-        open=float(row.get("open", 0.0)),
-        high=float(row.get("high", 0.0)),
-        low=float(row.get("low", 0.0)),
-        close=float(row.get("close", 0.0)),
-        volume=float(row.get("volume", 0.0)),
-        adj_close=opt_float(row.get("adj_close") or row.get("adjusted_close")),
     )
 
 
@@ -202,43 +188,3 @@ def _legacy_parse_indicators(raw: dict[str, list[Any]]) -> dict[str, list[float 
             continue
         result[key] = [float(v) if v is not None else None for v in values]
     return result
-
-
-def _legacy_parse_fundamental(row: dict[str, Any]) -> FundamentalMetric:
-    return FundamentalMetric(
-        metric_id=row.get("metric_id", ""),
-        name=row.get("name", ""),
-        category=row.get("category", ""),
-        period_end=row.get("period_end"),
-        value=opt_float(row.get("value")),
-        unit=row.get("unit", ""),
-        state=row.get("state", ""),
-        tone=row.get("tone", ""),
-        quality_status=row.get("quality_status", ""),
-        available_at=row.get("available_at"),
-    )
-
-
-def _legacy_parse_insider(row: dict[str, Any]) -> InsiderTransaction:
-    return InsiderTransaction(
-        effective_date=str(row.get("effective_date", "")),
-        transaction_type=str(row.get("transaction_code", row.get("transaction_type", ""))),
-        shares=opt_float(row.get("shares")),
-        price=opt_float(row.get("price")),
-        value=opt_float(row.get("value")),
-    )
-
-
-def _legacy_parse_earnings(row: dict[str, Any]) -> EarningsEvent:
-    return EarningsEvent(
-        effective_date=str(row.get("effective_date", "")),
-        symbol=str(row.get("symbol", row.get("security_id", ""))),
-    )
-
-
-def _legacy_parse_mention(row: dict[str, Any]) -> MentionObservation:
-    return MentionObservation(
-        effective_date=str(row.get("effective_date", "")),
-        count=int(row.get("mention_count", row.get("count", 0))),
-        source=str(row.get("source_id", "alpha_lake")),
-    )

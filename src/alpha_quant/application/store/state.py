@@ -162,15 +162,6 @@ class CanonicalStore(
             ")"
         )
         conn.execute(
-            "CREATE TABLE IF NOT EXISTS indicator_state ("
-            "  symbol VARCHAR NOT NULL,"
-            "  state_date DATE NOT NULL,"
-            "  values JSON NOT NULL,"
-            "  status VARCHAR NOT NULL DEFAULT 'valid',"
-            "  PRIMARY KEY (symbol, state_date)"
-            ")"
-        )
-        conn.execute(
             "CREATE TABLE IF NOT EXISTS catalog ("
             "  dataset VARCHAR NOT NULL,"
             "  version VARCHAR NOT NULL,"

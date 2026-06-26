@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
 
-from pydantic import BaseModel, ConfigDict
+from alpha_quant.domain._base import FrozenModel
 
 
-class LLMConfig(BaseModel):
-    model_config = ConfigDict(frozen=True)
+class LLMConfig(FrozenModel):
     provider: str = "openrouter"
     model: str = "anthropic/claude-sonnet-4"
     base_url: str = ""

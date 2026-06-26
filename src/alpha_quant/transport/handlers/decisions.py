@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 
 from alpha_quant.application.query.decisions import DecisionService
+from alpha_quant.transport.deps import svc_depends
 
 router = APIRouter(tags=["decisions"])
-
-
-def _svc() -> DecisionService:
-    return DecisionService()
 
 
 @router.get("/decisions")
@@ -19,7 +16,7 @@ async def list_decisions(
     sort: str = Query("desc"),
     symbol: str | None = Query(None),
     run_id: str | None = Query(None),
-    svc: DecisionService = Depends(_svc),
+    svc: DecisionService = svc_depends(DecisionService),
 ):
     return svc.list_decisions(
         book_id=book_id,
@@ -34,6 +31,6 @@ async def list_decisions(
 @router.get("/decisions/{decision_id}")
 async def get_decision(
     decision_id: str,
-    svc: DecisionService = Depends(_svc),
+    svc: DecisionService = svc_depends(DecisionService),
 ):
     return svc.get_decision(decision_id)

@@ -4,14 +4,13 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
+from alpha_quant.domain._base import FrozenModel
 from alpha_quant.domain.models import Fill, Order
 
 
-class BaseDomainEvent(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class BaseDomainEvent(FrozenModel):
     event_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:16])
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     run_id: str

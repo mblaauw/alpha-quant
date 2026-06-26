@@ -7,15 +7,14 @@ from datetime import date, datetime
 from datetime import time as dtime
 
 import structlog
-from pydantic import BaseModel, ConfigDict
 
+from alpha_quant.domain._base import FrozenModel
 from alpha_quant.domain.models import Bar, CorporateAction, Fill, Order, Position, Quote
 
 logger = structlog.get_logger()
 
 
-class FillConfig(BaseModel):
-    model_config = ConfigDict(frozen=True)
+class FillConfig(FrozenModel):
     slippage_bps: float = 5.0
     max_gap_pct: float = 0.02
     max_fill_pct: float = 1.0

@@ -10,13 +10,12 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
-from pydantic import BaseModel, ConfigDict
+from alpha_quant.domain._base import FrozenModel
 
 
-class DegradationStatus(BaseModel):
+class DegradationStatus(FrozenModel):
     """Per-dataset degradation flags derived from lake health."""
 
-    model_config = ConfigDict(frozen=True)
     insider_degraded: bool = False
     crowding_degraded: bool = False
     fundamentals_degraded: bool = False

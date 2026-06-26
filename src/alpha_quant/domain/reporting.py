@@ -5,16 +5,13 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
-
+from alpha_quant.domain._base import FrozenModel
 from alpha_quant.domain.narration import NarrationContext
 
 ReportType = Literal["weekly", "monthly"]
 
 
-class ReportEntry(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class ReportEntry(FrozenModel):
     date: date
     report_type: ReportType
     content: str
