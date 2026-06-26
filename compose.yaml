@@ -1,5 +1,60 @@
 services:
-  alpha-quant:
+  postgres:
+    image: postgres:17-alpine
+    volumes:
+      - alpha_quant_pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: alpha_quant
+      POSTGRES_USER: alpha_quant
+      POSTGRES_PASSWORD: alpha_quant_dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alpha_quant -d alpha_quant"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  artifacts:
+    image: rustfs/rustfs:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    volumes:
+      - alpha_quant_artifacts:/data
+    environment:
+      RUSTFS_ACCESS_KEY: rustfsadmin
+      RUSTFS_SECRET_KEY: rustfsadmin
+    healthcheck:
+      test: ["CMD", "pgrep", "rustfs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  artifact-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: ["python3", "-c", "import boto3, os; c=boto3.client('s3', endpoint_url=os.environ['RUSTFS_ENDPOINT'], aws_access_key_id=os.environ['RUSTFS_ACCESS_KEY'], aws_secret_access_key=os.environ['RUSTFS_SECRET_KEY']); c.create_bucket(Bucket='alpha-quant-artifacts'); print('Bucket ready')"]
+    environment:
+      RUSTFS_ENDPOINT: http://artifacts:9000
+      RUSTFS_ACCESS_KEY: rustfsadmin
+      RUSTFS_SECRET_KEY: rustfsadmin
+    depends_on:
+      artifacts:
+        condition: service_healthy
+    restart: "no"
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["db-migrate"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://alpha_quant:alpha_quant_dev@postgres:5432/alpha_quant
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
     build:
       context: .
       dockerfile: Dockerfile
@@ -7,14 +62,41 @@ services:
     ports:
       - "8501:8501"
     environment:
+      DATABASE_URL: postgresql+psycopg://alpha_quant:alpha_quant_dev@postgres:5432/alpha_quant
       ALPHA_QUANT_LAKE__MODE: rest
       ALPHA_QUANT_LAKE__BASE_URL: "${ALPHA_QUANT_LAKE__BASE_URL:-http://host.docker.internal:8000}"
       ALPHA_LAKE_API_KEY: "${ALPHA_LAKE_API_KEY:-}"
-      ALPHA_QUANT_DATA__MODE: live
       ALPHA_QUANT_DASHBOARD__HOST: 0.0.0.0
       ALPHA_QUANT_DASHBOARD__PORT: 8501
     volumes:
       - alpha-quant-data:/app/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      artifact-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["worker", "--poll-interval", "1"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://alpha_quant:alpha_quant_dev@postgres:5432/alpha_quant
+      ALPHA_QUANT_LAKE__MODE: rest
+      ALPHA_QUANT_LAKE__BASE_URL: "${ALPHA_QUANT_LAKE__BASE_URL:-http://host.docker.internal:8000}"
+      ALPHA_LAKE_API_KEY: "${ALPHA_LAKE_API_KEY:-}"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      artifact-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
 
 volumes:
+  alpha_quant_pgdata:
+    name: alpha_quant_pgdata
+  alpha_quant_artifacts:
+    name: alpha_quant_artifacts
   alpha-quant-data:

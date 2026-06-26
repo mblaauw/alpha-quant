@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from uuid import UUID
 
@@ -14,7 +15,10 @@ from alpha_quant.contracts.operational import (
     RunReservation,
 )
 
-DEFAULT_DATABASE_URL = "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant"
+DEFAULT_DATABASE_URL = (
+    os.environ.get("DATABASE_URL")
+    or "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant"
+)
 
 CommandHandler = Callable[[Command], tuple[CommandStatus, str | None, str | None]]
 

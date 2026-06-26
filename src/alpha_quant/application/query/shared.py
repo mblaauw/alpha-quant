@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from typing import Any
 from uuid import UUID
 
-from alpha_quant.adapters.postgres.unit_of_work import OperationalUnitOfWork
-
-DEFAULT_DATABASE_URL = "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant"
+DEFAULT_DATABASE_URL = (
+    os.environ.get("DATABASE_URL")
+    or "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant"
+)
 DEFAULT_BOOK_ID = UUID("00000000-0000-0000-0000-000000000001")
 
 
