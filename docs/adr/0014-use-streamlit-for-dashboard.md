@@ -2,7 +2,7 @@
 
 ## Status
 
-Superseded (by FastAPI Dashboard — see ADR-0041)
+Superseded by ADR-0046 (Static Lake Watch–Aligned Operational Console)
 
 ## Date
 

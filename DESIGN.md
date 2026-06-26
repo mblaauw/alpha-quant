@@ -1,7 +1,7 @@
 # Alpha-Quant — Architecture (v2.0)
 
 > **⚠️ This document describes the v1 architecture.** \
-> The codebase has been consolidated under `src/alpha_quant/` (Phase 5), the dashboard has been migrated from Streamlit to FastAPI + HTMX (Phase 6), DuckDB has been replaced by PostgreSQL as the operational system of record (Phase 4/P4.R/Phase 7), and the file-based halt has been replaced by database-backed halts (ADR-0040). See [REFERENCE_ARCHITECTURE.md](docs/architecture/REFERENCE_ARCHITECTURE.md) for the current architecture. This document will be rewritten for v2 in a future phase.
+> The codebase has been consolidated under `src/alpha_quant/`, the dashboard has been rewritten as a static vanilla JS SPA (Alpha-Quant Desk), DuckDB has been replaced by PostgreSQL as the operational system of record, and the file-based halt has been replaced by database-backed halts (ADR-0040). See [REFERENCE_ARCHITECTURE.md](docs/architecture/REFERENCE_ARCHITECTURE.md) for the current architecture. This document will be rewritten for v2 in a future phase.
 
 Deterministic, daily-cadence, long-only equity system with an internal paper-trading engine — no broker dependency, no data ingestion. All neutral market facts (bars, fundamentals, insider transactions, earnings, attention metrics) are sourced from **Alpha-Lake** via REST API. LLM is explainer/educator only — never in the decision path. Ports-and-adapters hexagonal architecture: pure domain core with typed ports; adapters for data, LLM, and storage; fixture replay; shadow ablation books; append-only event log.
 
@@ -51,7 +51,7 @@ Single-machine: macOS/Linux workstation or headless server.
 - **CLI process** — `uv run alpha-quant run` triggers one daily pipeline run
 - **Store** — DuckDB file in `data/` with tables for positions, orders, fills, decisions, events, portfolio snapshots
 - **Config** — `config.toml` (secrets via `config.local.toml` or `ALPHA_QUANT_*` env vars)
-- **Halt** — `data/.HALT` lockfile blocks pipeline runs
+- **Halt** — database-backed halt state blocks pipeline runs (ADR-0040)
 
 ### Source directory layout
 
@@ -62,7 +62,7 @@ src/
 │   ├── pipeline_v2.py                # run_v2() daily pipeline
 │   ├── factory.py                    # DI: create_alpha_lake_reader, create_store, etc.
 │   ├── config.py                     # pydantic-settings + TOML loading
-│   ├── dashboard.py                  # Streamlit dashboard
+│   ├── console_routes.py            # Alpha-Quant Desk read API
 │   ├── halt.py                       # halt file management
 │   ├── backup.py                     # state store backup
 │   └── store/                        # DuckDB-backed state store
@@ -255,7 +255,7 @@ One fill model, every execution reality.
 Append-only typed events from every stage:
 `PipelineRunStarted · PipelineRunCompleted · PipelineStepCompleted · RegimeChanged · CandidateScored · CandidateBlocked · CandidatePromoted · FillBooked · StopAdjusted · PartialTaken · TimeStopTriggered · DrawdownLadderTripped · ConsistencyViolation · ErrorOccurred`
 
-Narrator, reports, and dashboard consume events only — never pipeline internals.
+The journal and Desk views consume events only — never pipeline internals.
 
 ---
 
@@ -296,7 +296,7 @@ I10. `cash + Σ(market_value) ≈ equity` after every batch; violation ⇒ full 
 | Config | **pydantic-settings** + TOML | typed, env-overridable |
 | Logging | **structlog** | events + logs share shape |
 | CLI | **typer** | typed CLI with rich output |
-| Dashboard | **Streamlit** | reads DuckDB via Store port |
+| Desk | **FastAPI SPA** | reads PostgreSQL via query services |
 | Testing | **pytest** | unit + integration |
 | LLM client | **httpx** | OpenAI-compatible |
 | Testing types | **ty** | extremely fast Python type checker |

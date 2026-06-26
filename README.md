@@ -22,7 +22,7 @@ Deterministic strategy-policy and paper-trading engine
 
 Alpha-Quant is a deterministic strategy-policy and paper-trading engine. It consumes point-in-time market facts **exclusively from Alpha-Lake** through a versioned authenticated REST API.
 
-Alpha-Quant owns decisions, portfolio controls, paper execution, journals, operational commands, and replay — not market data. Its frontend is a same-origin vanilla JavaScript SPA served by FastAPI with no build toolchain.
+Alpha-Quant owns decisions, portfolio controls, paper execution, journals, operational commands, and replay — not market data. Its operational console, **Alpha-Quant Desk**, is a same-origin vanilla JavaScript SPA served by FastAPI with no build toolchain.
 
 **It does not:**
 - Ingest market data from any provider
@@ -63,12 +63,24 @@ Alpha-Lake owns facts.  Alpha-Quant owns decisions.
           └────────────┼────────────┘
                        ▼
                ┌───────────────┐
-               │ Local State   │
-               │ (decisions,   │
-               │  orders,      │
-               │  fills,       │
-               │  positions,   │
-               │  journal)     │
+               │   PostgreSQL   │
+               │  Operational   │
+               │     Store      │
+               │ (decisions,    │
+               │  orders,       │
+               │  fills,        │
+               │  positions,    │
+               │  journal,      │
+               │  commands,     │
+               │  artifacts)    │
+               └───────┬───────┘
+                       │
+               ┌───────┴───────┐
+               │ Alpha-Quant   │
+               │    Desk       │
+               │ (FastAPI BFF) │
+               │  /v1/console  │
+               │  /v1/commands │
                └───────────────┘
 ```
 
@@ -79,6 +91,7 @@ Alpha-Lake owns facts.  Alpha-Quant owns decisions.
 - **One fill model** — backtest, replay, paper, and shadow books all share the same conservative fill semantics
 - **Ablation-ready** — every mechanism has a shadow book counterpart for walk-forward validation
 - **Auditable** — every decision records its Alpha-Lake snapshot_id, metric IDs, and provenance
+- **Command-only mutations** — all operator writes are durable, idempotent commands; no direct state mutation
 
 ## Quick Start
 
@@ -89,11 +102,9 @@ export ALPHA_LAKE_API_KEY="your-key"
 # Run the daily decision pipeline
 alpha-quant run --as-of 2026-06-24T20:00:00Z --snapshot-id market-close-2026-06-24
 
-# Backtest against historical PIT data
-alpha-quant backtest --from 2024-01-01 --to 2025-12-31 --snapshot-id historical-v1
-
-# Replay a prior decision run
-alpha-quant replay --decision-run-id run-20260624-001
+# Start the operational console
+alpha-quant dashboard
+# Open http://localhost:8501
 
 # View status and portfolio
 alpha-quant status
@@ -104,21 +115,37 @@ alpha-quant status
 | Command | Purpose |
 |---------|---------|
 | `run` | Execute daily decision pipeline against Alpha-Lake |
-| `backtest` | Historical simulation against PIT Alpha-Lake data |
-| `replay` | Deterministic replay of a prior decision run |
-| `journal` | View decision journal |
-| `report` | Generate performance report |
-| `status` | Show system and portfolio status |
-| `halt` | Manage system halt file |
-| `unhalt` | Resume halted pipeline |
-| `backup` | Backup local decision/paper state |
-| `ask` | Query recorded decisions with LLM |
-| `dashboard` | Launch FastAPI operational console (port 8501) |
+| `dashboard` | Launch Alpha-Quant Desk operational console (port 8501) |
 | `worker` | Run background command worker process |
+| `status` | Show system and portfolio status |
+| `journal` | View decision journal |
+| `ask` | Query recorded decisions with LLM |
+| `report` | Generate performance report |
+| `halt` | Manage system halt |
+| `backup` | Backup local decision/paper state |
 | `db-health` | Check PostgreSQL operational store connectivity |
 | `db-migrate` | Run Alembic schema migrations |
 | `db-seed` | Seed default reference data |
 | `db-import` | Import legacy DuckDB data into PostgreSQL |
+
+## Alpha-Quant Desk
+
+The operational console is a static vanilla JavaScript SPA served by FastAPI, styled as a calm Financial-Times-inspired operational desk.
+
+**Screens:**
+
+| Tab | Purpose |
+|-----|---------|
+| Desk | Operational readiness, latest run, attention queue |
+| Portfolio | Current book equity, cash, exposures, positions |
+| Decisions | Candidates, policy evaluations, ranking, exclusions |
+| Orders | Order intent, fill trace, execution history |
+| Risk | Halt status, risk posture, breaches, remediation |
+| Runs | Decision runs, backtests, replays, commands |
+| Journal | Immutable timeline of all system events |
+| System | Operational dependencies and configuration |
+
+All mutations use authenticated, idempotent, audited commands. The browser never talks directly to PostgreSQL, Alpha-Lake, or object storage.
 
 ## Repo Structure
 
@@ -135,19 +162,30 @@ src/alpha_quant/
 │   ├── real/                 # AlphaLakeRestClient, SystemClock, LLM
 │   └── fake/                 # Fixture-based replay, in-memory fakes
 ├── application/
-│   ├── cli.py                # Typer CLI (15+ commands)
+│   ├── cli.py                # Typer CLI (12+ commands)
 │   ├── factory.py            # Composition root
 │   ├── pipeline_v2.py        # Daily decision pipeline
 │   ├── config.py             # pydantic-settings (TOML + env)
-│   ├── dashboard/            # FastAPI + HTMX dashboard
-│   ├── import_legacy_duckdb.py  # DuckDB → PostgreSQL migration
+│   ├── commands/             # Command dispatch and handlers
+│   ├── query/                # Console read model services
 │   └── store/                # CanonicalStore (DuckDB — legacy)
+├── transport/
+│   ├── app.py                # FastAPI application
+│   ├── console_routes.py     # /v1/console/* operational read API
+│   ├── commands.py           # /v1/commands mutation API
+│   ├── health.py             # /livez /readyz health checks
+│   ├── deps.py               # Shared FastAPI dependencies
+│   └── static/               # Vanilla JS SPA (no build)
+│       ├── index.html        # Shell with top bar + tabs
+│       ├── styles.css         # CSS token system
+│       ├── components/       # Reusable UI primitives
+│       └── render/           # Screen views
 └── migrations/        # Alembic schema migrations (PostgreSQL)
 ```
 
 ## Documentation
 
-- [Architecture Decision Records](docs/adr/README.md) — 45 ADRs covering every architectural decision
+- [Architecture Decision Records](docs/adr/README.md) — 48 ADRs covering every architectural decision
 - [Reference Architecture](docs/architecture/REFERENCE_ARCHITECTURE.md) — System design and key decisions
 - [C4 Architecture Diagrams](docs/architecture/README.md) — Context, container, and component views
 - [DESIGN.md](DESIGN.md) — Detailed design document

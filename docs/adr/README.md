@@ -19,7 +19,7 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0011](./0011-use-httpx-for-llm-integration.md) | Use Direct httpx (No SDK) for LLM Integration | Accepted | 2026-06-10 |
 | [0012](./0012-use-eodhd-as-primary-data-source.md) | Use EODHD as the Primary Market Data Source | Superseded | 2026-06-10 |
 | [0013](./0013-use-structlog-structured-logging.md) | Use structlog with JSON Format for Structured Logging | Accepted | 2026-06-10 |
-| [0014](./0014-use-streamlit-for-dashboard.md) | Use Streamlit for the Read-Only Dashboard | **Superseded** | 2026-06-10 |
+| [0014](./0014-use-streamlit-for-dashboard.md) | Use Streamlit for the Read-Only Dashboard | Superseded by 0046 | 2026-06-10 |
 | [0015](./0015-use-incremental-o1-indicators.md) | Use Incremental O(1) Indicator Engine | **Superseded** | 2026-06-10 |
 | [0016](./0016-use-degrade-dont-block-failure-model.md) | Use Degrade-Don't-Block Data Failure Model | Accepted | 2026-06-10 |
 | [0017](./0017-use-golden-replay-ci.md) | Use Golden Replay as the Primary CI Strategy | Accepted | 2026-06-10 |
@@ -51,6 +51,9 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0043](./0043-durable-command-model.md) | Durable Command Model for Dashboard Mutations | **Accepted** | 2026-06-26 |
 | [0044](./0044-persistent-docker-volumes.md) | Persistent Named Docker Volumes and Idempotent Migrations | **Accepted** | 2026-06-26 |
 | [0045](./0045-no-offline-cache-operational-console.md) | No Offline Cache for the Write-Capable Operational Console | **Accepted** | 2026-06-26 |
+| [0046](./0046-static-lake-watch-aligned-console.md) | Static Lake Watch–Aligned Operational Console | **Accepted** | 2026-06-27 |
+| [0047](./0047-operational-context-not-global-pit.md) | Operational Context Is Not Global PIT Context | **Accepted** | 2026-06-27 |
+| [0048](./0048-commands-sole-mutation-boundary.md) | Commands Are the Sole Mutation Boundary | **Accepted** | 2026-06-27 |
 
 ## Status Meanings
 
