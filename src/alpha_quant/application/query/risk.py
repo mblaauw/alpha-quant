@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from alpha_quant.application.query.shared import with_uow, DEFAULT_BOOK_ID
+from alpha_quant.application.query.shared import DEFAULT_BOOK_ID, with_uow
 
 
 class RiskService:
@@ -12,7 +12,6 @@ class RiskService:
         def _query(uow):
             halt = uow.store.current_halt(bid)
             positions = uow.store.list_positions(bid)
-            runs = uow.store.list_decision_runs(bid, limit=1)
             near_stop = []
             for p in positions:
                 stop = float(p.stop_price) if p.stop_price else None

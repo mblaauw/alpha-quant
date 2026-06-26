@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
-from alpha_quant.application.commands import submit_command, dispatch
+from alpha_quant.application.commands import submit_command
 from alpha_quant.application.factory import create_unit_of_work
 from alpha_quant.contracts.operational import CommandEnvelope
 
@@ -43,7 +43,6 @@ async def post_command(
 
 @router.get("/{command_id}")
 async def get_command(command_id: str):
-    from alpha_quant.application.factory import create_unit_of_work
 
     uow = create_unit_of_work()
     with uow:
@@ -68,7 +67,6 @@ async def get_command(command_id: str):
 
 @router.get("")
 async def list_commands(limit: int = 50, book_id: str | None = None):
-    from alpha_quant.application.factory import create_unit_of_work
 
     uow = create_unit_of_work()
     with uow:
@@ -91,7 +89,6 @@ async def list_commands(limit: int = 50, book_id: str | None = None):
 
 @router.post("/{command_id}/cancel")
 async def cancel_command(command_id: str):
-    from alpha_quant.application.factory import create_unit_of_work
     from alpha_quant.contracts.operational import CommandStatus
 
     uow = create_unit_of_work()

@@ -768,7 +768,6 @@ def worker(
 
     from alpha_quant.application.commands import dispatch
     from alpha_quant.application.factory import create_unit_of_work
-    from alpha_quant.contracts.operational import CommandStatus
 
     logger = structlog.get_logger("alpha_quant.worker")
     log = logger.info

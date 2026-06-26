@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from alpha_quant.application.query.shared import with_uow, DEFAULT_BOOK_ID
-
 
 class ReportService:
     def list_reports(

@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-from uuid import UUID
-
-from alpha_quant.application.query.shared import with_uow, DEFAULT_BOOK_ID
-
 
 class OrderService:
     def list_orders(

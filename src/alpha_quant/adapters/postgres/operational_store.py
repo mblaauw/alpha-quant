@@ -658,7 +658,7 @@ class PostgresOperationalStore:
                 "eid": str(uuid4()),
                 "rid": str(cmd.book_id) if cmd.book_id else "",
                 "et": f"command.{cmd.type}.requested",
-                "pj": f'{{"command_id":"{cmd.command_id}","type":"{cmd.type}","actor":"{cmd.actor_id}"}}',
+                "pj": f'{{"command_id":"{cmd.command_id}","type":"{cmd.type}","actor":"{cmd.actor_id}"}}',  # noqa: E501
                 "now": now,
             },
         )
@@ -787,7 +787,7 @@ class PostgresOperationalStore:
     def count_pending_commands(self) -> int:
         row = self.session.execute(
             text(
-                "SELECT COUNT(*) AS cnt FROM ops.command WHERE status IN ('requested', 'queued', 'running')"
+                "SELECT COUNT(*) AS cnt FROM ops.command WHERE status IN ('requested', 'queued', 'running')"  # noqa: E501
             )
         ).fetchone()
         return row._mapping["cnt"] if row else 0

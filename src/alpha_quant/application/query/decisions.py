@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from alpha_quant.application.query.shared import with_uow, DEFAULT_BOOK_ID
+from alpha_quant.application.query.shared import DEFAULT_BOOK_ID, with_uow
 
 
 class DecisionService:
