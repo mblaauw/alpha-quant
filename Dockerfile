@@ -9,6 +9,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY src/ src/
 COPY alembic.ini .
+COPY config.toml .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
@@ -17,5 +18,6 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/src /app/src
 COPY --from=builder /app/alembic.ini /app/alembic.ini
+COPY --from=builder /app/config.toml /app/config.toml
 ENV PATH="/app/.venv/bin:$PATH"
 ENTRYPOINT ["alpha-quant"]

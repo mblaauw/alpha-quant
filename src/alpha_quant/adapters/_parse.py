@@ -75,17 +75,31 @@ def parse_technical_observations(raw: dict[str, list[Any]]) -> TechnicalObservat
     has_data = False
     additional: dict[str, float | None] = {}
 
+    skip_keys = {
+        "effective_date",
+        "security_id",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "source_id",
+        "available_at",
+        "ingested_at",
+        "source_published_at",
+        "validated_at",
+        "source_fetch_id",
+        "raw_payload_hash",
+        "ingestion_run_id",
+        "content_hash",
+        "version_hash",
+        "quality_status",
+        "normalization_version",
+        "schema_version",
+        "parser_version",
+    }
     for key, values in raw.items():
-        if key in (
-            "effective_date",
-            "security_id",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "source_id",
-        ):
+        if key in skip_keys:
             continue
         latest_val = None
         if values and len(values) > 0:
@@ -153,8 +167,8 @@ def parse_mention_obs(row: dict[str, Any]) -> MentionObservation:
 
 def parse_readout_definition(raw: dict[str, Any]) -> ReadoutDefinition:
     return ReadoutDefinition(
-        readout_id=str(raw.get("readout_id", "")),
-        label=str(raw.get("label", "")),
+        readout_id=str(raw.get("definition_id", raw.get("readout_id", ""))),
+        label=str(raw.get("name", raw.get("label", ""))),
         category=str(raw.get("category", "")),
         unit=str(raw.get("unit", "")),
     )
@@ -162,16 +176,21 @@ def parse_readout_definition(raw: dict[str, Any]) -> ReadoutDefinition:
 
 def parse_readout_observation(raw: dict[str, Any]) -> ReadoutObservation:
     return ReadoutObservation(
-        effective_date=str(raw.get("effective_date", "")),
+        effective_date=str(raw.get("as_of", raw.get("effective_date", ""))),
         value=opt_float(raw.get("value")),
         normalized=opt_float(raw.get("normalized")),
     )
 
 
 def parse_readout_item(raw: dict[str, Any]) -> ReadoutItem:
+    obs_raw = raw.get("observation", raw.get("observations", []))
+    if isinstance(obs_raw, dict):
+        observations = [parse_readout_observation(obs_raw)]
+    else:
+        observations = [parse_readout_observation(o) for o in obs_raw]
     return ReadoutItem(
         definition=parse_readout_definition(raw.get("definition", {})),
-        observations=[parse_readout_observation(o) for o in raw.get("observations", [])],
+        observations=observations,
     )
 
 
@@ -184,13 +203,28 @@ def parse_facts_bundle_metadata(raw: dict[str, Any]) -> FactsBundleMetadata:
     )
 
 
+def _resolve_readouts(raw: dict[str, Any]) -> list[dict[str, Any]]:
+    """Handle both list and dict formats for readouts section."""
+    readouts_raw = raw.get("readouts", [])
+    if isinstance(readouts_raw, dict):
+        return readouts_raw.get("readouts", readouts_raw.get("items", []))
+    return readouts_raw if isinstance(readouts_raw, list) else []
+
+
 def parse_facts_bundle_sections(raw: dict[str, Any]) -> FactsBundleSections:
     return FactsBundleSections(
-        readouts=[parse_readout_item(r) for r in raw.get("readouts", [])],
-        fundamentals=[parse_fundamental_obs(m) for m in raw.get("fundamentals", [])],
-        insider_transactions=[parse_insider_obs(t) for t in raw.get("insider_transactions", [])],
+        readouts=[parse_readout_item(r) for r in _resolve_readouts(raw)],
+        fundamentals=[
+            parse_fundamental_obs(m) for m in raw.get("fundamentals", {}).get("metrics", [])
+        ],
+        insider_transactions=[
+            parse_insider_obs(t) for t in raw.get("insider_tx", raw.get("insider_transactions", []))
+        ],
         earnings_events=[parse_earnings_obs(e) for e in raw.get("earnings_events", [])],
-        attention_mentions=[parse_mention_obs(m) for m in raw.get("attention_mentions", [])],
+        attention_mentions=[
+            parse_mention_obs(m)
+            for m in raw.get("attention_metrics", raw.get("attention_mentions", []))
+        ],
     )
 
 

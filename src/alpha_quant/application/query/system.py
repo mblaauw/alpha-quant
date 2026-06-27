@@ -3,6 +3,29 @@ from __future__ import annotations
 from alpha_quant.application.query.shared import DEFAULT_BOOK_ID, with_uow
 
 
+def _check_lake_health() -> bool:
+    try:
+        from alpha_quant.application.config import load_config
+        from alpha_quant.application.factory import create_alpha_lake_reader
+
+        config = load_config()
+        lake = create_alpha_lake_reader(config)
+        health = lake.health()
+        lake.close()
+        return health.status == "ok"
+    except Exception:
+        return False
+
+
+def _resolve_book_id() -> str:
+    try:
+        from alpha_quant.application.query.shared import DEFAULT_BOOK_ID
+
+        return str(DEFAULT_BOOK_ID)
+    except Exception:
+        return "00000000-0000-0000-0000-000000000001"
+
+
 def _check_postgres_health() -> bool:
     try:
         from alpha_quant.adapters.postgres.engine import create_engine
@@ -17,8 +40,9 @@ def _check_postgres_health() -> bool:
 
 class SystemService:
     def context(self) -> dict[str, object]:
-        book_id = DEFAULT_BOOK_ID
+        book_id = _resolve_book_id()
         db_healthy = _check_postgres_health()
+        lake_healthy = _check_lake_health()
 
         def _query(uow):
             halt = uow.store.current_halt(book_id)
@@ -35,7 +59,7 @@ class SystemService:
                 "books": [{"id": str(b.book_id), "name": b.name, "kind": b.kind} for b in books],
                 "mode": "PAPER",
                 "snapshot": None,
-                "lake_healthy": False,
+                "lake_healthy": lake_healthy,
                 "postgres_healthy": db_healthy,
             }
 

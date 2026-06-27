@@ -392,7 +392,7 @@ class PostgresOperationalStore:
                 INSERT INTO projection.position_current
                     (book_id, security_id, symbol, quantity, avg_cost)
                 SELECT
-                    pf.portfolio_book_id,
+                    po.portfolio_book_id,
                     pf.security_id,
                     pf.symbol,
                     SUM(CASE WHEN pf.side = 'buy' THEN pf.quantity ELSE -pf.quantity END),
@@ -406,7 +406,7 @@ class PostgresOperationalStore:
                 FROM trade.paper_fill pf
                 JOIN trade.paper_order po ON pf.order_id = po.order_id
                 WHERE po.portfolio_book_id = :bid
-                GROUP BY pf.portfolio_book_id, pf.security_id, pf.symbol
+                GROUP BY po.portfolio_book_id, pf.security_id, pf.symbol
                 HAVING SUM(CASE WHEN pf.side = 'buy' THEN pf.quantity ELSE -pf.quantity END) != 0
                 """
             ),

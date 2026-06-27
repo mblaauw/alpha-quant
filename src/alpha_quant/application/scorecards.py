@@ -66,9 +66,12 @@ _CRITICAL_COMPONENTS = {"data_quality"}
 
 
 def _readout_value(bundle: FactsBundle, readout_id: str) -> float | None:
+    """Get latest value from a readout by ID (supports suffix matching for Alpha-Lake dot IDs)."""
     for item in bundle.sections.readouts:
-        if item.definition.readout_id == readout_id and item.observations:
-            return item.observations[-1].value
+        rid = item.definition.readout_id
+        if rid == readout_id or rid.endswith(f".{readout_id}") or rid == readout_id:
+            if item.observations:
+                return item.observations[-1].value
     return None
 
 

@@ -188,6 +188,18 @@ def load_config(path: str | None = None) -> AppConfig:
             raise ConfigError(msg, source=str(local_path)) from e
 
     try:
+        # Apply env var overrides on top of TOML data.
+        # AppConfig is a BaseSettings, but model_validate(data) skips env vars.
+        # So we merge env var values into the data dict before validation.
+        import os as _os
+
+        env_lake_mode = _os.environ.get("ALPHA_QUANT_LAKE__MODE")
+        if env_lake_mode:
+            data.setdefault("lake", {})["mode"] = env_lake_mode
+        env_lake_url = _os.environ.get("ALPHA_QUANT_LAKE__BASE_URL")
+        if env_lake_url:
+            data.setdefault("lake", {})["base_url"] = env_lake_url
+
         return AppConfig.model_validate(data)
     except Exception as e:
         errors = getattr(e, "errors", lambda: None)()

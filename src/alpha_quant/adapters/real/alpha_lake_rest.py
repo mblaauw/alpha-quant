@@ -306,18 +306,32 @@ def _build_neutral_observations(
 
 
 def _legacy_parse_indicators(raw: dict[str, list[Any]]) -> dict[str, list[float | None]]:
+    skip_keys = {
+        "effective_date",
+        "security_id",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "source_id",
+        "available_at",
+        "ingested_at",
+        "source_published_at",
+        "validated_at",
+        "source_fetch_id",
+        "raw_payload_hash",
+        "ingestion_run_id",
+        "content_hash",
+        "version_hash",
+        "quality_status",
+        "normalization_version",
+        "schema_version",
+        "parser_version",
+    }
     result: dict[str, list[float | None]] = {}
     for key, values in raw.items():
-        if key in (
-            "effective_date",
-            "security_id",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "source_id",
-        ):
+        if key in skip_keys:
             continue
         result[key] = [float(v) if v is not None else None for v in values]
     return result

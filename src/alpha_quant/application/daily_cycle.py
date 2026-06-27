@@ -9,6 +9,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import structlog
+from sqlalchemy import text
 
 from alpha_quant.application.scorecards import (
     PortfolioContext,
@@ -139,8 +140,10 @@ class DailyCycleService:
 
         try:
             # -- Fetch observations from Alpha-Lake --
-            symbols_in_portfolio = list(state.positions.keys()) or ["SPY"]
+            symbols_in_portfolio = list(state.positions.keys())
             discovery = discovery_symbols or []
+            if not symbols_in_portfolio and not discovery:
+                discovery = ["AAPL", "MSFT", "GOOGL", "NVDA", "AMZN"]
             all_symbols = list(set(symbols_in_portfolio + discovery + ["SPY"]))
 
             self._alpha_lake.read_observations(all_symbols, as_of=now)
@@ -187,8 +190,23 @@ class DailyCycleService:
 
             # -- Persist scorecards --
             run_id_str = str(run.decision_run_id)
+            book_id_str = str(book_id)
             for sc in scorecards:
-                self._store.save_scorecard(sc, run_id_str)
+                sec_id = sc.security_id or sc.symbol
+                self._store.session.execute(
+                    text("""
+                        INSERT INTO core.security_reference (security_id, symbol)
+                        VALUES (:sid, :sym)
+                        ON CONFLICT (security_id) DO NOTHING
+                    """),
+                    {"sid": sec_id, "sym": sc.symbol},
+                )
+                sc_with_ids = sc.model_copy(update={
+                    "portfolio_book_id": book_id_str,
+                    "decision_run_id": run_id_str,
+                    "security_id": sec_id,
+                })
+                self._store.save_scorecard(sc_with_ids, run_id_str)
 
             # -- Persist portfolio mark --
             total_mv_end = sum(float(p.market_value or 0) for p in state.positions.values())
