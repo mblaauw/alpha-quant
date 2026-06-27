@@ -67,6 +67,21 @@ class DailyCycleService:
         self._alpha_lake = alpha_lake
         self._store = store
 
+    def _resolve_trading_day(self, as_of: datetime) -> datetime:
+        """Walk back from as_of to find a date with sufficient technical readouts."""
+        from datetime import timedelta
+
+        candidate = as_of
+        for _ in range(7):
+            try:
+                fb = self._alpha_lake.read_facts_bundle("AAPL", candidate)
+                if len(fb.sections.readouts) >= 15:
+                    return candidate
+            except Exception:
+                pass
+            candidate = candidate - timedelta(days=1)
+        return as_of
+
     def run(
         self,
         book_id: UUID,
@@ -77,7 +92,7 @@ class DailyCycleService:
         discovery_symbols: list[str] | None = None,
         strategy_version_id: UUID | None = None,
     ) -> DailyCycleResult:
-        now = as_of or datetime.now(UTC)
+        now = self._resolve_trading_day(as_of or datetime.now(UTC))
         today = now.date()
 
         strategy_version_id = strategy_version_id or UUID("00000000-0000-0000-0000-000000000001")
@@ -201,11 +216,13 @@ class DailyCycleService:
                     """),
                     {"sid": sec_id, "sym": sc.symbol},
                 )
-                sc_with_ids = sc.model_copy(update={
-                    "portfolio_book_id": book_id_str,
-                    "decision_run_id": run_id_str,
-                    "security_id": sec_id,
-                })
+                sc_with_ids = sc.model_copy(
+                    update={
+                        "portfolio_book_id": book_id_str,
+                        "decision_run_id": run_id_str,
+                        "security_id": sec_id,
+                    }
+                )
                 self._store.save_scorecard(sc_with_ids, run_id_str)
 
             # -- Persist portfolio mark --
