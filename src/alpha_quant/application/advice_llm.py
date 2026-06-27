@@ -159,7 +159,7 @@ class AdviceLLMService:
                 what_changed=data.get("what_changed_since_previous_run", []),
                 override_guidance=data.get("override_guidance", []),
             )
-        except ValueError, TypeError:
+        except (ValueError, TypeError):  # fmt: skip
             return None
 
     def _fallback_recommendation(self, rec: Recommendation) -> AdviceRecommendation:

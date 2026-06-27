@@ -34,6 +34,15 @@ Alpha-Quant owns decisions, portfolio controls, paper execution, journals, opera
 
 All neutral market facts come from Alpha-Lake's PIT (point-in-time) API. Every decision, backtest, and replay run is bounded by an explicit `as_of` timestamp and optional `snapshot_id` for deterministic reproducibility.
 
+### Advice Workflow
+
+Alpha-Quant's advice workflow produces daily scorecards with deterministic recommendations:
+
+- **Scorecard engine** converts facts-bundle data into 13 scored components (technical trend, momentum, fundamentals, event risk, etc.) with pass/warn/fail gates and a weighted total score.
+- **LLM explanation layer** converts scorecards into structured natural-language advice. The LLM explains deterministic results — it never computes prices, stops, or position sizes.
+- **Advice Desk tab** displays daily advice cards with Follow/Modify/Reject actions. Every override is a durable audited command.
+- **Risk methods** are user-visible, deterministic policies (fixed percent, ATR trailing, time stop, drawdown ladder, etc.) registered in `METHOD_REGISTRY`.
+
 ## Architecture
 
 ```
