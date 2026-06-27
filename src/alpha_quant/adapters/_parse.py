@@ -7,11 +7,19 @@ from alpha_quant.contracts.alpha_lake import (
     INDICATOR_FIELD_MAP,
     BarObservation,
     EarningsEvent,
+    FactsBundle,
+    FactsBundleMetadata,
+    FactsBundleSections,
     FundamentalMetric,
     InsiderTransaction,
     MentionObservation,
     PriceObservation,
+    ReadoutDefinition,
+    ReadoutItem,
+    ReadoutObservation,
+    SymbolMutationResult,
     SymbolObservations,
+    SymbolRegistryItem,
     TechnicalObservations,
 )
 
@@ -137,6 +145,74 @@ def parse_mention_obs(row: dict[str, Any]) -> MentionObservation:
         effective_date=str(row.get("effective_date", "")),
         count=int(row.get("mention_count", row.get("count", 0))),
         source=str(row.get("source_id", "alpha_lake")),
+    )
+
+
+# -- Facts-bundle parsing --
+
+
+def parse_readout_definition(raw: dict[str, Any]) -> ReadoutDefinition:
+    return ReadoutDefinition(
+        readout_id=str(raw.get("readout_id", "")),
+        label=str(raw.get("label", "")),
+        category=str(raw.get("category", "")),
+        unit=str(raw.get("unit", "")),
+    )
+
+
+def parse_readout_observation(raw: dict[str, Any]) -> ReadoutObservation:
+    return ReadoutObservation(
+        effective_date=str(raw.get("effective_date", "")),
+        value=opt_float(raw.get("value")),
+        normalized=opt_float(raw.get("normalized")),
+    )
+
+
+def parse_readout_item(raw: dict[str, Any]) -> ReadoutItem:
+    return ReadoutItem(
+        definition=parse_readout_definition(raw.get("definition", {})),
+        observations=[parse_readout_observation(o) for o in raw.get("observations", [])],
+    )
+
+
+def parse_facts_bundle_metadata(raw: dict[str, Any]) -> FactsBundleMetadata:
+    return FactsBundleMetadata(
+        symbol=str(raw.get("symbol", "")),
+        as_of=datetime.fromisoformat(str(raw.get("as_of", "")).replace("Z", "+00:00")),
+        snapshot_id=raw.get("snapshot_id"),
+        categories=list(raw.get("categories", [])),
+    )
+
+
+def parse_facts_bundle_sections(raw: dict[str, Any]) -> FactsBundleSections:
+    return FactsBundleSections(
+        readouts=[parse_readout_item(r) for r in raw.get("readouts", [])],
+        fundamentals=[parse_fundamental_obs(m) for m in raw.get("fundamentals", [])],
+        insider_transactions=[parse_insider_obs(t) for t in raw.get("insider_transactions", [])],
+        earnings_events=[parse_earnings_obs(e) for e in raw.get("earnings_events", [])],
+        attention_mentions=[parse_mention_obs(m) for m in raw.get("attention_mentions", [])],
+    )
+
+
+def parse_facts_bundle(raw: dict[str, Any]) -> FactsBundle:
+    return FactsBundle(
+        metadata=parse_facts_bundle_metadata(raw),
+        sections=parse_facts_bundle_sections(raw.get("sections", raw)),
+    )
+
+
+def parse_symbol_registry_item(raw: dict[str, Any]) -> SymbolRegistryItem:
+    return SymbolRegistryItem(
+        symbol=str(raw.get("symbol", "")),
+        added_at=str(raw.get("added_at", "")),
+        active=bool(raw.get("active", True)),
+    )
+
+
+def parse_symbol_mutation_result(raw: dict[str, Any]) -> SymbolMutationResult:
+    return SymbolMutationResult(
+        symbol=str(raw.get("symbol", "")),
+        status=str(raw.get("status", "")),
     )
 
 

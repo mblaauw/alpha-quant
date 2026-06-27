@@ -8,19 +8,25 @@ import httpx
 from alpha_quant.adapters._parse import (
     parse_bar_obs,
     parse_earnings_obs,
+    parse_facts_bundle,
     parse_fundamental_obs,
     parse_insider_obs,
     parse_mention_obs,
+    parse_symbol_mutation_result,
     parse_symbol_observations,
+    parse_symbol_registry_item,
 )
 from alpha_quant.contracts.alpha_lake import (
     AlphaLakeContract,
     AlphaLakeHealth,
     DecisionPanel,
+    FactsBundle,
     MarketObservations,
     NeutralObservations,
+    SymbolMutationResult,
     SymbolObservations,
     SymbolPanel,
+    SymbolRegistryItem,
     UniverseMember,
     UniverseSnapshot,
 )
@@ -129,6 +135,98 @@ class AlphaLakeRestClient(AlphaLakeReadPort):
             pass
         now = datetime.now(UTC)
         return {s: now for s in symbols}
+
+    @override
+    def read_facts_bundle(
+        self,
+        symbol: str,
+        as_of: datetime,
+        snapshot_id: str | None = None,
+        *,
+        categories: list[str] | None = None,
+        readout_ids: list[str] | None = None,
+        metric_ids: list[str] | None = None,
+    ) -> FactsBundle:
+        params: dict[str, str] = {
+            "as_of": as_of.isoformat(),
+        }
+        if snapshot_id:
+            params["snapshot_id"] = snapshot_id
+        if categories:
+            params["categories"] = ",".join(categories)
+        if readout_ids:
+            params["readout_ids"] = ",".join(readout_ids)
+        if metric_ids:
+            params["metric_ids"] = ",".join(metric_ids)
+        resp = self._client.get(
+            f"{self._base_url}/v1/symbol/{symbol}/facts-bundle",
+            headers=self._headers,
+            params=params,
+        )
+        resp.raise_for_status()
+        return parse_facts_bundle(resp.json())
+
+    @override
+    def read_facts_bundle_batch(
+        self,
+        symbols: list[str],
+        as_of: datetime,
+        snapshot_id: str | None = None,
+        *,
+        categories: list[str] | None = None,
+        readout_ids: list[str] | None = None,
+        metric_ids: list[str] | None = None,
+    ) -> dict[str, FactsBundle]:
+        body: dict[str, Any] = {
+            "symbols": symbols,
+            "as_of": as_of.isoformat(),
+        }
+        if snapshot_id:
+            body["snapshot_id"] = snapshot_id
+        if categories:
+            body["categories"] = categories
+        if readout_ids:
+            body["readout_ids"] = readout_ids
+        if metric_ids:
+            body["metric_ids"] = metric_ids
+        resp = self._client.post(
+            f"{self._base_url}/v1/facts-bundle/batch",
+            headers={**self._headers, "Content-Type": "application/json"},
+            json=body,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return {sym: parse_facts_bundle(b) for sym, b in data.items()}
+
+    @override
+    def list_symbols(self, active_only: bool = True) -> list[SymbolRegistryItem]:
+        params = {"active_only": str(active_only).lower()}
+        resp = self._client.get(
+            f"{self._base_url}/v1/symbols",
+            headers=self._headers,
+            params=params,
+        )
+        resp.raise_for_status()
+        return [parse_symbol_registry_item(item) for item in resp.json()]
+
+    @override
+    def add_symbol(self, symbol: str) -> SymbolMutationResult:
+        resp = self._client.post(
+            f"{self._base_url}/v1/symbols",
+            headers={**self._headers, "Content-Type": "application/json"},
+            json={"symbol": symbol},
+        )
+        resp.raise_for_status()
+        return parse_symbol_mutation_result(resp.json())
+
+    @override
+    def remove_symbol(self, symbol: str) -> SymbolMutationResult:
+        resp = self._client.delete(
+            f"{self._base_url}/v1/symbols/{symbol}",
+            headers=self._headers,
+        )
+        resp.raise_for_status()
+        return parse_symbol_mutation_result(resp.json())
 
     @override
     def close(self) -> None:
