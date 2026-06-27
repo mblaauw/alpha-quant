@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from datetime import UTC, datetime
 from uuid import UUID
 
 from alpha_quant.application.factory import create_unit_of_work
@@ -41,24 +40,21 @@ def submit_command(
 
 
 def run_decision_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | None]:
+    from alpha_quant.application.config import load_config
+    from alpha_quant.application.daily_cycle import DailyCycleService
+    from alpha_quant.application.factory import create_alpha_lake_reader
+
     uow = create_unit_of_work()
     with uow:
-        run = uow.store.reserve_run(
-            RunReservation(
-                run_key=f"manual-{cmd.command_id}",
-                run_kind=RunKind.DAILY,
-                strategy_version_id=UUID("00000000-0000-0000-0000-000000000001"),
-                portfolio_book_id=cmd.book_id or UUID("00000000-0000-0000-0000-000000000001"),
-                decision_as_of=datetime.now(UTC),
-                resolved_snapshot_id="manual",
-                alpha_lake_api_version="1.0",
-                alpha_lake_contract_version="1.0",
-                config_hash="manual",
-                request_hash="manual",
-                response_hash="manual",
-            )
-        )
-        return CommandStatus.SUCCEEDED, str(run.decision_run_id), None
+        config = load_config()
+        alpha_lake = create_alpha_lake_reader(config)
+        svc = DailyCycleService(alpha_lake, uow.store)
+        book_id = cmd.book_id or UUID("00000000-0000-0000-0000-000000000001")
+        result = svc.run(book_id=book_id, run_key=f"cmd-{cmd.command_id}")
+        alpha_lake.close()
+        if result.halted:
+            return CommandStatus.SUCCEEDED, str(result.decision_run_id), "book_halted"
+        return CommandStatus.SUCCEEDED, str(result.decision_run_id), None
 
 
 def create_halt_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | None]:
