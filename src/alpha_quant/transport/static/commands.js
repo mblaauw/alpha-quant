@@ -21,6 +21,7 @@ export function generateKey() {
    Each returns the submit response { command_id, status }. The caller drives
    the toast via runWithToast() in components/toast.js. */
 export const cmd = {
+  submit: (type, payload, bookId = null, reason = null) => submitCommand(type, payload, { idempotency_key: generateKey(), book_id: bookId, reason }),
   runCycle:       (bookId, asOf = null) => submitCommand("decision_run.create", { decision_as_of: asOf, snapshot_id: null }, { idempotency_key: generateKey(), book_id: bookId, reason: "Manual run from Desk" }),
   haltCreate:     (bookId, reason) => submitCommand("halt.create", {}, { idempotency_key: generateKey(), book_id: bookId, reason }),
   haltResume:     (bookId, reason) => submitCommand("halt.resume", {}, { idempotency_key: generateKey(), book_id: bookId, reason }),

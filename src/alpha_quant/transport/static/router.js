@@ -1,4 +1,5 @@
 import store from "./state.js";
+import { renderAdvice } from "./render/advice.js";
 import { renderDesk } from "./render/desk.js";
 import { renderPortfolio } from "./render/portfolio.js";
 import { renderDecisions } from "./render/decisions.js";
@@ -9,6 +10,7 @@ import { renderJournal } from "./render/journal.js";
 import { renderSystem } from "./render/system.js";
 
 const routes = {
+  advice: renderAdvice,
   desk: renderDesk,
   portfolio: renderPortfolio,
   decisions: renderDecisions,
