@@ -62,4 +62,5 @@ services:
 
 volumes:
   alpha_quant_pgdata:
-    name: alpha_quant_pgdata
+    name: alpha-quant_pgdata
+    external: true
