@@ -237,7 +237,7 @@ class PaperOrder(Base):
     __table_args__ = {"schema": "trade"}
 
     order_id: Mapped[str] = pk_uuid()
-    decision_run_id: Mapped[str] = fk("run.decision_run.decision_run_id")
+    decision_run_id: Mapped[str | None] = fk_opt("run.decision_run.decision_run_id")
     portfolio_book_id: Mapped[str] = fk("core.portfolio_book.book_id")
     security_id: Mapped[str] = fk("core.security_reference.security_id")
     symbol: Mapped[str] = str_36()

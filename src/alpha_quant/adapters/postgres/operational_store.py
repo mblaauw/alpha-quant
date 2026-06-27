@@ -1112,7 +1112,7 @@ class PostgresOperationalStore:
             """),
             {
                 "oid": order_id,
-                "rid": decision_id or "",
+                "rid": decision_id if decision_id else None,
                 "pbid": str(book_id),
                 "sid": security_id,
                 "sym": symbol,
