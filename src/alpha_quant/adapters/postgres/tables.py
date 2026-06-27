@@ -36,6 +36,18 @@ class Base(DeclarativeBase):
     )
 
 
+def str_10():
+    return mapped_column(String(10), nullable=False)
+
+
+def str_20():
+    return mapped_column(String(20), nullable=False)
+
+
+def str_24():
+    return mapped_column(String(24), nullable=False)
+
+
 def str_36():
     return mapped_column(String(36), nullable=False)
 
@@ -406,3 +418,109 @@ class RunLockAudit(Base):
     run_key: Mapped[str] = mapped_column(String(255), nullable=False)
     action: Mapped[str] = str_36()
     created_at: Mapped[datetime] = dt_field()
+
+
+class RiskMethod(Base):
+    __tablename__ = "risk_method"
+    __table_args__ = {"schema": "core"}
+
+    risk_method_id: Mapped[str] = pk_uuid()
+    name: Mapped[str] = str_64()
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    method_type: Mapped[str] = str_36()
+    default_params_json: Mapped[str] = text_field()
+    is_active: Mapped[bool] = bool_field()
+
+
+class ScorecardOrm(Base):
+    __tablename__ = "scorecard"
+    __table_args__ = {"schema": "run"}
+
+    scorecard_id: Mapped[str] = pk_uuid()
+    decision_run_id: Mapped[str] = fk("run.decision_run.decision_run_id")
+    portfolio_book_id: Mapped[str] = fk("core.portfolio_book.book_id")
+    symbol: Mapped[str] = str_36()
+    security_id: Mapped[str] = fk("core.security_reference.security_id")
+    as_of: Mapped[datetime] = dt_field()
+    snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    facts_hash: Mapped[str] = str_64()
+    config_hash: Mapped[str] = str_64()
+    strategy_version: Mapped[str] = str_64()
+    recommendation: Mapped[str] = str_24()
+    confidence: Mapped[Decimal] = mapped_column(Numeric(6, 4), nullable=False)
+    total_score: Mapped[Decimal] = mapped_column(Numeric(8, 4), nullable=False)
+    data_quality: Mapped[str] = str_10()
+    created_at: Mapped[datetime] = dt_field()
+
+
+class ScorecardComponentOrm(Base):
+    __tablename__ = "scorecard_component"
+    __table_args__ = {"schema": "run"}
+
+    component_id: Mapped[str] = pk_uuid()
+    scorecard_id: Mapped[str] = fk("run.scorecard.scorecard_id")
+    name: Mapped[str] = str_64()
+    category: Mapped[str] = str_64()
+    score: Mapped[Decimal] = mapped_column(Numeric(8, 4), nullable=False)
+    state: Mapped[str] = str_10()
+    weight: Mapped[Decimal] = mapped_column(Numeric(8, 4), nullable=False)
+    passed: Mapped[bool] = bool_field()
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    details_json: Mapped[str] = text_field()
+
+
+class AdviceArtifactOrm(Base):
+    __tablename__ = "advice_artifact"
+    __table_args__ = {"schema": "run"}
+
+    advice_id: Mapped[str] = pk_uuid()
+    scorecard_id: Mapped[str] = fk("run.scorecard.scorecard_id")
+    llm_provider: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    llm_model: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    prompt_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    input_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    output_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    validation_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    recommendation: Mapped[str] = str_24()
+    headline: Mapped[str] = mapped_column(Text, nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    rationale_json: Mapped[str] = text_field()
+    risks_json: Mapped[str] = text_field()
+    deterministic_differs: Mapped[bool] = bool_field()
+    created_at: Mapped[datetime] = dt_field()
+
+
+class OperatorOverrideOrm(Base):
+    __tablename__ = "operator_override"
+    __table_args__ = {"schema": "audit"}
+
+    override_id: Mapped[str] = pk_uuid()
+    scorecard_id: Mapped[str] = fk("run.scorecard.scorecard_id")
+    command_id: Mapped[str] = fk("ops.command.command_id")
+    actor_id: Mapped[str] = str_64()
+    original_recommendation: Mapped[str] = str_24()
+    original_confidence: Mapped[Decimal] = mapped_column(Numeric(6, 4), nullable=False)
+    override_action: Mapped[str] = str_10()
+    modified_recommendation: Mapped[str | None] = str_24()
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = dt_field()
+
+
+class PositionRiskCurrent(Base):
+    __tablename__ = "position_risk_current"
+    __table_args__ = {"schema": "projection"}
+
+    book_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("core.portfolio_book.book_id"), primary_key=True
+    )
+    security_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("core.security_reference.security_id"), primary_key=True
+    )
+    risk_method_id: Mapped[str | None] = fk_opt("core.risk_method.risk_method_id")
+    stop_price: Mapped[Decimal | None] = mapped_column(Numeric(28, 10), nullable=True)
+    trail_price: Mapped[Decimal | None] = mapped_column(Numeric(28, 10), nullable=True)
+    trail_activation_pct: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
+    time_stop_date: Mapped[datetime | None] = date_opt()
+    auto_trail_enabled: Mapped[bool] = bool_field()
+    last_adjusted_at: Mapped[datetime | None] = dt_opt()
+    last_adjustment_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
