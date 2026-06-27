@@ -28,12 +28,18 @@ def _resolve_book_id() -> str:
 
 def _check_postgres_health() -> bool:
     try:
+        import os as _os
+
         from alpha_quant.adapters.postgres.engine import create_engine
         from alpha_quant.adapters.postgres.health import health_check
 
-        engine = create_engine()
+        db_url = _os.environ.get(
+            "DATABASE_URL",
+            "postgresql+psycopg://alpha_quant:alpha_quant_dev@postgres:5432/alpha_quant",
+        )
+        engine = create_engine(database_url=db_url)
         result = health_check(engine)
-        return bool(result.get("database", False))
+        return bool(result.get("db", result.get("database", False)))
     except Exception:
         return False
 
