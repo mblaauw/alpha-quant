@@ -37,23 +37,27 @@ def get_today_advice(
     def _query(uow: Any) -> list[dict[str, Any]]:
         from alpha_quant.contracts.operational import RunStatus
 
+        bid_filter = ""
+        params: dict[str, object] = {
+            "status": RunStatus.COMPLETED.value,
+            "lim": limit,
+        }
+        if book_id:
+            bid_filter = " AND dr.portfolio_book_id = :bid"
+            params["bid"] = str(book_id)
+
         rows = uow.store.session.execute(
-            text("""
+            text(f"""
                 SELECT dr.decision_run_id, dr.started_at,
                        s.scorecard_id, s.symbol, s.recommendation,
                        s.confidence, s.total_score, s.data_quality
                 FROM run.decision_run dr
                 JOIN run.scorecard s ON dr.decision_run_id = s.decision_run_id
-                WHERE dr.status = :status
-                  AND (:bid IS NULL OR dr.portfolio_book_id = :bid)
+                WHERE dr.status = :status{bid_filter}
                 ORDER BY dr.started_at DESC, s.total_score DESC
                 LIMIT :lim
             """),
-            {
-                "status": RunStatus.COMPLETED.value,
-                "bid": str(book_id) if book_id else None,
-                "lim": limit,
-            },
+            params,
         ).fetchall()
 
         results: list[dict[str, Any]] = []
@@ -72,7 +76,6 @@ def get_today_advice(
             )
         return results
 
-
     return with_uow(_query)
 
 
@@ -82,22 +85,23 @@ def get_position_advice(
     limit: int = 5,
 ) -> list[dict[str, Any]]:
     def _query(uow: Any) -> list[dict[str, Any]]:
+        bid_filter = ""
+        params: dict[str, object] = {"sym": symbol, "lim": limit}
+        if book_id:
+            bid_filter = " AND s.portfolio_book_id = :bid"
+            params["bid"] = str(book_id)
+
         rows = uow.store.session.execute(
-            text("""
+            text(f"""
                 SELECT s.scorecard_id, s.symbol, s.recommendation,
                        s.confidence, s.total_score, s.data_quality,
                        s.created_at
                 FROM run.scorecard s
-                WHERE s.symbol = :sym
-                  AND (:bid IS NULL OR s.portfolio_book_id = :bid)
+                WHERE s.symbol = :sym{bid_filter}
                 ORDER BY s.created_at DESC
                 LIMIT :lim
             """),
-            {
-                "sym": symbol,
-                "bid": str(book_id) if book_id else None,
-                "lim": limit,
-            },
+            params,
         ).fetchall()
 
         return [
@@ -112,6 +116,5 @@ def get_position_advice(
             }
             for r in rows
         ]
-
 
     return with_uow(_query)

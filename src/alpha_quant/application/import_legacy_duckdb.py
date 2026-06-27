@@ -447,7 +447,7 @@ class LegacyDuckDBImporter:
                     )
                     gate_results = cj.get("gate_results", {})
                     block_reason = cj.get("block_reason")
-                except json.JSONDecodeError, TypeError:
+                except (json.JSONDecodeError, TypeError):  # fmt: skip
                     pass
 
             existing_ce = (
@@ -490,7 +490,7 @@ class LegacyDuckDBImporter:
                                 details_json="{}",
                             )
                             self._session.add(pe)
-                except json.JSONDecodeError, TypeError:
+                except (json.JSONDecodeError, TypeError):  # fmt: skip
                     pass
             count += 1
         self._session.flush()

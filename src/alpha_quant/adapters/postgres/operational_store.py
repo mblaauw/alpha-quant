@@ -917,7 +917,7 @@ class PostgresOperationalStore:
             """),
             {
                 "eid": str(uuid4()),
-                "rid": str(cmd.book_id) if cmd.book_id else None,
+                "rid": None,
                 "et": f"command.{cmd.type}.requested",
                 "pj": f'{{"command_id":"{cmd.command_id}","type":"{cmd.type}","actor":"{cmd.actor_id}"}}',  # noqa: E501
                 "now": now,

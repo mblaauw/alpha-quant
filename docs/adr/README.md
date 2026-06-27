@@ -53,7 +53,13 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0045](./0045-no-offline-cache-operational-console.md) | No Offline Cache for the Write-Capable Operational Console | **Accepted** | 2026-06-26 |
 | [0046](./0046-static-lake-watch-aligned-console.md) | Static Lake Watch–Aligned Operational Console | **Accepted** | 2026-06-27 |
 | [0047](./0047-operational-context-not-global-pit.md) | Operational Context Is Not Global PIT Context | **Accepted** | 2026-06-27 |
-| [0048](./0048-commands-sole-mutation-boundary.md) | Commands Are the Sole Mutation Boundary | **Accepted** | 2026-06-27 |
+| [0048](./0048-commands-sole-mutation-boundary.md)
+| [0049](./0049-alpha-lake-facts-bundle-consumption.md) | Alpha-Lake Facts Bundle as Primary Scorecard Data Source | Accepted | 2026-06-27 |
+| [0050](./0050-scorecards-as-primary-decision-artifact.md) | Scorecards Are the Primary Decision Artifact | Accepted | 2026-06-27 |
+| [0051](./0051-llm-explains-deterministic-advice.md) | LLM Explains Deterministic Advice — Never Computes It | Accepted | 2026-06-27 |
+| [0052](./0052-user-overrides-as-audited-commands.md) | User Overrides Are Audited Commands | Accepted | 2026-06-27 |
+| [0053](./0053-risk-methods-as-user-visible-policy.md) | Risk Methods Are User-Visible Deterministic Policies | Accepted | 2026-06-27 |
+| [0054](./0054-evolved-desk-advice-tab.md) | Desk Redesigned with Advice-First Tab | Accepted | 2026-06-27 | | Commands Are the Sole Mutation Boundary | **Accepted** | 2026-06-27 |
 
 ## Status Meanings
 

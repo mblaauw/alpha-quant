@@ -291,8 +291,6 @@ async def list_risk_methods():
 
 @router.get("/lake-symbols")
 async def list_lake_symbols(active_only: bool = Query(True)):
-    import os
-
     from alpha_quant.application.config import load_config
     from alpha_quant.application.factory import create_alpha_lake_reader
 

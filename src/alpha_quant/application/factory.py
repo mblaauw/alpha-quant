@@ -42,8 +42,6 @@ def create_alpha_lake_reader(config: AppConfig) -> AlphaLakeReadPort:
     from alpha_quant.adapters.real.alpha_lake_rest import AlphaLakeRestClient
 
     if config.lake.mode in ("live", "rest"):
-        import os
-
         client: AlphaLakeReadPort = AlphaLakeRestClient(
             base_url=config.lake.base_url,
             api_key=os.environ.get(config.lake.api_key_env, ""),
