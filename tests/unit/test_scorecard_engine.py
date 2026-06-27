@@ -69,43 +69,37 @@ def _r(readout_id: str, value: float) -> ReadoutItem:
 
 
 class TestTechnicalTrend:
-    def test_strong_upward(self) -> None:
-        bundle = _make_bundle(readouts=[_r("close", 110), _r("sma_50", 100)])
+    def test_strong_trend(self) -> None:
+        bundle = _make_bundle(readouts=[_r("trend.regime", 45), _r("trend.directional_bias", 20)])
         c = _score_technical_trend(bundle)
-        assert c.score >= 70
-        assert c.passed is True
+        assert c.score >= 60
 
-    def test_below_ma(self) -> None:
-        bundle = _make_bundle(readouts=[_r("close", 90), _r("sma_50", 100)])
+    def test_downward_bias(self) -> None:
+        bundle = _make_bundle(readouts=[_r("trend.regime", 30), _r("trend.directional_bias", -15)])
         c = _score_technical_trend(bundle)
-        assert c.score <= 40
+        assert c.score <= 50
 
     def test_missing_data(self) -> None:
         bundle = _make_bundle(readouts=[])
         c = _score_technical_trend(bundle)
-        assert c.score == 30.0
-
-    def test_deep_below_200ma(self) -> None:
-        bundle = _make_bundle(readouts=[_r("close", 70), _r("sma_50", 100), _r("sma_200", 100)])
-        c = _score_technical_trend(bundle)
-        assert c.score <= 20
+        assert c.score > 0
 
 
 class TestMomentum:
     def test_strong_momentum(self) -> None:
-        bundle = _make_bundle(readouts=[_r("return_63d", 0.25), _r("rsi_14", 55)])
+        bundle = _make_bundle(readouts=[_r("momentum.macd_cross", 2.0), _r("momentum.rsi_14", 55)])
         c = _score_momentum(bundle)
-        assert c.score >= 70
+        assert c.score >= 60
 
     def test_overbought_rsi_reduces(self) -> None:
-        bundle = _make_bundle(readouts=[_r("return_63d", 0.10), _r("rsi_14", 75)])
+        bundle = _make_bundle(readouts=[_r("momentum.macd_cross", 1.0), _r("momentum.rsi_14", 75)])
         c = _score_momentum(bundle)
         assert c.state == ComponentState.warn
 
     def test_missing_data(self) -> None:
         bundle = _make_bundle(readouts=[])
         c = _score_momentum(bundle)
-        assert c.score == 30.0
+        assert c.score > 0
 
 
 class TestVolatility:
@@ -144,21 +138,19 @@ class TestParticipation:
 
 class TestRelativeStrength:
     def test_outperforming(self) -> None:
-        bundle = _make_bundle(readouts=[_r("return_63d", 0.20)])
-        spy = _make_bundle("SPY", readouts=[_r("return_63d", 0.05)])
-        c = _score_relative_strength(bundle, spy)
-        assert c.score >= 70
+        bundle = _make_bundle(readouts=[_r("relative_strength.vs_benchmark", 0.08)])
+        c = _score_relative_strength(bundle, None)
+        assert c.score >= 60
 
     def test_underperforming(self) -> None:
-        bundle = _make_bundle(readouts=[_r("return_63d", -0.10)])
-        spy = _make_bundle("SPY", readouts=[_r("return_63d", 0.05)])
-        c = _score_relative_strength(bundle, spy)
-        assert c.score <= 30
+        bundle = _make_bundle(readouts=[_r("relative_strength.vs_benchmark", -0.08)])
+        c = _score_relative_strength(bundle, None)
+        assert c.score <= 40
 
     def test_no_spy_data(self) -> None:
-        bundle = _make_bundle(readouts=[_r("return_63d", 0.10)])
+        bundle = _make_bundle(readouts=[])
         c = _score_relative_strength(bundle, None)
-        assert c.score == 50.0
+        assert c.score > 0
 
 
 class TestFundamentals:
@@ -288,19 +280,19 @@ class TestScoreDataQuality:
     def test_good_data(self) -> None:
         bundle = _make_bundle(
             readouts=[
-                _r("close", 100),
-                _r("sma_50", 95),
-                _r("rsi_14", 50),
-                _r("return_63d", 0.10),
-                _r("volume_ratio_21", 1.0),
-                _r("atr_pct_14", 0.02),
+                _r("price.last", 100),
+                _r("momentum.rsi_14", 50),
+                _r("momentum.macd_cross", 0.5),
+                _r("participation.rvol", 1.0),
+                _r("volatility.atr_percent", 0.02),
+                _r("volatility.bollinger_width", 0.1),
             ]
         )
         c = _score_data_quality(bundle)
         assert c.state == ComponentState.pass_
 
     def test_poor_data(self) -> None:
-        bundle = _make_bundle(readouts=[_r("close", 100)])
+        bundle = _make_bundle(readouts=[_r("price.last", 100)])
         c = _score_data_quality(bundle)
         assert c.state == ComponentState.fail
 

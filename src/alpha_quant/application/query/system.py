@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from alpha_quant.application.query.shared import DEFAULT_BOOK_ID, with_uow
+from alpha_quant.application.query.shared import with_uow
 
 
 def _check_lake_health() -> bool:
@@ -66,9 +66,25 @@ class SystemService:
         return with_uow(_query)
 
     def health(self) -> dict[str, object]:
+        pg_h = _check_postgres_health()
+        lake_h = _check_lake_health()
         return {
             "components": {
-                "postgresql": {"healthy": _check_postgres_health()},
+                "postgresql": {
+                    "healthy": pg_h,
+                    "status": "connected" if pg_h else "disconnected",
+                    "detail": "PostgreSQL operational store",
+                },
+                "alpha_lake": {
+                    "healthy": lake_h,
+                    "status": "connected" if lake_h else "disconnected",
+                    "detail": "Market facts / readouts / facts-bundle API",
+                },
+                "operational": {
+                    "healthy": True,
+                    "status": "running",
+                    "detail": "Command worker + API",
+                },
             },
         }
 

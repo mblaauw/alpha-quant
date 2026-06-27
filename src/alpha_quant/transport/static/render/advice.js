@@ -6,7 +6,7 @@ import { emptyState } from "../components/empty_state.js";
 import { errorState } from "../components/error_state.js";
 import { showModal, closeModal } from "../components/modal.js";
 import { runWithToast } from "../components/toast.js";
-import { showDrawer } from "../components/drawer.js";
+import { openDrawer as showDrawer } from "../components/drawer.js";
 import store from "../state.js";
 
 export async function renderAdvice() {

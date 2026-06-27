@@ -62,16 +62,25 @@ _COMPONENT_WEIGHTS: dict[str, float] = {
 _CRITICAL_COMPONENTS = {"data_quality"}
 
 
-# -- helpers --
+# Mapping from scorecard engine readout IDs to actual Alpha-Lake v2 readout IDs.
+# Suffix matching handles most cases (momentum.rsi_14 → rsi_14), but some need
+# explicit mapping where the last segment differs.
+_READOUT_ID_MAP: dict[str, str] = {
+    "atr_pct_14": "atr_percent",
+    "volume_ratio_21": "rvol",
+}
 
 
 def _readout_value(bundle: FactsBundle, readout_id: str) -> float | None:
-    """Get latest value from a readout by ID (supports suffix matching for Alpha-Lake dot IDs)."""
+    """Get latest value from a readout by ID."""
+    # Check explicit mapping first
+    mapped = _READOUT_ID_MAP.get(readout_id)
     for item in bundle.sections.readouts:
         rid = item.definition.readout_id
-        if rid == readout_id or rid.endswith(f".{readout_id}") or rid == readout_id:
-            if item.observations:
-                return item.observations[-1].value
+        if (rid == readout_id or rid.endswith(f".{readout_id}")) and item.observations:
+            return item.observations[-1].value
+        if mapped and (rid == mapped or rid.endswith(f".{mapped}")) and item.observations:
+            return item.observations[-1].value
     return None
 
 
@@ -98,45 +107,42 @@ def _parse_date(raw: str) -> date | None:
 
 
 def _score_technical_trend(bundle: FactsBundle) -> ScorecardComponent:
-    close_val = _readout_value(bundle, "close")
-    ma_50 = _readout_value(bundle, "sma_50")
-    ma_200 = _readout_value(bundle, "sma_200")
+    # Alpha-Lake v2: use trend.directional_bias and trend.regime instead of SMAs
+    dir_bias = _readout_value(bundle, "directional_bias")
+    trend_regime = _readout_value(bundle, "regime")
 
     score = 50.0
     reasons: list[str] = []
+    state = ComponentState.pass_
 
-    if close_val is not None and ma_50 is not None and ma_50 > 0:
-        ratio = close_val / ma_50
-        if ratio >= 1.10:
-            score = 90.0
-            reasons.append("Price well above 50-MA")
-        elif ratio >= 1.05:
-            score = 75.0
-            reasons.append("Price above 50-MA")
-        elif ratio >= 1.0:
-            score = 60.0
-            reasons.append("Price at 50-MA")
-        elif ratio >= 0.95:
-            score = 35.0
-            reasons.append("Slightly below 50-MA")
-        else:
-            score = 15.0
-            reasons.append("Well below 50-MA")
+    if trend_regime is not None:
+        if trend_regime >= 40:
+            score = 70.0
+            reasons.append("Strong trend regime")
+        elif trend_regime >= 20:
+            score = 55.0
+            reasons.append("Moderate trend")
+        elif trend_regime > 0:
+            score = 40.0
+            reasons.append("Weak trend regime (ADX)")
+            state = ComponentState.warn
     else:
-        reasons.append("Missing MA indicators")
-        score = 30.0
+        reasons.append("Unknown trend")
 
-    if close_val is not None and ma_200 is not None and ma_200 > 0:
-        level = close_val / ma_200
-        if level < 0.8:
-            score = min(score, 20.0)
-            reasons.append("Deep below 200-MA (distressed)")
+    if dir_bias is not None:
+        if dir_bias > 0:
+            reasons.append("Upward bias")
+            score = min(score + 10, 95)
+        elif dir_bias < 0:
+            reasons.append("Downward bias")
+            score = max(score - 15, 10)
+            state = ComponentState.warn
 
     return ScorecardComponent(
         name="technical_trend",
         category="technical",
         score=score,
-        state=ComponentState.pass_ if score >= 40 else ComponentState.warn,
+        state=state,
         weight=_COMPONENT_WEIGHTS["technical_trend"],
         passed=score >= 20,
         reason="; ".join(reasons) if reasons else "Neutral trend",
@@ -144,36 +150,38 @@ def _score_technical_trend(bundle: FactsBundle) -> ScorecardComponent:
 
 
 def _score_momentum(bundle: FactsBundle) -> ScorecardComponent:
-    ret_63d = _readout_value(bundle, "return_63d")
     rsi_14 = _readout_value(bundle, "rsi_14")
+    macd_val = _readout_value(bundle, "macd_cross")
+    quality = _readout_value(bundle, "quality")
 
     score = 50.0
     reasons: list[str] = []
     state = ComponentState.pass_
 
-    if ret_63d is not None:
-        ret_pct = ret_63d * 100
-        if ret_pct > 20:
-            score = 85.0
-            reasons.append("Strong 63d return")
-        elif ret_pct > 10:
+    # Use MACD cross as a momentum proxy
+    if macd_val is not None:
+        if macd_val > 0:
             score = 70.0
-            reasons.append("Good 63d return")
-        elif ret_pct > 5:
-            score = 55.0
-            reasons.append("Modest 63d return")
-        elif ret_pct > -5:
-            score = 40.0
-            reasons.append("Flat 63d return")
-        elif ret_pct > -10:
-            score = 25.0
-            reasons.append("Negative 63d return")
+            reasons.append("MACD positive cross")
+        elif macd_val < 0:
+            score = 30.0
+            reasons.append("MACD negative cross")
+            state = ComponentState.warn
         else:
-            score = 10.0
-            reasons.append("Sharp 63d decline")
+            score = 45.0
+            reasons.append("MACD neutral")
     else:
-        reasons.append("Missing return data")
-        score = 30.0
+        reasons.append("MACD unavailable")
+
+    # Momentum quality (ROC consensus)
+    if quality is not None:
+        if quality > 0:
+            score = min(score + 15, 95)
+            reasons.append("Positive momentum quality")
+        elif quality < 0:
+            score = max(score - 10, 10)
+            reasons.append("Negative momentum quality")
+            state = ComponentState.warn
 
     if rsi_14 is not None:
         if rsi_14 >= 70:
@@ -201,46 +209,69 @@ def _score_momentum(bundle: FactsBundle) -> ScorecardComponent:
 
 def _score_volatility(bundle: FactsBundle) -> ScorecardComponent:
     atr_pct = _readout_value(bundle, "atr_pct_14")
-    if atr_pct is None or atr_pct <= 0:
-        return ScorecardComponent(
-            name="volatility",
-            category="risk",
-            score=50.0,
-            weight=_COMPONENT_WEIGHTS["volatility"],
-            reason="Unknown volatility",
-        )
-    atr_pct_val = atr_pct * 100
-    if atr_pct_val > 4.0:
-        return ScorecardComponent(
-            name="volatility",
-            category="risk",
-            score=10.0,
-            state=ComponentState.warn,
-            weight=_COMPONENT_WEIGHTS["volatility"],
-            reason="Very high volatility",
-        )
-    if atr_pct_val > 2.5:
-        return ScorecardComponent(
-            name="volatility",
-            category="risk",
-            score=30.0,
-            weight=_COMPONENT_WEIGHTS["volatility"],
-            reason="Elevated volatility",
-        )
-    if atr_pct_val > 1.5:
-        return ScorecardComponent(
-            name="volatility",
-            category="risk",
-            score=60.0,
-            weight=_COMPONENT_WEIGHTS["volatility"],
-            reason="Moderate volatility",
-        )
+    boll_width = _readout_value(bundle, "bollinger_width")
+    vol_regime = _readout_value(bundle, "regime")
+
+    reasons: list[str] = []
+    score = 50.0
+    state = ComponentState.pass_
+
+    if atr_pct is not None and atr_pct > 0:
+        atr_val = atr_pct * 100
+        if atr_val > 4.0:
+            score = 10.0
+            reasons.append("Very high ATR")
+            state = ComponentState.warn
+        elif atr_val > 2.5:
+            score = 30.0
+            reasons.append("Elevated ATR")
+        elif atr_val > 1.5:
+            score = 60.0
+            reasons.append("Moderate ATR")
+        else:
+            score = 85.0
+            reasons.append("Low ATR")
+
+    if boll_width is not None and not reasons:
+        if boll_width > 0.5:
+            score = 15.0
+            reasons.append("Wide Bollinger bands")
+            state = ComponentState.warn
+        elif boll_width > 0.2:
+            score = 40.0
+            reasons.append("Moderate Bollinger width")
+        elif boll_width > 0.05:
+            score = 70.0
+            reasons.append("Tight Bollinger bands")
+        else:
+            score = 85.0
+            reasons.append("Squeezed Bollinger bands")
+
+    if vol_regime is not None and not reasons:
+        if vol_regime > 1.5:
+            score = 20.0
+            reasons.append("Elevated volatility regime")
+            state = ComponentState.warn
+        elif vol_regime > 1.0:
+            score = 45.0
+            reasons.append("Normal-high volatility")
+        elif vol_regime > 0.5:
+            score = 65.0
+            reasons.append("Normal-low volatility")
+        else:
+            score = 80.0
+            reasons.append("Low volatility regime")
+
+    if not reasons:
+        reasons.append("Unknown volatility")
+
     return ScorecardComponent(
         name="volatility",
         category="risk",
-        score=85.0,
+        score=score,
+        state=state,
         weight=_COMPONENT_WEIGHTS["volatility"],
-        reason="Low volatility",
+        reason="; ".join(reasons),
     )
 
 
@@ -292,57 +323,87 @@ def _score_relative_strength(
     bundle: FactsBundle,
     spy_bundle: FactsBundle | None,
 ) -> ScorecardComponent:
-    ret_63d = _readout_value(bundle, "return_63d")
-    spy_ret = _readout_value(spy_bundle, "return_63d") if spy_bundle else None
+    # Alpha-Lake v2: use relative_strength.vs_benchmark directly
+    rs_val = _readout_value(bundle, "vs_benchmark")
 
-    if ret_63d is None or spy_ret is None or spy_ret == 0:
+    if rs_val is not None:
+        rel = rs_val * 100
+        if rel > 5:
+            return ScorecardComponent(
+                name="relative_strength",
+                category="technical",
+                score=90.0,
+                weight=_COMPONENT_WEIGHTS["relative_strength"],
+                reason=f"Strong vs SPY (+{rel:.1f}%)",
+            )
+        if rel > 1:
+            return ScorecardComponent(
+                name="relative_strength",
+                category="technical",
+                score=70.0,
+                weight=_COMPONENT_WEIGHTS["relative_strength"],
+                reason=f"Above SPY ({rel:.1f}%)",
+            )
+        if rel > -1:
+            return ScorecardComponent(
+                name="relative_strength",
+                category="technical",
+                score=50.0,
+                weight=_COMPONENT_WEIGHTS["relative_strength"],
+                reason="In line with SPY",
+            )
+        if rel > -5:
+            return ScorecardComponent(
+                name="relative_strength",
+                category="technical",
+                score=30.0,
+                weight=_COMPONENT_WEIGHTS["relative_strength"],
+                reason=f"Below SPY ({rel:.1f}%)",
+            )
         return ScorecardComponent(
             name="relative_strength",
             category="technical",
-            score=50.0,
+            score=10.0,
+            state=ComponentState.warn,
             weight=_COMPONENT_WEIGHTS["relative_strength"],
-            reason="Relative strength not computed",
+            reason=f"Underperformance ({rel:.1f}%)",
         )
-    rel = (ret_63d - spy_ret) * 100
-    if rel > 15:
-        return ScorecardComponent(
-            name="relative_strength",
-            category="technical",
-            score=90.0,
-            weight=_COMPONENT_WEIGHTS["relative_strength"],
-            reason=f"Strong relative strength (+{rel:.1f}%)",
-        )
-    if rel > 5:
-        return ScorecardComponent(
-            name="relative_strength",
-            category="technical",
-            score=70.0,
-            weight=_COMPONENT_WEIGHTS["relative_strength"],
-            reason=f"Above market ({rel:.1f}%)",
-        )
-    if rel > -5:
-        return ScorecardComponent(
-            name="relative_strength",
-            category="technical",
-            score=50.0,
-            weight=_COMPONENT_WEIGHTS["relative_strength"],
-            reason="In line with market",
-        )
-    if rel > -15:
+
+    # Fallback: daily change vs SPY
+    sym_change = _readout_value(bundle, "change_pct")
+    spy_change = _readout_value(spy_bundle, "change_pct") if spy_bundle else None
+    if sym_change is not None and spy_change is not None and spy_change != 0:
+        rel = (sym_change - spy_change) * 100
+        if rel > 1:
+            return ScorecardComponent(
+                name="relative_strength",
+                category="technical",
+                score=70.0,
+                weight=_COMPONENT_WEIGHTS["relative_strength"],
+                reason=f"Outperformed SPY today ({rel:.1f}%)",
+            )
+        if rel > -1:
+            return ScorecardComponent(
+                name="relative_strength",
+                category="technical",
+                score=50.0,
+                weight=_COMPONENT_WEIGHTS["relative_strength"],
+                reason="In line with SPY today",
+            )
         return ScorecardComponent(
             name="relative_strength",
             category="technical",
             score=30.0,
             weight=_COMPONENT_WEIGHTS["relative_strength"],
-            reason=f"Below market ({rel:.1f}%)",
+            reason=f"Underperformed SPY today ({rel:.1f}%)",
         )
+
     return ScorecardComponent(
         name="relative_strength",
         category="technical",
-        score=10.0,
-        state=ComponentState.warn,
+        score=50.0,
         weight=_COMPONENT_WEIGHTS["relative_strength"],
-        reason=f"Significant underperformance ({rel:.1f}%)",
+        reason="Relative strength not computed",
     )
 
 
@@ -674,7 +735,7 @@ def _score_cash_impact(
 
 def _score_data_quality(bundle: FactsBundle) -> ScorecardComponent:
     missing = 0
-    expected = ["close", "sma_50", "rsi_14", "return_63d", "volume_ratio_21", "atr_pct_14"]
+    expected = ["last", "rsi_14", "macd_cross", "rvol", "atr_pct_14", "bollinger_width"]
     for readout_id in expected:
         if _readout_value(bundle, readout_id) is None:
             missing += 1

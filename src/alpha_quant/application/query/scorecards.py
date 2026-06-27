@@ -46,15 +46,17 @@ def get_today_advice(
             bid_filter = " AND dr.portfolio_book_id = :bid"
             params["bid"] = str(book_id)
 
+        # Use DISTINCT ON to get the latest scorecard per symbol
         rows = uow.store.session.execute(
             text(f"""
-                SELECT dr.decision_run_id, dr.started_at,
+                SELECT DISTINCT ON (s.symbol)
+                       dr.decision_run_id, dr.started_at,
                        s.scorecard_id, s.symbol, s.recommendation,
                        s.confidence, s.total_score, s.data_quality
                 FROM run.decision_run dr
                 JOIN run.scorecard s ON dr.decision_run_id = s.decision_run_id
                 WHERE dr.status = :status{bid_filter}
-                ORDER BY dr.started_at DESC, s.total_score DESC
+                ORDER BY s.symbol, dr.started_at DESC
                 LIMIT :lim
             """),
             params,

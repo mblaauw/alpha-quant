@@ -211,11 +211,61 @@ def _resolve_readouts(raw: dict[str, Any]) -> list[dict[str, Any]]:
     return readouts_raw if isinstance(readouts_raw, list) else []
 
 
+def _resolve_price_as_readouts(raw: dict[str, Any]) -> list[ReadoutItem]:
+    """Convert price section into synthetic readout items (price.last, price.volume, etc.)."""
+    price = raw.get("price", {})
+    if not isinstance(price, dict):
+        return []
+    items: list[ReadoutItem] = []
+    numeric_keys = {
+        "last",
+        "high",
+        "low",
+        "open",
+        "volume",
+        "change",
+        "change_pct",
+        "dollar_volume",
+    }
+    for k in numeric_keys:
+        v = price.get(k)
+        if v is not None:
+            try:
+                val = float(v)
+                items.append(
+                    ReadoutItem(
+                        definition=ReadoutDefinition(
+                            readout_id=f"price.{k}",
+                            label=f"Price {k}",
+                            category="price",
+                        ),
+                        observations=[
+                            ReadoutObservation(
+                                effective_date=str(price.get("latest_date", "")),
+                                value=val,
+                            )
+                        ],
+                    )
+                )
+            except (ValueError, TypeError):  # fmt: skip
+                pass
+    return items
+
+
 def parse_facts_bundle_sections(raw: dict[str, Any]) -> FactsBundleSections:
+    raw_readouts = _resolve_readouts(raw)
+    items: list[ReadoutItem] = [parse_readout_item(r) for r in raw_readouts]
+    if isinstance(raw, dict):
+        items.extend(_resolve_price_as_readouts(raw))
     return FactsBundleSections(
-        readouts=[parse_readout_item(r) for r in _resolve_readouts(raw)],
+        readouts=items,
         fundamentals=[
-            parse_fundamental_obs(m) for m in raw.get("fundamentals", {}).get("metrics", [])
+            parse_fundamental_obs(m)
+            for m in (
+                raw.get("fundamentals", {}).get("metrics", [])
+                if isinstance(raw.get("fundamentals"), dict)
+                else raw.get("fundamentals", [])
+            )
         ],
         insider_transactions=[
             parse_insider_obs(t) for t in raw.get("insider_tx", raw.get("insider_transactions", []))
