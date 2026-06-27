@@ -8,19 +8,25 @@ from typing import Any, override
 from alpha_quant.adapters._parse import (
     parse_bar_obs,
     parse_earnings_obs,
+    parse_facts_bundle,
     parse_fundamental_obs,
     parse_insider_obs,
     parse_mention_obs,
     parse_symbol_observations,
+    parse_symbol_registry_item,
 )
 from alpha_quant.contracts.alpha_lake import (
     AlphaLakeContract,
     AlphaLakeHealth,
     DecisionPanel,
+    FactsBundle,
+    FactsBundleMetadata,
     MarketObservations,
     NeutralObservations,
+    SymbolMutationResult,
     SymbolObservations,
     SymbolPanel,
+    SymbolRegistryItem,
     UniverseMember,
     UniverseSnapshot,
 )
@@ -106,6 +112,67 @@ class AlphaLakeHttpFixtureClient(AlphaLakeReadPort):
             per_symbol=per_symbol,
             market=MarketObservations.from_symbol_observations(spy_obs),
         )
+
+    @override
+    def read_facts_bundle(
+        self,
+        symbol: str,
+        as_of: datetime,
+        snapshot_id: str | None = None,
+        *,
+        categories: list[str] | None = None,
+        readout_ids: list[str] | None = None,
+        metric_ids: list[str] | None = None,
+    ) -> FactsBundle:
+        key = f"facts-bundle-{symbol}"
+        data = self._load_json(key)
+        if not data:
+            data = self._load_json("facts-bundle")
+        if not data:
+            return FactsBundle(
+                metadata=FactsBundleMetadata(
+                    symbol=symbol,
+                    as_of=as_of,
+                    snapshot_id=snapshot_id,
+                    categories=categories or [],
+                )
+            )
+        return parse_facts_bundle(data)
+
+    @override
+    def read_facts_bundle_batch(
+        self,
+        symbols: list[str],
+        as_of: datetime,
+        snapshot_id: str | None = None,
+        *,
+        categories: list[str] | None = None,
+        readout_ids: list[str] | None = None,
+        metric_ids: list[str] | None = None,
+    ) -> dict[str, FactsBundle]:
+        key = f"facts-bundle-batch-{'-'.join(sorted(symbols))}"
+        data = self._load_json(key)
+        if not data:
+            data = self._load_json("facts-bundle-batch")
+        if not data:
+            return {sym: self.read_facts_bundle(sym, as_of, snapshot_id) for sym in symbols}
+        return {sym: parse_facts_bundle(b) for sym, b in data.items()}
+
+    @override
+    def list_symbols(self, active_only: bool = True) -> list[SymbolRegistryItem]:
+        raw = self._load_json("symbols")
+        if not raw:
+            return []
+        items: list[Any] = raw if isinstance(raw, list) else raw.get("symbols", [])
+        return [parse_symbol_registry_item(d) for d in items if isinstance(d, dict)]
+
+    @override
+    def add_symbol(self, symbol: str) -> SymbolMutationResult:
+        return SymbolMutationResult(symbol=symbol, status="added")
+
+    @override
+    def remove_symbol(self, symbol: str) -> SymbolMutationResult:
+        return SymbolMutationResult(symbol=symbol, status="removed")
 
     @override
     def close(self) -> None:
