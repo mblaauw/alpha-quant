@@ -40,8 +40,6 @@ services:
       ALPHA_LAKE_API_KEY: "${ALPHA_LAKE_API_KEY:-}"
       ALPHA_QUANT_DASHBOARD__HOST: 0.0.0.0
       ALPHA_QUANT_DASHBOARD__PORT: 8501
-    volumes:
-      - alpha-quant-data:/app/data
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -65,4 +63,3 @@ services:
 volumes:
   alpha_quant_pgdata:
     name: alpha_quant_pgdata
-  alpha-quant-data:
