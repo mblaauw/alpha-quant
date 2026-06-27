@@ -30,8 +30,8 @@ class LakeConfig(FrozenModel):
     @field_validator("mode")
     @classmethod
     def _mode_valid(cls, v: str) -> str:
-        if v not in ("in_process", "rest", "fixture"):
-            raise ValueError("mode must be 'in_process', 'rest', or 'fixture'")
+        if v not in ("rest", "fixture"):
+            raise ValueError("mode must be 'rest' or 'fixture'")
         return v
 
 
@@ -72,7 +72,7 @@ class AppConfig(BaseSettings):
 
         _logging.warning(
             "Config version %d detected. Current version is 1. "
-            "Run `alpha-quant status --show-config` to review current config fields.",
+            "Run `alpha-quant --help` to see available CLI commands.",
             v,
         )
 

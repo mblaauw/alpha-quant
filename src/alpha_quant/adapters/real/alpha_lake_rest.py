@@ -1,34 +1,21 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
-from typing import Any, override
+from datetime import UTC, datetime
+from typing import override
 
 import httpx
 
 from alpha_quant.adapters._parse import (
-    parse_bar_obs,
-    parse_earnings_obs,
     parse_facts_bundle,
-    parse_fundamental_obs,
-    parse_insider_obs,
-    parse_mention_obs,
     parse_symbol_mutation_result,
-    parse_symbol_observations,
     parse_symbol_registry_item,
 )
 from alpha_quant.contracts.alpha_lake import (
     AlphaLakeContract,
     AlphaLakeHealth,
-    DecisionPanel,
     FactsBundle,
-    MarketObservations,
-    NeutralObservations,
     SymbolMutationResult,
-    SymbolObservations,
-    SymbolPanel,
     SymbolRegistryItem,
-    UniverseMember,
-    UniverseSnapshot,
 )
 from alpha_quant.ports.alpha_lake import AlphaLakeReadPort
 
@@ -72,51 +59,6 @@ class AlphaLakeRestClient(AlphaLakeReadPort):
         )
 
     @override
-    def read_universe(self, as_of: date | None = None) -> UniverseSnapshot:
-        params: dict[str, str] = {}
-        if as_of:
-            params["as_of"] = as_of.isoformat()
-        resp = self._client.get(
-            f"{self._base_url}/v1/universe",
-            headers=self._headers,
-            params=params,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return UniverseSnapshot(
-            as_of=as_of,
-            members=[UniverseMember(**m) for m in data.get("members", [])],
-        )
-
-    @override
-    def read_decision_panel(
-        self,
-        symbols: list[str],
-        as_of: datetime,
-        snapshot_id: str | None = None,
-    ) -> DecisionPanel:
-        return _legacy_panel(self._fetch_panel_data, symbols, as_of, snapshot_id)
-
-    @override
-    def read_replay_panel(
-        self,
-        symbols: list[str],
-        as_of: datetime,
-        snapshot_id: str,
-    ) -> DecisionPanel:
-        return _legacy_panel(self._fetch_panel_data, symbols, as_of, snapshot_id)
-
-    @override
-    def read_observations(
-        self,
-        symbols: list[str],
-        as_of: datetime,
-        snapshot_id: str | None = None,
-    ) -> NeutralObservations:
-        data = self._fetch_panel_data(symbols, as_of, snapshot_id)
-        return _build_neutral_observations(data, symbols, as_of, snapshot_id)
-
-    @override
     def get_freshness(self, symbols: list[str]) -> dict[str, datetime]:
         try:
             resp = self._client.get(
@@ -147,9 +89,7 @@ class AlphaLakeRestClient(AlphaLakeReadPort):
         readout_ids: list[str] | None = None,
         metric_ids: list[str] | None = None,
     ) -> FactsBundle:
-        params: dict[str, str] = {
-            "as_of": as_of.isoformat(),
-        }
+        params: dict[str, str] = {"as_of": as_of.isoformat()}
         if snapshot_id:
             params["snapshot_id"] = snapshot_id
         if categories:
@@ -165,38 +105,6 @@ class AlphaLakeRestClient(AlphaLakeReadPort):
         )
         resp.raise_for_status()
         return parse_facts_bundle(resp.json())
-
-    @override
-    def read_facts_bundle_batch(
-        self,
-        symbols: list[str],
-        as_of: datetime,
-        snapshot_id: str | None = None,
-        *,
-        categories: list[str] | None = None,
-        readout_ids: list[str] | None = None,
-        metric_ids: list[str] | None = None,
-    ) -> dict[str, FactsBundle]:
-        body: dict[str, Any] = {
-            "symbols": symbols,
-            "as_of": as_of.isoformat(),
-        }
-        if snapshot_id:
-            body["snapshot_id"] = snapshot_id
-        if categories:
-            body["categories"] = categories
-        if readout_ids:
-            body["readout_ids"] = readout_ids
-        if metric_ids:
-            body["metric_ids"] = metric_ids
-        resp = self._client.post(
-            f"{self._base_url}/v1/facts-bundle/batch",
-            headers={**self._headers, "Content-Type": "application/json"},
-            json=body,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return {sym: parse_facts_bundle(b) for sym, b in data.items()}
 
     @override
     def list_symbols(self, active_only: bool = True) -> list[SymbolRegistryItem]:
@@ -231,107 +139,3 @@ class AlphaLakeRestClient(AlphaLakeReadPort):
     @override
     def close(self) -> None:
         self._client.close()
-
-    def _fetch_panel_data(
-        self,
-        symbols: list[str],
-        as_of: datetime,
-        snapshot_id: str | None = None,
-    ) -> dict[str, Any]:
-        params: dict[str, str] = {
-            "symbols": ",".join(symbols),
-            "as_of": as_of.isoformat(),
-        }
-        if snapshot_id:
-            params["snapshot_id"] = snapshot_id
-        resp = self._client.get(
-            f"{self._base_url}/v1/decision-panel",
-            headers=self._headers,
-            params=params,
-        )
-        resp.raise_for_status()
-        return resp.json()
-
-
-def _legacy_panel(
-    fetcher: Any,
-    symbols: list[str],
-    as_of: datetime,
-    snapshot_id: str | None = None,
-) -> DecisionPanel:
-    data = fetcher(symbols, as_of, snapshot_id)
-    panels: dict[str, SymbolPanel] = {}
-    for symbol, raw in data.get("panels", {}).items():
-        bars = [parse_bar_obs(b) for b in raw.get("bars", [])]
-        indicators = _legacy_parse_indicators(raw.get("indicators", {}))
-        fundamentals = [parse_fundamental_obs(m) for m in raw.get("fundamentals", [])]
-        insider = [parse_insider_obs(t) for t in raw.get("insider_transactions", [])]
-        earnings = [parse_earnings_obs(e) for e in raw.get("earnings_events", [])]
-        mentions = [parse_mention_obs(m) for m in raw.get("attention_mentions", [])]
-        panels[symbol] = SymbolPanel(
-            symbol=symbol,
-            bars=bars,
-            indicators=indicators,
-            fundamentals=fundamentals,
-            insider_transactions=insider,
-            earnings_events=earnings,
-            attention_mentions=mentions,
-        )
-    return DecisionPanel(
-        as_of=as_of,
-        snapshot_id=snapshot_id,
-        symbols=symbols,
-        panels=panels,
-    )
-
-
-def _build_neutral_observations(
-    data: dict[str, Any],
-    symbols: list[str],
-    as_of: datetime,
-    snapshot_id: str | None = None,
-) -> NeutralObservations:
-    per_symbol: dict[str, SymbolObservations] = {}
-    for symbol, raw in data.get("panels", {}).items():
-        per_symbol[symbol] = parse_symbol_observations(symbol, raw)
-
-    spy_obs = per_symbol.get("SPY")
-    return NeutralObservations(
-        as_of=as_of,
-        snapshot_id=snapshot_id,
-        symbols=symbols,
-        per_symbol=per_symbol,
-        market=MarketObservations.from_symbol_observations(spy_obs),
-    )
-
-
-def _legacy_parse_indicators(raw: dict[str, list[Any]]) -> dict[str, list[float | None]]:
-    skip_keys = {
-        "effective_date",
-        "security_id",
-        "open",
-        "high",
-        "low",
-        "close",
-        "volume",
-        "source_id",
-        "available_at",
-        "ingested_at",
-        "source_published_at",
-        "validated_at",
-        "source_fetch_id",
-        "raw_payload_hash",
-        "ingestion_run_id",
-        "content_hash",
-        "version_hash",
-        "quality_status",
-        "normalization_version",
-        "schema_version",
-        "parser_version",
-    }
-    result: dict[str, list[float | None]] = {}
-    for key, values in raw.items():
-        if key in skip_keys:
-            continue
-        result[key] = [float(v) if v is not None else None for v in values]
-    return result

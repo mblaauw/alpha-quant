@@ -7,13 +7,8 @@
 # Example:
 #
 # [lake]
-# mode = "in_process"
-# config_path = "../alpha-lake/config/stack.toml"
-# snapshot_id = ""  # pin for reproducible replay/backtest reads
-#
-# [alpaca]
-# api_key = "your-alpaca-api-key"
-# secret_key = "your-alpaca-secret-key"
+# mode = "rest"
+# base_url = "http://localhost:8000"
 #
 # [llm]
 # api_key = "your-openrouter-or-openai-key"

@@ -4,8 +4,6 @@ from datetime import date, datetime
 from typing import Any
 
 from alpha_quant.contracts.alpha_lake import (
-    INDICATOR_FIELD_MAP,
-    BarObservation,
     EarningsEvent,
     FactsBundle,
     FactsBundleMetadata,
@@ -13,14 +11,11 @@ from alpha_quant.contracts.alpha_lake import (
     FundamentalMetric,
     InsiderTransaction,
     MentionObservation,
-    PriceObservation,
     ReadoutDefinition,
     ReadoutItem,
     ReadoutObservation,
     SymbolMutationResult,
-    SymbolObservations,
     SymbolRegistryItem,
-    TechnicalObservations,
 )
 
 
@@ -38,88 +33,6 @@ def opt_float(raw: Any) -> float | None:
     if raw is None:
         return None
     return float(raw)
-
-
-def parse_bar_obs(row: dict[str, Any]) -> BarObservation:
-    return BarObservation(
-        effective_date=parse_date(row.get("effective_date") or row.get("date")),
-        open=float(row.get("open", 0.0)),
-        high=float(row.get("high", 0.0)),
-        low=float(row.get("low", 0.0)),
-        close=float(row.get("close", 0.0)),
-        volume=float(row.get("volume", 0.0)),
-        adj_close=opt_float(row.get("adj_close") or row.get("adjusted_close")),
-    )
-
-
-def parse_price_observation(
-    bars: list[BarObservation],
-    tech: TechnicalObservations | None,
-) -> PriceObservation | None:
-    if not bars:
-        return None
-    last = bars[-1]
-    prev_close = bars[-2].close if len(bars) >= 2 else None
-    return PriceObservation(
-        latest_close=last.close,
-        latest_volume=last.volume,
-        previous_close=prev_close,
-        daily_high=last.high,
-        daily_low=last.low,
-        daily_open=last.open,
-    )
-
-
-def parse_technical_observations(raw: dict[str, list[Any]]) -> TechnicalObservations | None:
-    technical = TechnicalObservations()
-    has_data = False
-    additional: dict[str, float | None] = {}
-
-    skip_keys = {
-        "effective_date",
-        "security_id",
-        "open",
-        "high",
-        "low",
-        "close",
-        "volume",
-        "source_id",
-        "available_at",
-        "ingested_at",
-        "source_published_at",
-        "validated_at",
-        "source_fetch_id",
-        "raw_payload_hash",
-        "ingestion_run_id",
-        "content_hash",
-        "version_hash",
-        "quality_status",
-        "normalization_version",
-        "schema_version",
-        "parser_version",
-    }
-    for key, values in raw.items():
-        if key in skip_keys:
-            continue
-        latest_val = None
-        if values and len(values) > 0:
-            raw_v = values[-1]
-            latest_val = float(raw_v) if raw_v is not None else None
-
-        field = INDICATOR_FIELD_MAP.get(key)
-        if field and latest_val is not None:
-            setattr(technical, field, latest_val)
-            has_data = True
-        elif latest_val is not None:
-            additional[key] = latest_val
-            has_data = True
-
-    if not has_data:
-        return None
-
-    if additional:
-        object.__setattr__(technical, "additional", additional)
-    return technical
 
 
 def parse_fundamental_obs(row: dict[str, Any]) -> FundamentalMetric:
@@ -204,7 +117,6 @@ def parse_facts_bundle_metadata(raw: dict[str, Any]) -> FactsBundleMetadata:
 
 
 def _resolve_readouts(raw: dict[str, Any]) -> list[dict[str, Any]]:
-    """Handle both list and dict formats for readouts section."""
     readouts_raw = raw.get("readouts", [])
     if isinstance(readouts_raw, dict):
         return readouts_raw.get("readouts", readouts_raw.get("items", []))
@@ -212,7 +124,6 @@ def _resolve_readouts(raw: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _resolve_price_as_readouts(raw: dict[str, Any]) -> list[ReadoutItem]:
-    """Convert price section into synthetic readout items (price.last, price.volume, etc.)."""
     price = raw.get("price", {})
     if not isinstance(price, dict):
         return []
@@ -297,26 +208,4 @@ def parse_symbol_mutation_result(raw: dict[str, Any]) -> SymbolMutationResult:
     return SymbolMutationResult(
         symbol=str(raw.get("symbol", "")),
         status=str(raw.get("status", "")),
-    )
-
-
-def parse_symbol_observations(symbol: str, raw: dict[str, Any]) -> SymbolObservations:
-    bars = [parse_bar_obs(b) for b in raw.get("bars", [])]
-    tech = parse_technical_observations(raw.get("indicators", {}))
-    price = parse_price_observation(bars, tech)
-
-    fundamentals = [parse_fundamental_obs(m) for m in raw.get("fundamentals", [])]
-    insider = [parse_insider_obs(t) for t in raw.get("insider_transactions", [])]
-    earnings = [parse_earnings_obs(e) for e in raw.get("earnings_events", [])]
-    mentions = [parse_mention_obs(m) for m in raw.get("attention_mentions", [])]
-
-    return SymbolObservations(
-        symbol=symbol,
-        price=price,
-        technical=tech,
-        fundamentals=fundamentals,
-        insider_transactions=insider,
-        earnings_events=earnings,
-        attention_mentions=mentions,
-        bars=bars,
     )
