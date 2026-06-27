@@ -229,6 +229,73 @@ def backtest_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | Non
         return CommandStatus.SUCCEEDED, str(run.decision_run_id), None
 
 
+def lake_symbol_add_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | None]:
+    import json
+
+    from alpha_quant.application.config import load_config
+    from alpha_quant.application.factory import create_alpha_lake_reader
+
+    payload: dict = json.loads(cmd.payload_json) if cmd.payload_json else {}
+    symbol: str | None = payload.get("symbol")
+    if not symbol:
+        return CommandStatus.FAILED, None, "Missing symbol in payload"
+
+    config = load_config()
+    lake = create_alpha_lake_reader(config)
+    try:
+        result = lake.add_symbol(symbol)
+        lake.close()
+        return CommandStatus.SUCCEEDED, result.status, None
+    except Exception as e:
+        lake.close()
+        return CommandStatus.FAILED, None, f"Alpha-Lake add failed: {e}"
+
+
+def lake_symbol_remove_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | None]:
+    import json
+
+    from alpha_quant.application.config import load_config
+    from alpha_quant.application.factory import create_alpha_lake_reader
+
+    payload: dict = json.loads(cmd.payload_json) if cmd.payload_json else {}
+    symbol: str | None = payload.get("symbol")
+    if not symbol:
+        return CommandStatus.FAILED, None, "Missing symbol in payload"
+
+    config = load_config()
+    lake = create_alpha_lake_reader(config)
+    try:
+        result = lake.remove_symbol(symbol)
+        lake.close()
+        return CommandStatus.SUCCEEDED, result.status, None
+    except Exception as e:
+        lake.close()
+        return CommandStatus.FAILED, None, f"Alpha-Lake remove failed: {e}"
+
+
+def lake_symbol_refresh_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | None]:
+    import json
+    from datetime import datetime
+
+    from alpha_quant.application.config import load_config
+    from alpha_quant.application.factory import create_alpha_lake_reader
+
+    payload: dict = json.loads(cmd.payload_json) if cmd.payload_json else {}
+    symbol: str | None = payload.get("symbol")
+    if not symbol:
+        return CommandStatus.FAILED, None, "Missing symbol in payload"
+
+    config = load_config()
+    lake = create_alpha_lake_reader(config)
+    try:
+        lake.read_facts_bundle(symbol, datetime.now())
+        lake.close()
+        return CommandStatus.SUCCEEDED, symbol, None
+    except Exception as e:
+        lake.close()
+        return CommandStatus.FAILED, None, f"Alpha-Lake refresh failed: {e}"
+
+
 HANDLERS: dict[str, CommandHandler] = {
     "decision_run.create": run_decision_handler,
     "halt.create": create_halt_handler,
@@ -240,6 +307,9 @@ HANDLERS: dict[str, CommandHandler] = {
     "position.flatten": flatten_position_handler,
     "position.set_stop": set_stop_handler,
     "backtest.create": backtest_handler,
+    "lake_symbol.add": lake_symbol_add_handler,
+    "lake_symbol.remove": lake_symbol_remove_handler,
+    "lake_symbol.refresh": lake_symbol_refresh_handler,
 }
 
 
