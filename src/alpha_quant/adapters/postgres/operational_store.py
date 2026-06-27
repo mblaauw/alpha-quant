@@ -31,6 +31,12 @@ from alpha_quant.contracts.operational import (
     RunStatus,
     Strategy,
 )
+from alpha_quant.domain.advice import AdviceArtifact, OperatorOverride
+from alpha_quant.domain.scorecard import (
+    Recommendation,
+    Scorecard,
+    ScorecardComponent,
+)
 
 
 class PostgresOperationalStore:
@@ -421,6 +427,261 @@ class PostgresOperationalStore:
                 """
             ),
             {"bid": str(book_id), "now": datetime.now(UTC)},
+        )
+
+    # --- Scorecards ---
+
+    def save_scorecard(self, scorecard: Scorecard, decision_run_id: str) -> str:
+
+        now = datetime.now(UTC)
+        scorecard_id = str(uuid4())
+
+        self.session.execute(
+            text("""
+                INSERT INTO run.scorecard
+                    (scorecard_id, decision_run_id, portfolio_book_id,
+                     symbol, security_id, as_of, snapshot_id,
+                     facts_hash, config_hash, strategy_version,
+                     recommendation, confidence, total_score, data_quality, created_at)
+                VALUES
+                    (:sid, :rid, :pbid,
+                     :sym, :secid, :ao, :snap,
+                     :fh, :ch, :sv,
+                     :rec, :conf, :ts, :dq, :now)
+            """),
+            {
+                "sid": scorecard_id,
+                "rid": decision_run_id,
+                "pbid": scorecard.portfolio_book_id or "",
+                "sym": scorecard.symbol,
+                "secid": scorecard.security_id or scorecard.symbol,
+                "ao": scorecard.as_of or now,
+                "snap": scorecard.snapshot_id,
+                "fh": scorecard.facts_hash or "",
+                "ch": scorecard.config_hash or "",
+                "sv": scorecard.strategy_version or "",
+                "rec": scorecard.recommendation.value
+                if scorecard.recommendation
+                else Recommendation.do_nothing.value,
+                "conf": str(scorecard.confidence),
+                "ts": str(scorecard.total_score),
+                "dq": scorecard.data_quality.value if scorecard.data_quality else "pass",
+                "now": now,
+            },
+        )
+
+        for comp in scorecard.components:
+            self.session.execute(
+                text("""
+                    INSERT INTO run.scorecard_component
+                        (component_id, scorecard_id, name, category,
+                         score, state, weight, passed, reason, details_json)
+                    VALUES
+                        (:cid, :sid, :n, :cat,
+                         :sc, :st, :w, :p, :r, :dj)
+                """),
+                {
+                    "cid": str(uuid4()),
+                    "sid": scorecard_id,
+                    "n": comp.name,
+                    "cat": comp.category,
+                    "sc": str(comp.score),
+                    "st": comp.state.value if comp.state else "pass",
+                    "w": str(comp.weight),
+                    "p": comp.passed,
+                    "r": comp.reason,
+                    "dj": comp.details_json or "{}",
+                },
+            )
+
+        return scorecard_id
+
+    def load_scorecard(self, scorecard_id: str) -> Scorecard | None:
+        row = self.session.execute(
+            text("""
+                SELECT scorecard_id, decision_run_id, portfolio_book_id,
+                       symbol, security_id, as_of, snapshot_id,
+                       facts_hash, config_hash, strategy_version,
+                       recommendation, confidence, total_score, data_quality, created_at
+                FROM run.scorecard WHERE scorecard_id = :sid
+            """),
+            {"sid": scorecard_id},
+        ).fetchone()
+        if row is None:
+            return None
+        return _row_to_scorecard(row, self.session)
+
+    def load_scorecards_for_run(self, run_id: str) -> list[Scorecard]:
+        rows = self.session.execute(
+            text("""
+                SELECT scorecard_id, decision_run_id, portfolio_book_id,
+                       symbol, security_id, as_of, snapshot_id,
+                       facts_hash, config_hash, strategy_version,
+                       recommendation, confidence, total_score, data_quality, created_at
+                FROM run.scorecard WHERE decision_run_id = :rid
+                ORDER BY total_score DESC
+            """),
+            {"rid": run_id},
+        ).fetchall()
+        return [_row_to_scorecard(r, self.session) for r in rows]
+
+    # --- Advice ---
+
+    def save_advice_artifact(self, advice: AdviceArtifact) -> str:
+        import json
+
+        now = datetime.now(UTC)
+        advice_id = str(uuid4())
+        rec = advice.recommendation
+
+        self.session.execute(
+            text("""
+                INSERT INTO run.advice_artifact
+                    (advice_id, scorecard_id,
+                     llm_provider, llm_model, prompt_version,
+                     input_hash, output_hash, validation_status,
+                     recommendation, headline, summary,
+                     rationale_json, risks_json,
+                     deterministic_differs, created_at)
+                VALUES
+                    (:aid, :sid,
+                     :lp, :lm, :pv,
+                     :ih, :oh, :vs,
+                     :rec, :hl, :sum,
+                     :rj, :rkj,
+                     :dd, :now)
+            """),
+            {
+                "aid": advice_id,
+                "sid": advice.scorecard_id,
+                "lp": advice.llm_provider,
+                "lm": advice.llm_model,
+                "pv": advice.prompt_version,
+                "ih": advice.input_hash,
+                "oh": advice.output_hash,
+                "vs": advice.validation_status,
+                "rec": rec.recommendation.value if rec else Recommendation.do_nothing.value,
+                "hl": rec.headline if rec else "",
+                "sum": rec.summary if rec else "",
+                "rj": json.dumps(rec.key_reasons if rec else []),
+                "rkj": json.dumps(rec.main_risks if rec else []),
+                "dd": advice.deterministic_differs,
+                "now": now,
+            },
+        )
+        return advice_id
+
+    # --- Operator Overrides ---
+
+    def save_operator_override(self, override: OperatorOverride) -> str:
+        now = datetime.now(UTC)
+        override_id = str(uuid4())
+
+        self.session.execute(
+            text("""
+                INSERT INTO audit.operator_override
+                    (override_id, scorecard_id, command_id, actor_id,
+                     original_recommendation, original_confidence,
+                     override_action, modified_recommendation, reason, created_at)
+                VALUES
+                    (:oid, :sid, :cid, :aid,
+                     :or, :oc,
+                     :oa, :mr, :rea, :now)
+            """),
+            {
+                "oid": override_id,
+                "sid": override.scorecard_id,
+                "cid": override.command_id,
+                "aid": override.actor_id,
+                "or": override.original_recommendation.value,
+                "oc": str(override.original_confidence),
+                "oa": override.override_action.value,
+                "mr": override.modified_recommendation.value
+                if override.modified_recommendation
+                else None,
+                "rea": override.reason,
+                "now": now,
+            },
+        )
+        return override_id
+
+    # --- Risk Methods ---
+
+    def list_risk_methods(self) -> list[dict[str, Any]]:
+        rows = self.session.execute(
+            text("""
+                SELECT risk_method_id, name, description, method_type,
+                       default_params_json, is_active
+                FROM core.risk_method ORDER BY name
+            """),
+        ).fetchall()
+        return [
+            {
+                "risk_method_id": r._mapping["risk_method_id"],
+                "name": r._mapping["name"],
+                "description": r._mapping["description"],
+                "method_type": r._mapping["method_type"],
+                "default_params_json": r._mapping["default_params_json"],
+                "is_active": r._mapping["is_active"],
+            }
+            for r in rows
+        ]
+
+    def set_book_risk_profile(self, book_id: UUID, risk_method_id: str, params_json: str) -> None:
+        self.session.execute(
+            text("""
+                INSERT INTO core.book_risk_profile
+                    (book_id, risk_method_id, params_json, updated_at)
+                VALUES (:bid, :rmid, :pj, :now)
+                ON CONFLICT (book_id) DO UPDATE SET
+                    risk_method_id = :rmid2, params_json = :pj2, updated_at = :now
+            """),
+            {
+                "bid": str(book_id),
+                "rmid": risk_method_id,
+                "rmid2": risk_method_id,
+                "pj": params_json,
+                "pj2": params_json,
+                "now": datetime.now(UTC),
+            },
+        )
+
+    def update_position_risk(
+        self,
+        book_id: UUID,
+        security_id: str,
+        stop_price: float | None = None,
+        trail_price: float | None = None,
+        risk_method_id: str | None = None,
+        auto_trail_enabled: bool | None = None,
+    ) -> None:
+        self.session.execute(
+            text("""
+                INSERT INTO projection.position_risk_current
+                    (book_id, security_id, stop_price, trail_price,
+                     risk_method_id, auto_trail_enabled, last_adjusted_at)
+                VALUES (:bid, :sid, :sp, :tp, :rmid, :ate, :now)
+                ON CONFLICT (book_id, security_id) DO UPDATE SET
+                    stop_price = COALESCE(:sp2, position_risk_current.stop_price),
+                    trail_price = COALESCE(:tp2, position_risk_current.trail_price),
+                    risk_method_id = COALESCE(:rmid2, position_risk_current.risk_method_id),
+                    auto_trail_enabled = COALESCE(:ate2, position_risk_current.auto_trail_enabled),
+                    last_adjusted_at = :now2
+            """),
+            {
+                "bid": str(book_id),
+                "sid": security_id,
+                "sp": str(stop_price) if stop_price is not None else None,
+                "tp": str(trail_price) if trail_price is not None else None,
+                "rmid": risk_method_id,
+                "ate": auto_trail_enabled if auto_trail_enabled is not None else True,
+                "now": datetime.now(UTC),
+                "sp2": str(stop_price) if stop_price is not None else None,
+                "tp2": str(trail_price) if trail_price is not None else None,
+                "rmid2": risk_method_id,
+                "ate2": auto_trail_enabled,
+                "now2": datetime.now(UTC),
+            },
         )
 
     # --- Queries ---
@@ -920,3 +1181,49 @@ class PostgresOperationalStore:
             completed_at=r._mapping.get("completed_at"),
             failure_reason=r._mapping.get("failure_reason"),
         )
+
+
+def _row_to_scorecard(row: Any, session: Session) -> Scorecard:
+    comp_rows = session.execute(
+        text("""
+            SELECT component_id, scorecard_id, name, category,
+                   score, state, weight, passed, reason, details_json
+            FROM run.scorecard_component
+            WHERE scorecard_id = :sid
+            ORDER BY name
+        """),
+        {"sid": row._mapping["scorecard_id"]},
+    ).fetchall()
+
+    components = [
+        ScorecardComponent(
+            name=r._mapping["name"],
+            category=r._mapping["category"],
+            score=float(r._mapping["score"]),
+            state=r._mapping["state"],
+            weight=float(r._mapping["weight"]),
+            passed=r._mapping["passed"],
+            reason=r._mapping["reason"] or "",
+            details_json=r._mapping["details_json"],
+        )
+        for r in comp_rows
+    ]
+
+    return Scorecard(
+        scorecard_id=row._mapping["scorecard_id"],
+        decision_run_id=row._mapping["decision_run_id"],
+        portfolio_book_id=row._mapping["portfolio_book_id"],
+        symbol=row._mapping["symbol"],
+        security_id=row._mapping["security_id"],
+        as_of=row._mapping["as_of"],
+        snapshot_id=row._mapping.get("snapshot_id"),
+        facts_hash=row._mapping["facts_hash"],
+        config_hash=row._mapping["config_hash"],
+        strategy_version=row._mapping["strategy_version"],
+        recommendation=row._mapping["recommendation"],
+        confidence=float(row._mapping["confidence"]),
+        total_score=float(row._mapping["total_score"]),
+        data_quality=row._mapping["data_quality"],
+        components=components,
+        created_at=row._mapping["created_at"],
+    )
