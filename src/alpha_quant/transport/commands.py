@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException
@@ -35,7 +36,7 @@ async def post_command(
         book_id=UUID(req.book_id) if req.book_id else None,
         reason=req.reason,
         expected_version=req.expected_version,
-        payload_json=str(req.payload),
+        payload_json=json.dumps(req.payload, default=str),
     )
     cmd = submit_command(envelope)
     return {"command_id": str(cmd.command_id), "status": cmd.status.value}

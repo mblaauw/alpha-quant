@@ -1071,7 +1071,7 @@ class PostgresOperationalStore:
             """),
             {
                 "eid": str(uuid4()),
-                "rid": "",
+                "rid": None,
                 "et": "order.cancelled",
                 "pj": f'{{"order_id": "{order_id}", "reason": "{reason or ""}"}}',
                 "now": datetime.now(UTC),
@@ -1090,6 +1090,13 @@ class PostgresOperationalStore:
     ) -> str:
         from alpha_quant.contracts.operational import OrderStatus
 
+        # Resolve security_id from symbol, defaulting to symbol as fallback
+        sec_row = self.session.execute(
+            text("SELECT security_id FROM core.security_reference WHERE symbol = :sym"),
+            {"sym": symbol},
+        ).fetchone()
+        security_id = str(sec_row._mapping["security_id"]) if sec_row else symbol
+
         order_id = str(uuid4())
         status = OrderStatus.PENDING.value
         self.session.execute(
@@ -1107,7 +1114,7 @@ class PostgresOperationalStore:
                 "oid": order_id,
                 "rid": decision_id or "",
                 "pbid": str(book_id),
-                "sid": symbol,
+                "sid": security_id,
                 "sym": symbol,
                 "sd": side,
                 "qty": str(quantity),

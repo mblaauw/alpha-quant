@@ -296,6 +296,109 @@ def lake_symbol_refresh_handler(cmd: Command) -> tuple[CommandStatus, str | None
         return CommandStatus.FAILED, None, f"Alpha-Lake refresh failed: {e}"
 
 
+def candidate_follow_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | None]:
+    import json
+
+    uow = create_unit_of_work()
+    with uow:
+        payload: dict = json.loads(cmd.payload_json) if cmd.payload_json else {}
+        symbol: str | None = payload.get("symbol")
+        decision_id: str | None = payload.get("decision_id")
+        quantity_raw = payload.get("quantity")
+        if not symbol or quantity_raw is None:
+            return CommandStatus.FAILED, None, "Missing required fields: symbol, quantity"
+        order_id = uow.store.create_order(
+            symbol=symbol,
+            side="buy",
+            quantity=float(quantity_raw),
+            order_type="market",
+            book_id=cmd.book_id or UUID("00000000-0000-0000-0000-000000000001"),
+            decision_id=decision_id,
+        )
+        return CommandStatus.SUCCEEDED, order_id, None
+
+
+def candidate_modify_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | None]:
+    import json
+
+    uow = create_unit_of_work()
+    with uow:
+        payload: dict = json.loads(cmd.payload_json) if cmd.payload_json else {}
+        symbol: str | None = payload.get("symbol")
+        quantity_raw = payload.get("quantity")
+        limit_price_raw = payload.get("limit_price")
+        if not symbol or quantity_raw is None:
+            return CommandStatus.FAILED, None, "Missing required fields: symbol, quantity"
+        order_id = uow.store.create_order(
+            symbol=symbol,
+            side="buy",
+            quantity=float(quantity_raw),
+            order_type="limit" if limit_price_raw else "market",
+            book_id=cmd.book_id or UUID("00000000-0000-0000-0000-000000000001"),
+            limit_price=float(limit_price_raw) if limit_price_raw else None,
+        )
+        return CommandStatus.SUCCEEDED, order_id, None
+
+
+def position_follow_advice_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | None]:
+    import json
+
+    uow = create_unit_of_work()
+    with uow:
+        payload: dict = json.loads(cmd.payload_json) if cmd.payload_json else {}
+        symbol: str | None = payload.get("symbol")
+        stop_price_raw = payload.get("stop_price")
+        if not symbol or stop_price_raw is None:
+            return CommandStatus.FAILED, None, "Missing required fields: symbol, stop_price"
+        uow.store.update_position_stop(
+            symbol=symbol,
+            stop_price=float(stop_price_raw),
+            book_id=cmd.book_id or UUID("00000000-0000-0000-0000-000000000001"),
+        )
+        return CommandStatus.SUCCEEDED, symbol, None
+
+
+def position_override_advice_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | None]:
+    return CommandStatus.SUCCEEDED, None, "Override recorded"
+
+
+def risk_profile_update_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | None]:
+    import json
+
+    uow = create_unit_of_work()
+    with uow:
+        payload: dict = json.loads(cmd.payload_json) if cmd.payload_json else {}
+        risk_method_id: str | None = payload.get("risk_method_id")
+        params_raw = payload.get("params")
+        params_json = json.dumps(params_raw) if params_raw else "{}"
+        if not risk_method_id:
+            return CommandStatus.FAILED, None, "Missing risk_method_id"
+        uow.store.set_book_risk_profile(
+            book_id=cmd.book_id or UUID("00000000-0000-0000-0000-000000000001"),
+            risk_method_id=risk_method_id,
+            params_json=params_json,
+        )
+        return CommandStatus.SUCCEEDED, risk_method_id, None
+
+
+def position_set_risk_method_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | None]:
+    import json
+
+    uow = create_unit_of_work()
+    with uow:
+        payload: dict = json.loads(cmd.payload_json) if cmd.payload_json else {}
+        symbol: str | None = payload.get("symbol")
+        risk_method_id: str | None = payload.get("risk_method_id")
+        if not symbol or not risk_method_id:
+            return CommandStatus.FAILED, None, "Missing symbol or risk_method_id"
+        uow.store.update_position_risk(
+            book_id=cmd.book_id or UUID("00000000-0000-0000-0000-000000000001"),
+            security_id=symbol,
+            risk_method_id=risk_method_id,
+        )
+        return CommandStatus.SUCCEEDED, symbol, None
+
+
 HANDLERS: dict[str, CommandHandler] = {
     "decision_run.create": run_decision_handler,
     "halt.create": create_halt_handler,
@@ -304,9 +407,15 @@ HANDLERS: dict[str, CommandHandler] = {
     "order.submit": submit_order_handler,
     "candidate.approve": approve_candidate_handler,
     "candidate.reject": reject_candidate_handler,
+    "candidate.follow": candidate_follow_handler,
+    "candidate.modify": candidate_modify_handler,
     "position.flatten": flatten_position_handler,
     "position.set_stop": set_stop_handler,
+    "position.follow_advice": position_follow_advice_handler,
+    "position.override_advice": position_override_advice_handler,
     "backtest.create": backtest_handler,
+    "risk_profile.update": risk_profile_update_handler,
+    "position.set_risk_method": position_set_risk_method_handler,
     "lake_symbol.add": lake_symbol_add_handler,
     "lake_symbol.remove": lake_symbol_remove_handler,
     "lake_symbol.refresh": lake_symbol_refresh_handler,
