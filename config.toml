@@ -1,39 +1,12 @@
-[bootstrap]
-symbols = ["NVDA", "MSFT", "GOOGL", "ASML", "QBTS", "RGTI", "IONQ"]
-history_years = 3
-include_benchmarks = ["SPY", "^VIX"]
-
 [data]
-indicator_state = true
-staleness_halt_hours = 30
+mode = "fixture"
 fixture_version = "v1"
 
 [lake]
 mode = "fixture"
-config_path = "../alpha-lake/config/stack.toml"
 base_url = "http://localhost:8000"
 api_key_env = "ALPHA_LAKE_API_KEY"
-snapshot_id = ""
-price_mode = "split_adjusted"
-max_lookback_days = 1095
 fixture_version = "v1"
-
-[universe]
-min_price = 5.0
-min_adv_usd = 5_000_000
-index_base = "sp500_plus_midcap400"
-
-[portfolio]
-max_positions = 8
-max_position_pct = 0.15
-max_gross_exposure = 0.80
-risk_per_trade_pct = 0.01
-max_sector_positions = 2
-
-[paper]
-starting_equity = 100000
-slippage_bps = 5
-spread_model = "half_spread_estimate"
 
 [risk]
 stop_atr_mult = 2.0
@@ -43,19 +16,11 @@ time_stop_days = 30
 dd_ladder = [[0.10, 0.5], [0.15, 0.0]]
 daily_loss_halt_pct = 0.03
 
-[shadow]
-books = ["RULES_ONLY", "NO_INSIDER", "NO_CROWDING_VETO"]
-
 [llm]
 provider = "openrouter"
 model = "anthropic/claude-sonnet-4"
 base_url = ""
 timeout_s = 30
-
-[dashboard]
-host = "localhost"
-port = 8501
-refresh_seconds = 60
 
 [freshness]
 sla_minutes = 120

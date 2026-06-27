@@ -36,10 +36,7 @@ def _freshness_service() -> FreshnessService:  # noqa: B008
         config = load_config(cfg_path)
     else:
         config = AppConfig(
-            bootstrap={"symbols": ["SPY"], "history_years": 1},
             data={"mode": "fixture"},
-            portfolio={"max_positions": 8, "max_gross_exposure": 0.8, "risk_per_trade_pct": 0.01},
-            paper={"starting_equity": 100_000},
             risk={
                 "stop_atr_mult": 2.0,
                 "trail_after_r": 1.0,
@@ -51,7 +48,6 @@ def _freshness_service() -> FreshnessService:  # noqa: B008
                 "mode": "rest",
                 "base_url": os.environ.get("ALPHA_QUANT_LAKE__BASE_URL", "http://localhost:8000"),
             },
-            dashboard={"host": "localhost", "port": 8501},
             freshness=FreshnessConfig(),
         )
     lake = create_alpha_lake_reader(config)

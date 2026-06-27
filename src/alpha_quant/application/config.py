@@ -9,20 +9,8 @@ from alpha_quant.domain._base import FrozenModel
 from alpha_quant.domain.risk import RiskConfig
 
 
-class BootstrapConfig(FrozenModel):
-    """Configuration for initial data bootstrap (symbol list, history length)."""
-
-    symbols: list[str]
-    history_years: int = Field(default=3, ge=1, le=20)
-    include_benchmarks: list[str] = ["SPY", "^VIX"]
-
-
 class DataConfig(FrozenModel):
-    """Data source configuration — fixture vs live, staleness thresholds."""
-
     mode: str = "fixture"
-    indicator_state: bool = True
-    staleness_halt_hours: int = Field(default=30, ge=1, le=168)
     fixture_version: str = "v1"
 
     @field_validator("mode")
@@ -34,15 +22,9 @@ class DataConfig(FrozenModel):
 
 
 class LakeConfig(FrozenModel):
-    """Alpha-Lake data-plane configuration."""
-
     mode: str = "fixture"
-    config_path: str = "../alpha-lake/config/stack.toml"
     base_url: str = "http://localhost:8000"
     api_key_env: str = "ALPHA_LAKE_API_KEY"
-    snapshot_id: str = ""
-    price_mode: str = "split_adjusted"
-    max_lookback_days: int = Field(default=1095, ge=1, le=3650)
     fixture_version: str = "v1"
 
     @field_validator("mode")
@@ -53,27 +35,6 @@ class LakeConfig(FrozenModel):
         return v
 
 
-class PortfolioConfig(FrozenModel):
-    max_positions: int = Field(default=8, ge=1, le=100)
-    max_position_pct: float = 0.15
-    max_gross_exposure: float = 0.80
-    risk_per_trade_pct: float = 0.01
-    max_sector_positions: int = 2
-
-    @field_validator("max_position_pct", "max_gross_exposure", "risk_per_trade_pct")
-    @classmethod
-    def _pct_range(cls, v: float) -> float:
-        if not 0.0 <= v <= 1.0:
-            raise ValueError("percentage must be between 0.0 and 1.0")
-        return v
-
-
-class PaperConfig(FrozenModel):
-    starting_equity: float = Field(default=100_000.0, ge=1_000, le=100_000_000)
-    slippage_bps: int = Field(default=5, ge=0, le=100)
-    spread_model: str = "half_spread_estimate"
-
-
 class AppLLMConfig(FrozenModel):
     provider: str = "openrouter"
     model: str = "anthropic/claude-sonnet-4"
@@ -82,25 +43,13 @@ class AppLLMConfig(FrozenModel):
     timeout_s: int = Field(default=30, ge=1, le=300)
 
 
-class DashboardConfig(FrozenModel):
-    """Streamlit dashboard configuration — refresh interval, display options."""
-
-    host: str = "localhost"
-    port: int = Field(default=8501, ge=1024, le=65535)
-    refresh_seconds: int = Field(default=60, ge=5, le=3600)
-
-
 class FreshnessConfig(FrozenModel):
-    """Data freshness SLA and gate configuration."""
-
     sla_minutes: int = Field(default=120, ge=1, le=1440)
     critical_minutes: int = Field(default=1440, ge=1, le=43200)
     gate_live_decisions: bool = True
 
 
 class AppConfig(BaseSettings):
-    """Top-level application configuration aggregating all sub-configs."""
-
     model_config = SettingsConfigDict(
         env_prefix="ALPHA_QUANT_",
         env_nested_delimiter="__",
@@ -127,14 +76,10 @@ class AppConfig(BaseSettings):
             v,
         )
 
-    bootstrap: BootstrapConfig
     data: DataConfig
     lake: LakeConfig = LakeConfig()
-    portfolio: PortfolioConfig
-    paper: PaperConfig
     risk: RiskConfig
     llm: AppLLMConfig
-    dashboard: DashboardConfig
     freshness: FreshnessConfig = FreshnessConfig()
 
 
@@ -176,7 +121,6 @@ def load_config(path: str | None = None) -> AppConfig:
         msg = f"Config file not found: {config_path}"
         raise ConfigError(msg, source=config_path) from e
 
-    # Layer local overrides on top if they exist
     local_path = Path(config_path).parent / "config.local.toml"
     if local_path.exists():
         try:
@@ -188,9 +132,6 @@ def load_config(path: str | None = None) -> AppConfig:
             raise ConfigError(msg, source=str(local_path)) from e
 
     try:
-        # Apply env var overrides on top of TOML data.
-        # AppConfig is a BaseSettings, but model_validate(data) skips env vars.
-        # So we merge env var values into the data dict before validation.
         import os as _os
 
         env_lake_mode = _os.environ.get("ALPHA_QUANT_LAKE__MODE")

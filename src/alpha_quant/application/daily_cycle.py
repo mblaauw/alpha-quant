@@ -161,8 +161,6 @@ class DailyCycleService:
                 discovery = ["AAPL", "MSFT", "GOOGL", "NVDA", "AMZN"]
             all_symbols = list(set(symbols_in_portfolio + discovery + ["SPY"]))
 
-            self._alpha_lake.read_observations(all_symbols, as_of=now)
-
             # -- Fetch facts bundles for scoring --
             symbols_to_score = [s for s in all_symbols if s != "SPY"]
             facts_bundles: dict[str, FactsBundle] = {}
