@@ -7,6 +7,7 @@ No route performs direct state mutation.
 from __future__ import annotations
 
 import os
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 
@@ -197,3 +198,115 @@ async def get_system(svc: SystemService = svc_depends(SystemService)):
 @router.get("/freshness")
 async def get_freshness(svc: FreshnessService = Depends(_freshness_service)):
     return svc.summary([])
+
+
+# -- Advice Workflow endpoints --
+
+
+@router.get("/advice/today")
+async def get_today_advice(
+    book_id: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+):
+    from alpha_quant.application.query.scorecards import get_today_advice as _get_today
+
+    bid = UUID(book_id) if book_id else None
+    return {"items": _get_today(book_id=bid, limit=limit)}
+
+
+@router.get("/scorecards")
+async def list_scorecards(
+    run_id: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+):
+    from alpha_quant.application.query.scorecards import list_scorecards as _list
+
+    return {"items": _list(run_id=run_id, limit=limit)}
+
+
+@router.get("/scorecards/{scorecard_id}")
+async def get_scorecard(scorecard_id: str):
+    from fastapi import HTTPException
+
+    from alpha_quant.application.query.scorecards import get_scorecard as _get
+
+    sc = _get(scorecard_id)
+    if sc is None:
+        raise HTTPException(404, "Scorecard not found")
+    return {
+        "scorecard_id": sc.scorecard_id,
+        "symbol": sc.symbol,
+        "recommendation": sc.recommendation.value if sc.recommendation else "",
+        "confidence": sc.confidence,
+        "total_score": sc.total_score,
+        "data_quality": sc.data_quality.value if sc.data_quality else "",
+        "as_of": str(sc.as_of) if sc.as_of else None,
+        "components": [
+            {
+                "name": c.name,
+                "category": c.category,
+                "score": c.score,
+                "state": c.state.value,
+                "weight": c.weight,
+                "passed": c.passed,
+                "reason": c.reason,
+            }
+            for c in sc.components
+        ],
+    }
+
+
+@router.get("/symbols/{symbol}/scorecard")
+async def get_symbol_scorecard(
+    symbol: str,
+    book_id: str | None = Query(None),
+):
+    from alpha_quant.application.query.scorecards import get_position_advice
+
+    bid = UUID(book_id) if book_id else None
+    items = get_position_advice(symbol, book_id=bid, limit=5)
+    return {"items": items}
+
+
+@router.get("/positions/{symbol}/advice")
+async def get_position_advice(
+    symbol: str,
+    book_id: str | None = Query(None),
+):
+    from alpha_quant.application.query.scorecards import get_position_advice as _get_advice
+
+    bid = UUID(book_id) if book_id else None
+    items = _get_advice(symbol, book_id=bid, limit=5)
+    return {"items": items}
+
+
+@router.get("/risk-methods")
+async def list_risk_methods():
+    from alpha_quant.application.factory import create_unit_of_work
+
+    uow = create_unit_of_work()
+    with uow:
+        return {"items": uow.store.list_risk_methods()}
+
+
+@router.get("/lake-symbols")
+async def list_lake_symbols(active_only: bool = Query(True)):
+    import os
+
+    from alpha_quant.application.config import load_config
+    from alpha_quant.application.factory import create_alpha_lake_reader
+
+    cfg_path = os.environ.get("ALPHA_QUANT_CONFIG")
+    config = load_config(cfg_path) if cfg_path else None
+    if config is None:
+        return {"items": []}
+    lake = create_alpha_lake_reader(config)
+    try:
+        symbols = lake.list_symbols(active_only=active_only)
+        return {
+            "items": [
+                {"symbol": s.symbol, "added_at": s.added_at, "active": s.active} for s in symbols
+            ]
+        }
+    finally:
+        lake.close()
