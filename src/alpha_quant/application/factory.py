@@ -6,25 +6,19 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from alpha_quant.adapters.fake.canned_llm import CannedLLM
-from alpha_quant.adapters.fake.fake_event_sink import FakeEventSink
-from alpha_quant.adapters.fake.fixture_store import FixtureStore
 from alpha_quant.adapters.fake.virtual_clock import VirtualClock
 from alpha_quant.adapters.postgres.unit_of_work import OperationalUnitOfWork
 from alpha_quant.adapters.real.clock import SystemClock
-from alpha_quant.adapters.real.event_sink import DuckDBEventSink
 from alpha_quant.adapters.real.llm_adapter import OpenAILikeLLM
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session, sessionmaker
 
 from alpha_quant.application.config import AppConfig, FreshnessConfig
-from alpha_quant.application.store import CanonicalStore
 from alpha_quant.ports.alpha_lake import AlphaLakeReadPort
 from alpha_quant.ports.clock import Clock
-from alpha_quant.ports.event_sink import EventSink
 from alpha_quant.ports.llm import LLM
 from alpha_quant.ports.llm import LLMConfig as PortLLMConfig
-from alpha_quant.ports.store import Store
 
 DEFAULT_DATABASE_URL = (
     os.environ.get("DATABASE_URL")
@@ -52,18 +46,6 @@ def create_alpha_lake_reader(config: AppConfig) -> AlphaLakeReadPort:
         return AlphaLakeHttpFixtureClient(fixture_path)
     msg = f"Unknown lake mode: {config.lake.mode}"
     raise ValueError(msg)
-
-
-def create_event_sink(config: AppConfig) -> EventSink:
-    if config.data.mode == "live":
-        return DuckDBEventSink(db_path=Path("data") / "state.db")
-    return FakeEventSink()
-
-
-def create_store(config: AppConfig) -> Store:
-    if config.data.mode == "live":
-        return CanonicalStore(base_path=Path("data"))
-    return FixtureStore()
 
 
 def create_llm(config: AppConfig) -> LLM:

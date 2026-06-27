@@ -3,21 +3,15 @@ from __future__ import annotations
 import pytest
 
 from alpha_quant.adapters.fake.canned_llm import CannedLLM
-from alpha_quant.adapters.fake.fake_event_sink import FakeEventSink
-from alpha_quant.adapters.fake.fixture_store import FixtureStore
 from alpha_quant.adapters.fake.virtual_clock import VirtualClock
 from alpha_quant.adapters.real.clock import SystemClock
-from alpha_quant.adapters.real.event_sink import DuckDBEventSink
 from alpha_quant.adapters.real.llm_adapter import OpenAILikeLLM
 from alpha_quant.application.config import AppConfig
 from alpha_quant.application.factory import (
     create_alpha_lake_reader,
     create_clock,
-    create_event_sink,
     create_llm,
-    create_store,
 )
-from alpha_quant.application.store import CanonicalStore
 
 
 def _fixture_config() -> AppConfig:
@@ -52,27 +46,6 @@ def _live_config() -> AppConfig:
             "dashboard": {},
         }
     )
-
-
-class TestCreateEventSink:
-    def test_fixture_mode_returns_fake_event_sink(self) -> None:
-        sink = create_event_sink(_fixture_config())
-        assert isinstance(sink, FakeEventSink)
-
-    def test_live_mode_returns_duckdb_event_sink(self) -> None:
-        sink = create_event_sink(_live_config())
-        assert isinstance(sink, DuckDBEventSink)
-        sink.close()
-
-
-class TestCreateStore:
-    def test_fixture_mode_returns_fixture_store(self) -> None:
-        store = create_store(_fixture_config())
-        assert isinstance(store, FixtureStore)
-
-    def test_live_mode_returns_canonical_store(self) -> None:
-        store = create_store(_live_config())
-        assert isinstance(store, CanonicalStore)
 
 
 class TestCreateClock:
