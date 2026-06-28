@@ -21,13 +21,16 @@ def with_uow(query_fn: Callable, database_url: str | None = None) -> Any:
 
 
 def resolve_active_book_id() -> UUID:
-    """Return the first registered book as the active default."""
+    """Return the earliest-registered book as the active default."""
     try:
         from alpha_quant.application.factory import create_unit_of_work
 
         uow = create_unit_of_work()
         with uow:
-            books = uow.store.list_books()
+            books = sorted(
+                uow.store.list_books(),
+                key=lambda b: b.created_at,
+            )
             if books:
                 return books[0].book_id
     except Exception:
