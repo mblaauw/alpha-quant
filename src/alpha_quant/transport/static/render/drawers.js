@@ -3,13 +3,7 @@ import { openDrawer } from "../components/drawer.js";
 import { runWithToast } from "../components/toast.js";
 import { cmd } from "../commands.js";
 import store from "../state.js";
-import { fmtCurrency, fmtPrice, fmtPct, fmtDateTime } from "../formatters.js";
-
-function esc(s) {
-  const d = document.createElement("div");
-  d.textContent = String(s ?? "");
-  return d.innerHTML;
-}
+import { fmtCurrency, fmtPrice, fmtDateTime, esc } from "../formatters.js";
 
 function statBlock(label, value, tone) {
   return `<div class="statblock"><span class="metric-label">${esc(label)}</span><span class="metric-value" data-tone="${tone || ""}">${value}</span></div>`;

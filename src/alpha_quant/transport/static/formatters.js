@@ -28,6 +28,12 @@ export function fmtPrice(v) {
 
 export function fmtNum(v) { return v == null ? "—" : Number(v).toLocaleString("en-US"); }
 
+export function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = String(s ?? "");
+  return d.innerHTML;
+}
+
 /* Maps a status string to a chip tone class used by statusChip(). */
 export function chip(state) {
   const s = String(state || "").toLowerCase();
