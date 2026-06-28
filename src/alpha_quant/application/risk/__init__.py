@@ -40,21 +40,38 @@ class RiskEngine:
             return self._empty_response(inputs)
 
         positions_list = inputs.positions
-        pos_returns = [
-            [
-                positions_list[i].current_price * 0.01 * (0.9 + 0.2 * i / len(positions_list))
-                for _ in range(500)
-            ]  # noqa: E501
-            for i in range(len(positions_list))
-        ]
-        benchmark_returns = [0.01 * (1.0 + 0.1 * (i / 500 - 0.5)) for i in range(500)]
+        # Generate daily returns with per-position seed for determinism
+        pos_returns = []
+        for i in range(len(positions_list)):
+            seed = 42 + i * 7
+            daily_returns: list[float] = []
+            for _ in range(500):
+                seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF
+                r = (seed / 2147483648.0 - 0.5) * 0.06
+                daily_returns.append(r)
+            pos_returns.append(daily_returns)
+        benchmark_returns = []
+        seed_b = 99
+        for _ in range(500):
+            seed_b = (seed_b * 1103515245 + 12345) & 0x7FFFFFFF
+            r = (seed_b / 2147483648.0 - 0.5) * 0.04
+            benchmark_returns.append(r)
 
         cov_matrix = self._compute_covariance(pos_returns)
 
+        # Portfolio-level historical returns (weighted sum of position returns per day)
+        portfolio_historical = (
+            [
+                sum(inputs.weights[i] * pos_returns[i][d] for i in range(len(pos_returns)))
+                for d in range(len(pos_returns[0]))
+                if pos_returns
+            ]
+            if pos_returns
+            else []
+        )
+
         # VaR & ES
-        var_result = compute_var(
-            inputs.weights, cov_matrix, pos_returns[0] if pos_returns else [], inputs.equity
-        )  # noqa: E501
+        var_result = compute_var(inputs.weights, cov_matrix, portfolio_historical, inputs.equity)
         headline_var = var_result["levels"]["p99"]["pct"]
         headline_es = var_result["levels"]["es975"]["pct"]
 
