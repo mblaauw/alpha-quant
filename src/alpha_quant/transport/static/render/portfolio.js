@@ -7,6 +7,7 @@ import { showModal, closeModal, intro, fieldText, fieldNumber, val } from "../co
 import { runWithToast } from "../components/toast.js";
 import { cmd } from "../commands.js";
 import { classify, ageLabel, freshnessFor } from "../freshness.js";
+import { openPositionDrawer } from "./drawers.js";
 
 const COLS = "1.7fr .7fr .9fr .9fr 1fr 1fr .7fr 1.3fr";
 
@@ -46,7 +47,7 @@ function buildPortfolio(p, positions) {
     const sevCls = f.severity === "crit" ? "fresh-badge crit" : f.severity === "warn" ? "fresh-badge warn" : "fresh-badge";
     const rowCls = f.stale ? (f.severity === "crit" ? "dtrow is-stale crit" : "dtrow is-stale") : "dtrow";
     const upl = pos.unrealized_pl;
-    return `<div class="${rowCls}" style="grid-template-columns:${COLS}">
+    return `<div class="${rowCls}" style="grid-template-columns:${COLS}" data-pos="${pos.symbol}">
       <span class="symcell"><span class="sym">${pos.symbol}</span><span class="${sevCls}">${f.stale ? "STALE" : "LIVE"}</span><span class="age">${ageLabel(f.age_minutes)}</span></span>
       <span class="num">${fmtNum(pos.quantity)}</span>
       <span class="num">${fmtPrice(pos.avg_cost)}</span>
@@ -54,7 +55,7 @@ function buildPortfolio(p, positions) {
       <span class="num ink">${fmtCurrency(pos.market_value)}</span>
       <span class="num ${upl >= 0 ? "up" : "down"}">${fmtCurrency(upl)}</span>
       <span class="num">${fmtPct(pos.portfolio_weight)}</span>
-      <span class="row-acts"><button class="act-btn" data-stop="${pos.symbol}">Stop</button><button class="act-btn danger" data-flatten="${pos.symbol}">Flatten</button></span>
+      <span class="row-acts"><button class="act-btn" data-stop="${pos.symbol}" data-stop-propagation>Stop</button><button class="act-btn danger" data-flatten="${pos.symbol}" data-stop-propagation>Flatten</button></span>
     </div>`;
   }).join("");
 
@@ -70,8 +71,15 @@ function metric(label, value, tone = "") {
 
 function wire(positions) {
   const byId = (s) => positions.find((p) => p.symbol === s) || { symbol: s };
-  document.querySelectorAll("[data-flatten]").forEach((b) => b.onclick = () => openFlatten(byId(b.dataset.flatten)));
-  document.querySelectorAll("[data-stop]").forEach((b) => b.onclick = () => openStop(byId(b.dataset.stop)));
+  document.querySelectorAll("[data-flatten]").forEach((b) => {
+    b.onclick = (e) => { e.stopPropagation(); openFlatten(byId(b.dataset.flatten)); };
+  });
+  document.querySelectorAll("[data-stop]").forEach((b) => {
+    b.onclick = (e) => { e.stopPropagation(); openStop(byId(b.dataset.stop)); };
+  });
+  document.querySelectorAll("[data-pos]").forEach((el) => {
+    el.onclick = () => openPositionDrawer(el.dataset.pos);
+  });
 }
 
 function openFlatten(pos) {
