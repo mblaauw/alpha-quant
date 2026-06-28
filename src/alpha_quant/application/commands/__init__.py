@@ -58,7 +58,9 @@ def _book_immediate_fill(
         text(sql_pos),
         {"bid": str(book_id), "sym": symbol},
     ).fetchone()
-    price = float(pos_row._mapping["current_price"]) if pos_row else 100.0
+    raw_price = pos_row._mapping["current_price"] if pos_row else None
+    price = float(raw_price) if raw_price is not None else 100.0
+    price = max(price, 0.01)  # prevent division by zero
 
     sec_uuid: UUID = (
         UUID(sec_id_str)
