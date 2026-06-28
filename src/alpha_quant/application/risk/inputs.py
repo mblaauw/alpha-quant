@@ -62,8 +62,10 @@ def load_inputs(
         equity = cash + total_mv if (cash + total_mv) > 0 else 350_000.0
 
         # Build sector map from security_reference
+        from sqlalchemy import text
+
         sec_rows = uow.store.session.execute(
-            "SELECT symbol, sector FROM core.security_reference"
+            text("SELECT symbol, sector FROM core.security_reference")
         ).fetchall()
         sector_map: dict[str, str] = {
             row._mapping["symbol"]: row._mapping["sector"] or "Unclassified" for row in sec_rows
