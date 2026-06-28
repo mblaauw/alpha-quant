@@ -1,6 +1,5 @@
 import store from "../state.js";
 import { get } from "../api.js";
-import { fmtPct } from "../formatters.js";
 import { emptyState } from "../components/empty_state.js";
 import { errorState } from "../components/error_state.js";
 import { tagChip } from "../components/status.js";
@@ -44,7 +43,7 @@ function buildDecisions(data) {
     const rowCls = blocked ? "dtrow is-stale crit" : "dtrow";
     const actionable = d.decision === "enter" || d.decision === "hold";
     const acts = actionable
-      ? `<span class="row-acts"><button class="act-btn approve" data-approve="${d.decision_id || d.symbol}" data-sym="${d.symbol}" data-stop-propagation>Approve</button><button class="act-btn" data-reject="${d.decision_id || d.symbol}" data-sym="${d.symbol}" data-stop-propagation>Reject</button></span>`
+      ? `<span class="row-acts"><button class="act-btn approve" data-approve="${d.decision_id || d.symbol}" data-sym="${d.symbol}">Approve</button><button class="act-btn" data-reject="${d.decision_id || d.symbol}" data-sym="${d.symbol}">Reject</button></span>`
       : `<span></span>`;
     return `<div class="${rowCls}" style="grid-template-columns:${COLS}" data-decision="${d.decision_id || d.symbol}">
       <span class="symcell"><span class="sym">${d.symbol}</span><span class="${sevCls}">${sev === "live" ? "LIVE" : "STALE"}</span></span>

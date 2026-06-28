@@ -8,11 +8,6 @@ export async function pollCommand(commandId) {
   return get(`/v1/commands/${commandId}`);
 }
 
-/* Cancel an in-flight *command* (not an order). */
-export async function cancelCommand(commandId) {
-  return post(`/v1/commands/${commandId}/cancel`, {});
-}
-
 export function generateKey() {
   return crypto.randomUUID();
 }
@@ -32,6 +27,5 @@ export const cmd = {
   flatten:        (bookId, positionId, reason) => submitCommand("position.flatten", { position_id: positionId }, { idempotency_key: generateKey(), book_id: bookId, reason }),
   setStop:        (bookId, positionId, stopPrice, reason) => submitCommand("position.set_stop", { position_id: positionId, stop_price: stopPrice }, { idempotency_key: generateKey(), book_id: bookId, reason }),
   modify:         (bookId, payload, reason) => submitCommand("candidate.modify", payload, { idempotency_key: generateKey(), book_id: bookId, reason }),
-  setRiskMethod:  (bookId, positionId, method, reason) => submitCommand("position.set_risk_method", { position_id: positionId, method }, { idempotency_key: generateKey(), book_id: bookId, reason }),
   backtest:       (bookId, payload, reason) => submitCommand("backtest.create", payload, { idempotency_key: generateKey(), book_id: bookId, reason }),
 };

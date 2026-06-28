@@ -1,71 +1,29 @@
 import store from "../state.js";
 import { get, post } from "../api.js";
 import { cmd } from "../commands.js";
-import { fmtCurrency, fmtNum } from "../formatters.js";
+import { fmtCurrency, fmtNum, esc } from "../formatters.js";
 import { emptyState } from "../components/empty_state.js";
 import { errorState } from "../components/error_state.js";
 import { runWithToast } from "../components/toast.js";
 import { openDrawer, closeDrawer } from "../components/drawer.js";
 
-const EQUITY = 350000;
-const CASH = 64226;
-
-function esc(s) {
-  const d = document.createElement("div");
-  d.textContent = String(s ?? "");
-  return d.innerHTML;
-}
-
-function cur(v) {
-  const a = Math.abs(Math.round(v)).toLocaleString("en-US");
-  return (v < 0 ? "-" : "") + "$" + a;
-}
-
 function price(v) {
   return "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function pct(v) { return (v * 100).toFixed(2) + "%"; }
 function pct1(v) { return (v * 100).toFixed(1) + "%"; }
 
-// ── Sizing engine (mirrors POST /sizing-preview server-side logic) ──
+// ── State ──
 
-function compute(ticket) {
-  const c = ticket.cand;
-  const riskBudget = EQUITY * (ticket.riskPct / 100);
-  let stopDist, stopBasis;
-  if (ticket.method === "atr25") { stopDist = 2.5 * c.atr; stopBasis = "2.5 × ATR " + price(c.atr); }
-  else if (ticket.method === "fixed") { stopDist = 0.08 * c.price; stopBasis = "8% × " + price(c.price); }
-  else { stopDist = 2.0 * c.atr; stopBasis = "2.0 × ATR " + price(c.atr); }
-  const autoQty = Math.max(1, Math.floor(riskBudget / stopDist));
-  const qty = ticket.qtyOverride != null ? Math.max(0, ticket.qtyOverride) : autoQty;
-  const stopPrice = c.price - stopDist;
-  const notional = qty * c.price;
-  const riskAtStop = qty * stopDist;
-  const target = c.price + 2 * stopDist;
-  const targetGain = 2 * riskAtStop;
-  const pctEquity = notional / EQUITY;
-  const riskPctEquity = riskAtStop / EQUITY;
-  const bpAfter = CASH - notional;
-  const modified = (ticket.qtyOverride != null && ticket.qtyOverride !== autoQty) || ticket.riskPct !== 0.5 || ticket.method !== "atr20";
-
-  const guards = [];
-  if (notional > CASH) guards.push({ sev: "block", icon: "⛔", text: `Notional ${cur(notional)} exceeds buying power $64,226 by ${cur(notional - CASH)}.` });
-  if (riskAtStop > EQUITY * 0.01) guards.push({ sev: "warn", icon: "⚠", text: `Risk at stop ${cur(riskAtStop)} is above the 1% per-trade cap ($3,500).` });
-  if (pctEquity > 0.20) guards.push({ sev: "warn", icon: "⚠", text: `Notional is ${pct1(pctEquity)} of equity — above 20% single-name guide.` });
-  if (qty === 0) guards.push({ sev: "block", icon: "⛔", text: "Quantity is zero — nothing to submit." });
-  if (!guards.length) guards.push({ sev: "ok", icon: "✓", text: `Within budget: risk ${cur(riskAtStop)} (${pct(riskPctEquity)}) and notional ${pct1(pctEquity)} of equity pass.` });
-
-  return { c, riskBudget, stopDist, stopBasis, autoQty, qty, stopPrice, notional, riskAtStop, target, targetGain, pctEquity, riskPctEquity, bpAfter, modified, guards, blocked: guards.some(g => g.sev === "block") };
-}
-
-function defaultTicket(sym, cand) {
-  return { sym, cand, mode: "recommended", riskPct: 0.5, method: "atr20", qtyOverride: null };
-}
+let _candCache = [];
+let _activeTicket = null;
+let _ticketSizing = null;
+let _ticketLoading = false;
+let _scorecardCache = {};
 
 // ── Advice card ──
 
-function buildCard(c, r) {
+function buildCard(c) {
   const recMap = { add: "ADD", consider_entry: "CONSIDER ENTRY", hold: "HOLD", reduce: "REDUCE", exit: "EXIT", watch: "WATCH", do_nothing: "—" };
   const recLabel = recMap[c.recommendation] || (c.recommendation || "").toUpperCase();
   return `<div class="acard" data-rec="${c.recommendation}" data-scorecard="${c.scorecard_id}">
@@ -75,7 +33,7 @@ function buildCard(c, r) {
         <span class="rec-chip" data-rec="${c.recommendation}">${recLabel}</span>
         <span class="acard-meta"><b>${Math.round((c.confidence || 0) * 100)}%</b> confidence · score <b>${fmtNum(c.total_score)}</b></span>
       </div>
-      <div class="acard-size">Engine size <b>${r.autoQty} sh</b> · ${cur(r.notional)} · risk ${cur(r.riskAtStop)}</div>
+      <div class="acard-size">Engine size from server</div>
     </div>
     <div class="acard-acts-wrap">
       <div class="acard-acts">
@@ -90,7 +48,7 @@ function buildCard(c, r) {
 
 // ── Scorecard drawer (rich M1→M8) ──
 
-function buildScorecardDrawer(s, c) {
+function buildScorecardDrawer(s, symbol) {
   const TYPE_LABEL = { hard: "Hard gate", soft: "Posture", score: "Score", evidence: "Evidence" };
   const ICON = { ok: "✓", info: "●", warn: "⚠", bad: "✕" };
 
@@ -123,8 +81,6 @@ function buildScorecardDrawer(s, c) {
   const invals = (s.invalidations || []).map(i => `<li><span class="mk">✕</span><span>${esc(i)}</span></li>`).join("");
   const changed = (s.changed_since || []).map(ch => `<li><span class="mk">→</span><span>${esc(ch)}</span></li>`).join("");
 
-  const r = compute(defaultTicket(c.symbol, c));
-
   return `<div class="dw-stats">
     <div class="statblock"><span class="sl">Composite</span><span class="sv">${fmtNum(s.total_score)}</span><span class="ss">${esc(s.score_scale || "")}</span></div>
     <div class="statblock"><span class="sl">Evidence align</span><span class="sv">${s.evidence_alignment ?? "—"}/100</span><span class="ss">calibration: ${esc(s.calibration || "provisional")}</span></div>
@@ -144,108 +100,105 @@ function buildScorecardDrawer(s, c) {
   ${invals ? `<div class="dw-sechead"><span class="t">What invalidates this</span></div><ul class="dlist" data-kind="inval">${invals}</ul>` : ""}
   ${changed ? `<div class="dw-sechead"><span class="t">Changed since last run</span></div><ul class="dlist" data-kind="changed">${changed}</ul>` : ""}
   <div class="dw-foot">
-    <div class="left"><button class="btn" data-variant="danger" data-dw-reject="${c.scorecard_id}">Reject</button></div>
+    <div class="left"><button class="btn" data-variant="danger" data-dw-reject="${s.scorecard_id}">Reject</button></div>
     <div class="right">
-      <button class="btn" data-sm="true" data-dw-modify="${c.scorecard_id}">Modify…</button>
-      <button class="btn" data-variant="go" data-dw-follow="${c.scorecard_id}">Follow — ${r.autoQty} sh</button>
+      <button class="btn" data-sm="true" data-dw-modify="${s.scorecard_id}">Modify…</button>
+      <button class="btn" data-variant="go" data-dw-follow="${s.scorecard_id}">Follow</button>
     </div>
   </div>`;
 }
 
-// ── Order ticket ──
+// ── Helpers ──
 
-function buildTicket(ticket) {
-  const r = compute(ticket);
-  const c = r.c;
+function recLabel(rec) {
+  const m = { add: "ADD", consider_entry: "CONSIDER ENTRY", hold: "HOLD", reduce: "REDUCE", exit: "EXIT", watch: "WATCH", do_nothing: "—" };
+  return m[rec] || (rec || "").toUpperCase();
+}
+
+async function fetchSizing(params) {
+  _ticketLoading = true;
+  try {
+    const res = await post("/v1/console/sizing-preview", params);
+    _ticketSizing = res;
+    return res;
+  } catch (e) {
+    throw e;
+  } finally {
+    _ticketLoading = false;
+  }
+}
+
+// ── Ticket build ──
+
+function buildTicket(ticket, sizing) {
   const lock = ticket.mode !== "modify";
-  const recLabel = ticket.recLabel || "";
-  const tk = {
-    symbol: c.symbol, recLabel,
-    recommendedOn: ticket.mode !== "modify", modifyOn: ticket.mode === "modify", lockControls: lock,
-    qty: String(r.qty), autoQty: String(r.autoQty),
-    sizeTag: r.modified ? "Modified" : "Engine sized", modified: r.modified,
-    riskBudget: cur(r.riskBudget), riskPct: ticket.riskPct.toFixed(2) + "%", riskPctRaw: ticket.riskPct,
-    stopDist: price(r.stopDist), stopBasis: r.stopBasis,
-    stopPrice: price(r.stopPrice), stopPct: "−" + pct1(r.stopDist / c.price),
-    qtyNote: ticket.qtyOverride != null && ticket.qtyOverride !== r.autoQty ? " → overridden to " + r.qty : "",
-    notional: cur(r.notional), pctEquity: pct1(r.pctEquity),
-    riskAtStop: cur(r.riskAtStop), riskPctEquity: pct(r.riskPctEquity),
-    riskTone: r.riskAtStop > EQUITY * 0.01 ? "warn" : "",
-    target: price(r.target), targetGain: cur(r.targetGain),
-    bpAfter: cur(r.bpAfter), bpTone: r.bpAfter < 0 ? "down" : "", price: price(c.price),
-    m20: ticket.method === "atr20", m25: ticket.method === "atr25", mfix: ticket.method === "fixed",
-    qtyAutoNote: ticket.qtyOverride != null && ticket.qtyOverride !== r.autoQty ? "Manual override." : "Following engine size.",
-    qtyAutoAction: ticket.qtyOverride != null && ticket.qtyOverride !== r.autoQty ? "Reset to " + r.autoQty : "",
-    submitLabel: r.blocked ? "Blocked by guardrail" : (r.modified ? "Submit modified — " + r.qty + " sh" : "Follow — submit " + r.qty + " sh"),
-    submitDisabled: r.blocked,
-  };
+  const g = (sizing.guardrails || []);
+  const blocked = g.some(x => x.severity === "block");
+  const isMod = ticket.mode === "modify" && (ticket.qtyOverride != null || ticket.riskPct !== 0.5 || ticket.method !== "atr_2_0");
+  const qty = ticket.qtyOverride != null ? ticket.qtyOverride : sizing.suggested_qty;
+  const notional = qty * sizing.last_price;
+  const pctEquity = notional / (sizing.risk_budget / (sizing.risk_budget / (sizing.suggested_qty * sizing.stop_distance || 1)));
 
   return `<div class="tk-head">
-    <div class="tt"><span class="tk-title">${esc(c.symbol)} <span class="rec-chip" data-rec="${c.rec}">${recLabel}</span></span><span class="tk-sub">market order · paper book</span></div>
+    <div class="tt"><span class="tk-title">${esc(ticket.sym)} <span class="rec-chip" data-rec="${ticket.rec}">${esc(ticket.recLabel)}</span></span><span class="tk-sub">market order · paper book</span></div>
     <button class="tk-close" id="tk-close-btn">✕</button>
   </div>
   <div class="tk-body">
     <div class="mode-toggle">
-      <button data-on="${tk.recommendedOn}" id="tk-rec-mode">Recommended</button>
-      <button data-on="${tk.modifyOn}" id="tk-mod-mode">Modify</button>
+      <button data-on="${!isMod}" id="tk-rec-mode">Recommended</button>
+      <button data-on="${isMod}" id="tk-mod-mode">Modify</button>
     </div>
     <div class="size-hero">
       <div class="size-hero-top">
-        <div class="size-qty">${tk.qty}<small>shares</small></div>
-        <span class="size-tag" data-mod="${tk.modified}">${tk.sizeTag}</span>
+        <div class="size-qty">${qty}<small>shares</small></div>
+        <span class="size-tag" data-mod="${isMod}">${isMod ? "Modified" : "Engine sized"}</span>
       </div>
-      <div class="size-math">Risk budget <b>${tk.riskBudget}</b> <span class="op">=</span> ${tk.riskPct} of <b>${cur(EQUITY)}</b><br>
-        Stop distance <b>${tk.stopDist}</b> <span class="op">=</span> ${tk.stopBasis}<br>
-        Shares <span class="op">=</span> ${tk.riskBudget} <span class="op">÷</span> ${tk.stopDist} <span class="op">=</span> <b>${tk.autoQty}</b>${tk.qtyNote}</div>
+      <div class="size-math">Risk budget <b>${fmtCurrency(sizing.risk_budget)}</b> <span class="op">=</span> ${pct1(ticket.riskPct / 100)} of equity<br>
+        Stop distance <b>${price(sizing.stop_distance)}</b> · method ${ticket.method.replace("_", " ").toUpperCase()}<br>
+        Shares <span class="op">=</span> ${fmtCurrency(sizing.risk_budget)} <span class="op">÷</span> ${price(sizing.stop_distance)} <span class="op">=</span> <b>${sizing.suggested_qty}</b></div>
     </div>
     <div class="ctrl-block">
-      <div class="ctrl-label"><span class="l">Per-trade risk budget</span><span class="v">${tk.riskPct} · ${tk.riskBudget}</span></div>
-      <input type="range" class="rng" min="0.25" max="1" step="0.05" value="${tk.riskPctRaw}" ${lock ? "disabled" : ""} id="tk-risk">
+      <div class="ctrl-label"><span class="l">Per-trade risk budget</span><span class="v">${pct1(ticket.riskPct / 100)} · ${fmtCurrency(sizing.risk_budget)}</span></div>
+      <input type="range" class="rng" min="0.25" max="1" step="0.05" value="${ticket.riskPct}" ${lock ? "disabled" : ""} id="tk-risk">
       <div class="rng-ticks"><span>0.25%</span><span>0.50%</span><span>0.75%</span><span>1.00%</span></div>
     </div>
     <div class="ctrl-block">
-      <div class="ctrl-label"><span class="l">Stop method</span><span class="v">stop @ ${tk.stopPrice}</span></div>
+      <div class="ctrl-label"><span class="l">Stop method</span><span class="v">stop @ ${price(sizing.stop_price)}</span></div>
       <div class="seg">
-        <button data-on="${tk.m20}" ${lock ? "disabled" : ""} id="tk-m20">ATR 2.0×</button>
-        <button data-on="${tk.m25}" ${lock ? "disabled" : ""} id="tk-m25">ATR 2.5×</button>
-        <button data-on="${tk.mfix}" ${lock ? "disabled" : ""} id="tk-fix">Fixed 8%</button>
+        <button data-on="${ticket.method === "atr_2_0"}" ${lock ? "disabled" : ""} id="tk-m20">ATR 2.0×</button>
+        <button data-on="${ticket.method === "atr_2_5"}" ${lock ? "disabled" : ""} id="tk-m25">ATR 2.5×</button>
+        <button data-on="${ticket.method === "fixed_8"}" ${lock ? "disabled" : ""} id="tk-fix">Fixed 8%</button>
       </div>
     </div>
     <div class="ctrl-block">
-      <div class="ctrl-label"><span class="l">Quantity</span><span class="v">${tk.notional} notional</span></div>
+      <div class="ctrl-label"><span class="l">Quantity</span><span class="v">${fmtCurrency(notional)} notional</span></div>
       <div class="qty-row">
         <div class="qty-stepper">
           <button ${lock ? "disabled" : ""} id="tk-qty-minus">−</button>
-          <input type="number" value="${tk.qty}" ${lock ? "disabled" : ""} id="tk-qty">
+          <input type="number" value="${qty}" ${lock ? "disabled" : ""} id="tk-qty">
           <button ${lock ? "disabled" : ""} id="tk-qty-plus">+</button>
         </div>
-        <span class="qty-auto">${tk.qtyAutoNote} ${tk.qtyAutoAction ? `<a id="tk-reset-qty">${tk.qtyAutoAction}</a>` : ""}</span>
+        <span class="qty-auto">${ticket.qtyOverride != null ? "Manual override. " : "Following engine size. "}${ticket.qtyOverride != null ? `<a id="tk-reset-qty">Reset to ${sizing.suggested_qty}</a>` : ""}</span>
       </div>
     </div>
     <div class="tk-metrics">
-      <div class="tk-metric"><div class="ml">Notional</div><div class="mv">${tk.notional}</div><div class="ms">${tk.pctEquity} of equity</div></div>
-      <div class="tk-metric"><div class="ml">Stop price</div><div class="mv">${tk.stopPrice}</div><div class="ms">−${tk.stopDist} (${tk.stopPct})</div></div>
-      <div class="tk-metric"><div class="ml">Risk at stop</div><div class="mv" data-tone="${tk.riskTone}">${tk.riskAtStop}</div><div class="ms">${tk.riskPctEquity} of equity · 1R</div></div>
-      <div class="tk-metric"><div class="ml">Target 2R</div><div class="mv" data-tone="up">${tk.target}</div><div class="ms">+${tk.targetGain} if hit</div></div>
-      <div class="tk-metric"><div class="ml">Buying power after</div><div class="mv" data-tone="${tk.bpTone}">${tk.bpAfter}</div><div class="ms">from $64,226</div></div>
-      <div class="tk-metric"><div class="ml">Avg cost basis</div><div class="mv">${tk.price}</div><div class="ms">last Lake mark</div></div>
+      <div class="tk-metric"><div class="ml">Notional</div><div class="mv">${fmtCurrency(notional)}</div><div class="ms">${pct1(notional / (sizing.risk_budget / (ticket.riskPct / 100)))} of equity</div></div>
+      <div class="tk-metric"><div class="ml">Stop price</div><div class="mv">${price(sizing.stop_price)}</div><div class="ms">−${price(sizing.stop_distance)} (${pct1(sizing.stop_distance / sizing.last_price)})</div></div>
+      <div class="tk-metric"><div class="ml">Risk at stop</div><div class="mv" data-tone="${sizing.risk_at_stop > 3500 ? "warn" : ""}">${fmtCurrency(sizing.risk_at_stop)}</div><div class="ms">${pct1(sizing.risk_at_stop / (sizing.risk_budget / (ticket.riskPct / 100)))} of equity · 1R</div></div>
+      <div class="tk-metric"><div class="ml">Target 2R</div><div class="mv" data-tone="up">${fmtCurrency(sizing.risk_at_stop * 2)}</div><div class="ms">+${fmtCurrency(sizing.risk_at_stop * 2)} if hit</div></div>
+      <div class="tk-metric"><div class="ml">Buying power after</div><div class="mv" data-tone="${sizing.buying_power_after < 0 ? "down" : ""}">${fmtCurrency(sizing.buying_power_after)}</div><div class="ms">from ${fmtCurrency(sizing.buying_power)}</div></div>
+      <div class="tk-metric"><div class="ml">Avg cost basis</div><div class="mv">${price(sizing.last_price)}</div><div class="ms">last Lake mark</div></div>
     </div>
-    ${r.guards.map(g => `<div class="guard" data-sev="${g.sev}"><span class="gi">${g.icon}</span><span>${esc(g.text)}</span></div>`).join("")}
+    ${g.map(g => `<div class="guard" data-sev="${g.severity}"><span class="gi">${g.severity === "block" ? "⛔" : g.severity === "warn" ? "⚠" : "✓"}</span><span>${esc(g.message)}</span></div>`).join("")}
   </div>
   <div class="tk-foot">
     <div class="left"><button class="btn" data-variant="danger" id="tk-reject">Reject advice</button></div>
     <div class="right">
       <button class="btn" id="tk-cancel">Cancel</button>
-      <button class="btn" data-variant="primary" ${tk.submitDisabled ? "disabled" : ""} id="tk-submit">${tk.submitLabel}</button>
+      <button class="btn" data-variant="primary" ${blocked ? "disabled" : ""} id="tk-submit">${blocked ? "Blocked by guardrail" : (isMod ? "Submit modified — " + qty + " sh" : "Follow — submit " + qty + " sh")}</button>
     </div>
   </div>`;
 }
-
-// ── State ──
-
-let _candCache = [];
-let _activeTicket = null;
-let _scorecardCache = {};
 
 // ── Main render ──
 
@@ -267,13 +220,7 @@ window.addEventListener("bookchange", renderAdvice);
 function buildPage(data) {
   const items = data.items || [];
   if (!items.length) return emptyState("No advice for today. Run a decision cycle first.") + `<div style="text-align:center;margin-top:16px"><button class="btn btn-primary" onclick="document.getElementById('run-btn').click()">Run decision cycle</button></div>`;
-
-  const cards = items.map(i => {
-    const c = { symbol: i.symbol, name: "", rec: i.recommendation, price: 100, atr: 3.3 };
-    const r = compute(defaultTicket(i.symbol, c));
-    return buildCard(i, r);
-  }).join("");
-
+  const cards = items.map(i => buildCard(i)).join("");
   return `<div class="metric-strip">
     <div class="metric"><span class="metric-label">Open positions</span><span class="metric-value">6</span></div>
     <div class="metric"><span class="metric-label">Gross exposure</span><span class="metric-value">$285,774</span><span class="metric-sub">82% of equity</span></div>
@@ -339,9 +286,8 @@ async function openScorecard(scorecardId) {
     }
   }
 
-  const c = { symbol: item.symbol, name: "", rec: item.recommendation, price: 100, atr: 3.3 };
-  const body = buildScorecardDrawer(sc, c);
-  openDrawer(`${esc(item.symbol)} <span class="rec-chip" data-rec="${item.recommendation}">${esc((item.recommendation || "").toUpperCase())}</span>`, body);
+  const body = buildScorecardDrawer(sc, item.symbol);
+  openDrawer(`${esc(item.symbol)} <span class="rec-chip" data-rec="${item.recommendation}">${esc(recLabel(item.recommendation))}</span>`, body);
 
   document.querySelector("[data-dw-reject]")?.addEventListener("click", () => { closeDrawer(); doReject(item); });
   document.querySelector("[data-dw-modify]")?.addEventListener("click", () => { closeDrawer(); openTicket(item, "modify"); });
@@ -349,23 +295,35 @@ async function openScorecard(scorecardId) {
 }
 
 async function openTicket(item, mode) {
-  let sizing;
-  try {
-    sizing = await post("/v1/console/sizing-preview", {
-      book_id: store.bookId,
-      symbol: item.symbol,
-      side: "buy",
-      risk_pct: mode === "modify" ? 0.5 : null,
-      method: mode === "modify" ? "atr_2_0" : null,
-    });
-  } catch {
-    sizing = { suggested_qty: 100, last_price: 100, atr: 3.3, stop_price: 94, stop_distance: 6, risk_budget: 1750, notional: 10000, risk_at_stop: 600, buying_power: 63000, buying_power_after: 53000, guardrails: [] };
+  _ticketSizing = null;
+  const params = {
+    book_id: store.bookId,
+    symbol: item.symbol,
+    side: "buy",
+    risk_pct: 0.5,
+    method: "atr_2_0",
+  };
+  if (mode === "modify") {
+    params.risk_pct = 0.5;
+    params.method = "atr_2_0";
   }
+  _activeTicket = {
+    sym: item.symbol, rec: item.recommendation, recLabel: recLabel(item.recommendation),
+    mode: mode || "recommended", riskPct: 0.5, method: "atr_2_0", qtyOverride: null,
+    scorecardId: item.scorecard_id,
+  };
 
-  const c = { symbol: item.symbol, name: "", rec: item.recommendation, price: sizing.last_price || 100, atr: sizing.atr || 3.3 };
-  const recLabel = (item.recommendation || "").toUpperCase();
-  _activeTicket = { sym: item.symbol, cand: c, recLabel, mode: mode || "recommended", riskPct: 0.5, method: "atr20", qtyOverride: null, scorecardId: item.scorecard_id };
+  renderTicket();
+  wireTicket();
 
+  try {
+    await fetchSizing(params);
+  } catch (e) {
+    _ticketSizing = null;
+    renderTicket();
+    wireTicket();
+    return;
+  }
   renderTicket();
   wireTicket();
 }
@@ -376,43 +334,74 @@ function renderTicket() {
   if (!el) {
     overlay.id = "tk-overlay";
     overlay.className = "tk-overlay";
-    overlay.innerHTML = `<div class="ticket" id="ticket">${buildTicket(_activeTicket)}</div>`;
     document.body.appendChild(overlay);
+  }
+  if (!_ticketSizing) {
+    overlay.innerHTML = `<div class="ticket" style="text-align:center;padding:40px"><div class="skeleton" style="height:200px"></div></div>`;
   } else {
-    overlay.querySelector("#ticket").innerHTML = buildTicket(_activeTicket);
+    overlay.innerHTML = `<div class="ticket" id="ticket">${buildTicket(_activeTicket, _ticketSizing)}</div>`;
   }
   overlay.dataset.open = "true";
 }
 
 function wireTicket() {
-  const close = () => { document.getElementById("tk-overlay").dataset.open = "false"; _activeTicket = null; };
+  const close = () => { document.getElementById("tk-overlay").dataset.open = "false"; _activeTicket = null; _ticketSizing = null; };
   document.getElementById("tk-close-btn")?.addEventListener("click", close);
   document.getElementById("tk-cancel")?.addEventListener("click", close);
   document.getElementById("tk-overlay")?.addEventListener("click", (e) => { if (e.target === e.currentTarget) close(); });
 
-  document.getElementById("tk-rec-mode")?.addEventListener("click", () => { _activeTicket.mode = "recommended"; _activeTicket.riskPct = 0.5; _activeTicket.method = "atr20"; _activeTicket.qtyOverride = null; renderTicket(); wireTicket(); });
+  document.getElementById("tk-rec-mode")?.addEventListener("click", async () => {
+    _activeTicket.mode = "recommended"; _activeTicket.riskPct = 0.5; _activeTicket.method = "atr_2_0"; _activeTicket.qtyOverride = null;
+    try { await fetchSizing({ book_id: store.bookId, symbol: _activeTicket.sym, side: "buy", risk_pct: 0.5, method: "atr_2_0" }); } catch {}
+    renderTicket(); wireTicket();
+  });
   document.getElementById("tk-mod-mode")?.addEventListener("click", () => { _activeTicket.mode = "modify"; renderTicket(); wireTicket(); });
 
-  document.getElementById("tk-risk")?.addEventListener("input", (e) => { _activeTicket.riskPct = parseFloat(e.target.value); _activeTicket.qtyOverride = null; renderTicket(); wireTicket(); });
-  document.getElementById("tk-m20")?.addEventListener("click", () => { _activeTicket.method = "atr20"; _activeTicket.qtyOverride = null; renderTicket(); wireTicket(); });
-  document.getElementById("tk-m25")?.addEventListener("click", () => { _activeTicket.method = "atr25"; _activeTicket.qtyOverride = null; renderTicket(); wireTicket(); });
-  document.getElementById("tk-fix")?.addEventListener("click", () => { _activeTicket.method = "fixed"; _activeTicket.qtyOverride = null; renderTicket(); wireTicket(); });
+  document.getElementById("tk-risk")?.addEventListener("input", async (e) => {
+    _activeTicket.riskPct = parseFloat(e.target.value); _activeTicket.qtyOverride = null;
+    try { await fetchSizing({ book_id: store.bookId, symbol: _activeTicket.sym, side: "buy", risk_pct: _activeTicket.riskPct / 100, method: _activeTicket.method }); } catch {}
+    renderTicket(); wireTicket();
+  });
+  document.getElementById("tk-m20")?.addEventListener("click", async () => {
+    _activeTicket.method = "atr_2_0"; _activeTicket.qtyOverride = null;
+    try { await fetchSizing({ book_id: store.bookId, symbol: _activeTicket.sym, side: "buy", risk_pct: _activeTicket.riskPct / 100, method: "atr_2_0" }); } catch {}
+    renderTicket(); wireTicket();
+  });
+  document.getElementById("tk-m25")?.addEventListener("click", async () => {
+    _activeTicket.method = "atr_2_5"; _activeTicket.qtyOverride = null;
+    try { await fetchSizing({ book_id: store.bookId, symbol: _activeTicket.sym, side: "buy", risk_pct: _activeTicket.riskPct / 100, method: "atr_2_5" }); } catch {}
+    renderTicket(); wireTicket();
+  });
+  document.getElementById("tk-fix")?.addEventListener("click", async () => {
+    _activeTicket.method = "fixed_8"; _activeTicket.qtyOverride = null;
+    try { await fetchSizing({ book_id: store.bookId, symbol: _activeTicket.sym, side: "buy", risk_pct: _activeTicket.riskPct / 100, method: "fixed_8" }); } catch {}
+    renderTicket(); wireTicket();
+  });
 
   document.getElementById("tk-qty")?.addEventListener("input", (e) => { const v = parseInt(e.target.value, 10); _activeTicket.qtyOverride = isNaN(v) ? 0 : v; renderTicket(); wireTicket(); });
-  document.getElementById("tk-qty-minus")?.addEventListener("click", () => { _activeTicket.qtyOverride = Math.max(0, (parseInt(_activeTicket.qtyOverride ?? compute(_activeTicket).autoQty, 10) || 0) - 1); renderTicket(); wireTicket(); });
-  document.getElementById("tk-qty-plus")?.addEventListener("click", () => { _activeTicket.qtyOverride = (parseInt(_activeTicket.qtyOverride ?? compute(_activeTicket).autoQty, 10) || 0) + 1; renderTicket(); wireTicket(); });
+  document.getElementById("tk-qty-minus")?.addEventListener("click", () => { _activeTicket.qtyOverride = Math.max(0, (_activeTicket.qtyOverride ?? _ticketSizing?.suggested_qty ?? 0) - 1); renderTicket(); wireTicket(); });
+  document.getElementById("tk-qty-plus")?.addEventListener("click", () => { _activeTicket.qtyOverride = (_activeTicket.qtyOverride ?? _ticketSizing?.suggested_qty ?? 0) + 1; renderTicket(); wireTicket(); });
   document.getElementById("tk-reset-qty")?.addEventListener("click", () => { _activeTicket.qtyOverride = null; renderTicket(); wireTicket(); });
 
   document.getElementById("tk-submit")?.addEventListener("click", () => {
-    const r = compute(_activeTicket);
-    if (r.blocked) return;
-    const isMod = _activeTicket.qtyOverride != null || _activeTicket.riskPct !== 0.5 || _activeTicket.method !== "atr20";
+    if (!_ticketSizing) return;
+    const blocked = _ticketSizing.guardrails?.some(g => g.severity === "block");
+    if (blocked) return;
+    const isMod = _activeTicket.qtyOverride != null || _activeTicket.riskPct !== 0.5 || _activeTicket.method !== "atr_2_0";
     const bookId = store.bookId;
+    const qty = _activeTicket.qtyOverride ?? _ticketSizing.suggested_qty;
     const reason = "Order from Desk";
     if (isMod) {
-      runWithToast(() => cmd.modify(bookId, { scorecard_id: _activeTicket.scorecardId, qty: r.qty, stop_price: r.stopPrice, risk_pct: _activeTicket.riskPct / 100, method: _activeTicket.method }, reason), "Submit modified — " + _activeTicket.sym);
+      runWithToast(() => cmd.modify(bookId, {
+        scorecard_id: _activeTicket.scorecardId, symbol: _activeTicket.sym,
+        qty, stop_price: _ticketSizing.stop_price,
+        risk_pct: _activeTicket.riskPct / 100, method: _activeTicket.method,
+      }, reason), "Submit modified — " + _activeTicket.sym);
     } else {
-      runWithToast(() => cmd.approve(bookId, { scorecard_id: _activeTicket.scorecardId, qty: r.qty, symbol: _activeTicket.sym }, reason), "Follow — " + _activeTicket.sym);
+      runWithToast(() => cmd.approve(bookId, {
+        scorecard_id: _activeTicket.scorecardId, symbol: _activeTicket.sym,
+        qty,
+      }, reason), "Follow — " + _activeTicket.sym);
     }
     close();
   });

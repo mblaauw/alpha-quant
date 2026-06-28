@@ -40,7 +40,7 @@ function buildOrders(data) {
       <span class="num">${fmtNum(o.requested_quantity ?? o.quantity)}</span>
       <span>${tagChip((o.status || "").toUpperCase(), o.status)}</span>
       <span class="age" style="font-size:11px">${created}</span>
-      <span class="r-right">${o.status === "pending" ? `<button class="act-btn danger" data-cancel="${o.order_id}" data-stop-propagation>Cancel</button>` : ""}</span>
+      <span class="r-right">${o.status === "pending" ? `<button class="act-btn danger" data-cancel="${o.order_id}">Cancel</button>` : ""}</span>
     </div>`;
   }).join("");
 

@@ -58,7 +58,7 @@ function buildPortfolio(p, positions) {
       <span class="num ink">${fmtCurrency(pos.market_value)}</span>
       <span class="num ${upl >= 0 ? "up" : "down"}">${fmtCurrency(upl)}</span>
       <span class="num">${fmtPct(pos.portfolio_weight)}</span>
-      <span class="row-acts"><button class="act-btn" data-stop="${pos.symbol}" data-stop-propagation>Stop</button><button class="act-btn danger" data-flatten="${pos.symbol}" data-stop-propagation>Flatten</button></span>
+      <span class="row-acts"><button class="act-btn" data-stop="${pos.symbol}" >Stop</button><button class="act-btn danger" data-flatten="${pos.symbol}" >Flatten</button></span>
     </div>`;
   }).join("");
 

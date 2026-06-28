@@ -5,7 +5,6 @@ import { runWithToast } from "../components/toast.js";
 import { cmd } from "../commands.js";
 import { fmtDateTime } from "../formatters.js";
 import { setFreshness, paintFeedPill } from "../freshness.js";
-import "../components/tooltip.js";
 
 let eventSource = null;
 

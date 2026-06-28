@@ -1,17 +1,9 @@
 import store from "../state.js";
 import { get } from "../api.js";
-import { fmtCurrency, fmtPrice, fmtPct } from "../formatters.js";
+import { fmtCurrency, esc } from "../formatters.js";
 import { errorState } from "../components/error_state.js";
 import { runWithToast } from "../components/toast.js";
 import { cmd } from "../commands.js";
-
-const EQUITY = 350000;
-
-function esc(s) {
-  const d = document.createElement("div");
-  d.textContent = String(s ?? "");
-  return d.innerHTML;
-}
 
 function pct1(v) { return (v * 100).toFixed(1) + "%"; }
 function pct0(v) { return (v * 100).toFixed(0) + "%"; }
