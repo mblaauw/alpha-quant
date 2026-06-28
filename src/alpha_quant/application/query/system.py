@@ -32,7 +32,7 @@ def _check_postgres_health() -> bool:
 
         db_url = _os.environ.get(
             "DATABASE_URL",
-            "postgresql+psycopg://alpha_quant:alpha_quant_dev@postgres:5432/alpha_quant",
+            "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant",
         )
         engine = create_engine(database_url=db_url)
         result = health_check(engine)
