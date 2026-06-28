@@ -9,7 +9,7 @@ import { runWithToast } from "../components/toast.js";
 import { cmd } from "../commands.js";
 import { openOrderDrawer } from "./drawers.js";
 
-const COLS = "1.3fr 1fr .8fr .7fr 1fr 1fr 1fr";
+const COLS = "1.3fr 1fr .8fr .7fr 1fr 1fr .5fr";
 
 export async function renderOrders() {
   const view = document.getElementById("view");
@@ -30,7 +30,7 @@ window.addEventListener("bookchange", renderOrders);
 
 function buildOrders(data) {
   const header = `<div class="dthead" style="grid-template-columns:${COLS}">
-    <span>Order ID</span><span>Symbol</span><span>Side</span><span class="r-right">Qty</span><span>Status</span><span>Created</span><span class="r-right"></span></div>`;
+    <span>Order ID</span><span>Symbol</span><span>Side</span><span class="r-right">Qty</span>    <span>Status</span><span>Created</span><span></span></div>`;
   const rows = (data.items || []).map((o) => {
     const created = o.created_at ? fmtTime(o.created_at) : (o.created || "—");
     return `<div class="dtrow" style="grid-template-columns:${COLS}" data-order="${o.order_id}">
@@ -40,7 +40,7 @@ function buildOrders(data) {
       <span class="num">${fmtNum(o.requested_quantity ?? o.quantity)}</span>
       <span>${tagChip((o.status || "").toUpperCase(), o.status)}</span>
       <span class="age" style="font-size:11px">${created}</span>
-      <span class="r-right">${o.status === "pending" ? `<button class="act-btn danger" data-cancel="${o.order_id}">Cancel</button>` : ""}</span>
+      <span class="chev">›</span>
     </div>`;
   }).join("");
 

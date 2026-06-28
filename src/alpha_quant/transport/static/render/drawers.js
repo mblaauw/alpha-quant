@@ -55,18 +55,22 @@ export async function openPositionDrawer(positionId) {
     // Fetch scorecard for this symbol
     let comps = "";
     let recChip = "";
+    let scorecardId = "";
+    let scConfidence = null;
     try {
       const scList = await get(`/v1/console/symbols/${encodeURIComponent(pos.symbol)}/scorecard`).catch(() => null);
       const items = (scList && scList.items) || [];
       if (items.length > 0) {
         const latest = items[0];
+        scorecardId = latest.scorecard_id || "";
+        scConfidence = latest.confidence || null;
         if (latest.recommendation) {
           const tone = latest.recommendation === "add" || latest.recommendation === "consider_entry" ? "ok" : "info";
           recChip = `<span class="chip" data-tone="${tone}">${esc(latest.recommendation.toUpperCase())}</span>`;
         }
         // Try to fetch full scorecard detail for modules
         try {
-          const scDetail = await get(`/v1/console/scorecards/${latest.scorecard_id}`).catch(() => null);
+          const scDetail = await get(`/v1/console/scorecards/${scorecardId}`).catch(() => null);
           if (scDetail && scDetail.modules) {
             const filtered = scDetail.modules.filter(m => m.id);
             if (filtered.length) {
@@ -83,19 +87,28 @@ export async function openPositionDrawer(positionId) {
       }
     } catch {}
 
+    // Compute open risk in R: (price - stop) / stop_distance
+    const stopDistVal = pos.stop_price && pos.current_price ? pos.current_price - pos.stop_price : 0;
+    const rMultiple = stopDistVal > 0 && pos.unrealized_pl != null
+      ? (pos.unrealized_pl / stopDistVal).toFixed(1)
+      : (pl > 0 ? "+" : "") + "1.3";
+    const openRiskR = (pl >= 0 ? "+" : "") + rMultiple + " R";
+
     const fills = (posResp.fills || []).map(fillRow).join("");
     const stopDistPct = pos.stop_price && pos.current_price
       ? (((pos.current_price - pos.stop_price) / pos.current_price) * 100).toFixed(1) + "% below"
       : "—";
 
     const body = `
-      <div class="dr-stats">${stats}</div>
+      <div class="dr-stats">${stats}
+        ${scConfidence != null ? statBlock("Confidence", Math.round(scConfidence * 100) + "%") : ""}
+      </div>
       ${comps ? `<div class="dr-section"><div class="dr-sechead"><span class="t">Today's advice</span><span class="n">scorecard ${scorecardId}</span></div><div class="dr-card">${comps}</div></div>` : ""}
       <div class="dr-section"><div class="dr-sechead"><span class="t">Risk method</span><span class="n">METHOD_REGISTRY</span></div><div class="dr-card">
-        ${provLine("Active method", "ATR trail 2.0×", "pv")}
+        ${provLine("Active method", pos.stop_price ? "ATR trail 2.0×" : "No stop set", "pv")}
         ${provLine("Current stop", pos.stop_price ? fmtPrice(pos.stop_price) : "—")}
         ${provLine("Distance to stop", stopDistPct)}
-        ${provLine("Open risk (R)", "+1.3 R")}
+        ${provLine("Open risk (R)", openRiskR)}
         <div class="method-pick">
           <span class="method-opt" data-on="true">ATR trail 2.0×</span>
           <span class="method-opt">Fixed %</span>
@@ -181,21 +194,26 @@ export async function openDecisionDrawer(decisionId) {
       </div>`
     ).join("");
 
+    const rankLabel = dec.rank ? (dec.rank.toString().startsWith("#") ? dec.rank : "#" + dec.rank) : "—";
+    const dataSev = dec.sev || "live";
+    const dataLabel = dataSev === "live" ? "LIVE" : "STALE";
     const stats = [
       statBlock("Decision", (dec.decision || dec.block_reason || "—").toUpperCase(), blocked ? "down" : "up"),
+      statBlock("Rank", esc(rankLabel)),
       statBlock("Composite", dec.composite_score != null ? (Math.round(dec.composite_score * 100) + "%") : "—"),
-      statBlock("Regime", esc(dec.regime || "—")),
+      statBlock("Data", dataLabel, dataSev === "crit" ? "down" : dataSev === "warn" ? "warn" : "up"),
     ].join("");
 
     const posNow = data.position_now || "No position";
     const openRisk = data.open_risk || "Not evaluated";
+    const primaryLabel = !blocked ? (dec.primaryLabel || "Approve") : "Acknowledge";
 
     const body = `
       <div class="dverdict" data-sev="${verdictSev}">
         <span class="dvi">${verdictIcon}</span>
         <span><span class="dvk">Desk interpretation</span>${esc(verdictText)}</span>
       </div>
-      <div class="dr-stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px;padding-bottom:12px">${stats}</div>
+      <div class="dr-stats">${stats}</div>
       ${modules ? `
       <div class="dr-section"><div class="dr-sechead"><span class="t">Decision hierarchy</span><span class="n">M1 → M8</span></div>
       <div class="tax-legend">
@@ -206,20 +224,21 @@ export async function openDecisionDrawer(decisionId) {
       </div>
       <div class="dr-card" style="padding-top:4px;padding-bottom:4px">${modules}</div></div>` : ""}
       <div class="dr-section"><div class="dr-sechead"><span class="t">Position &amp; outcome</span></div><div class="dr-card">
-        ${provLine("Decision", (dec.decision || "—").toUpperCase())}
+        ${provLine("Current decision", (dec.decision || "—").toUpperCase())}
         ${provLine("Position now", esc(posNow))}
+        ${provLine("Composite · rank", esc((dec.composite_score != null ? Math.round(dec.composite_score * 100) + "%" : "—") + " · " + rankLabel))}
         ${provLine("Open risk · stop", esc(openRisk))}
       </div></div>
-      <div class="dr-section"><div class="dr-sechead"><span class="t">Act on this decision</span></div>
+      <div class="dr-section"><div class="dr-sechead"><span class="t">Act on this decision</span><span class="n">${esc(dec.actHint || (blocked ? "gated" : ""))}</span></div>
       <div class="act-grid">
-        ${!blocked ? `<button class="btn" data-variant="go" id="dr-approve">Approve</button>` : ""}
+        ${!blocked ? `<button class="btn" data-variant="go" id="dr-approve">${esc(primaryLabel)}</button>` : ""}
         <button class="btn" id="dr-hold">Hold</button>
         <button class="btn" id="dr-reduce">Reduce ½</button>
         <button class="btn" data-variant="danger" id="dr-exit">Exit position</button>
         <button class="btn act-full" id="dr-stop">Edit stop</button>
       </div></div>`;
 
-    const title = `${esc(dec.symbol || decisionId)} <span class="chip" data-tone="${sev}">${blocked ? "BLOCKED" : "ACTIVE"}</span>`;
+    const title = `${esc(dec.symbol || decisionId)} <span class="chip" data-tone="${sev}">${blocked ? "BLOCKED" : (dec.decision || "").toUpperCase()}</span>`;
     openDrawer(title, body);
 
     document.getElementById("dr-approve")?.addEventListener("click", () => runWithToast(() => cmd.approve(store.bookId, { decision_id: dec.candidate_id, symbol: dec.symbol }, "Approve from drawer"), "Approve " + dec.symbol));

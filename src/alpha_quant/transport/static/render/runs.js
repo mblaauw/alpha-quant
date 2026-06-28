@@ -9,7 +9,7 @@ import { runWithToast } from "../components/toast.js";
 import { cmd } from "../commands.js";
 import { openRunDrawer } from "./drawers.js";
 
-const COLS = "1.2fr 1fr 1fr 1fr 1fr .7fr";
+const COLS = "1.2fr 1fr 1fr 1fr 1fr .7fr .5fr";
 
 export async function renderRuns() {
   const view = document.getElementById("view");
@@ -29,7 +29,7 @@ window.addEventListener("bookchange", renderRuns);
 
 function buildRuns(data) {
   const header = `<div class="dthead" style="grid-template-columns:${COLS}">
-    <span>Run ID</span><span>Type</span><span>Status</span><span>Started</span><span>Completed</span><span class="r-right">Cand.</span></div>`;
+    <span>Run ID</span><span>Type</span><span>Status</span><span>Started</span><span>Completed</span><span class="r-right">Cand.</span><span></span></div>`;
   const rows = (data.items || []).map((r) => `
     <div class="dtrow" style="grid-template-columns:${COLS}" data-run="${r.run_id}">
       <span class="age" style="font-size:11px;color:var(--aq-ink2)">${(r.run_id || "").slice(0, 10)}</span>
@@ -38,6 +38,7 @@ function buildRuns(data) {
       <span class="age" style="font-size:11px">${fmtDateTime(r.started_at)}</span>
       <span class="age" style="font-size:11px">${fmtDateTime(r.completed_at)}</span>
       <span class="num">${r.candidates_evaluated ?? "—"}</span>
+      <span class="chev">›</span>
     </div>`).join("");
 
   return `
