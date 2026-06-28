@@ -4,7 +4,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
 
-from alpha_quant.application.query.shared import DEFAULT_BOOK_ID, with_uow
+from alpha_quant.application.query.shared import (
+    resolve_active_book_id,
+    with_uow,
+)
 
 _SECTOR_BY_SYMBOL = {
     "AAPL": "Technology",
@@ -49,7 +52,7 @@ class _RiskPosition:
 
 class RiskService:
     def summary(self, book_id: str | None = None) -> dict[str, object]:
-        bid = UUID(book_id) if book_id else DEFAULT_BOOK_ID
+        bid = UUID(book_id) if book_id else resolve_active_book_id()
 
         def _query(uow):
             halt = uow.store.current_halt(bid)
@@ -372,7 +375,7 @@ class RiskService:
         return with_uow(_query)
 
     def halt_state(self) -> dict[str, object]:
-        bid = DEFAULT_BOOK_ID
+        bid = resolve_active_book_id()
 
         def _query(uow):
             halt = uow.store.current_halt(bid)
