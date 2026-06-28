@@ -7,6 +7,7 @@ import { tagChip } from "../components/status.js";
 import { showModal, closeModal, intro, fieldText, fieldSelect, fieldDateTime, val } from "../components/modal.js";
 import { runWithToast } from "../components/toast.js";
 import { cmd } from "../commands.js";
+import { openRunDrawer } from "./drawers.js";
 
 const COLS = "1.2fr 1fr 1fr 1fr 1fr .7fr";
 
@@ -17,6 +18,7 @@ export async function renderRuns() {
     const data = await get("/v1/console/runs");
     view.innerHTML = buildRuns(data);
     document.getElementById("bt-btn").onclick = openBacktest;
+    document.querySelectorAll("[data-run]").forEach((el) => { el.onclick = () => openRunDrawer(el.dataset.run); });
   } catch (e) {
     view.innerHTML = errorState("Failed to load runs", e.message);
   }
@@ -26,9 +28,9 @@ function buildRuns(data) {
   const header = `<div class="dthead" style="grid-template-columns:${COLS}">
     <span>Run ID</span><span>Type</span><span>Status</span><span>Started</span><span>Completed</span><span class="r-right">Cand.</span></div>`;
   const rows = (data.items || []).map((r) => `
-    <div class="dtrow" style="grid-template-columns:${COLS}">
+    <div class="dtrow" style="grid-template-columns:${COLS}" data-run="${r.run_id}">
       <span class="age" style="font-size:11px;color:var(--aq-ink2)">${(r.run_id || "").slice(0, 10)}</span>
-      <span>${tagChip((r.run_type || "").toUpperCase(), r.run_type === "decision" ? "decision" : "dim")}</span>
+      <span>${tagChip((r.run_type || r.run_kind || "").toUpperCase(), r.run_kind === "decision" ? "decision" : "dim")}</span>
       <span>${tagChip((r.status || "").toUpperCase(), r.status)}</span>
       <span class="age" style="font-size:11px">${fmtDateTime(r.started_at)}</span>
       <span class="age" style="font-size:11px">${fmtDateTime(r.completed_at)}</span>

@@ -8,6 +8,7 @@ import { showModal, closeModal, intro, fieldText, fieldNumber, val } from "../co
 import { runWithToast } from "../components/toast.js";
 import { cmd } from "../commands.js";
 import { classify, freshnessFor } from "../freshness.js";
+import { openDecisionDrawer } from "./drawers.js";
 
 const COLS = "1.5fr 1fr .6fr .6fr 2.2fr 1.2fr";
 
@@ -39,9 +40,9 @@ function buildDecisions(data) {
     const rowCls = blocked ? "dtrow is-stale crit" : "dtrow";
     const actionable = d.decision === "enter" || d.decision === "hold";
     const acts = actionable
-      ? `<span class="row-acts"><button class="act-btn approve" data-approve="${d.decision_id || d.symbol}" data-sym="${d.symbol}">Approve</button><button class="act-btn" data-reject="${d.decision_id || d.symbol}" data-sym="${d.symbol}">Reject</button></span>`
+      ? `<span class="row-acts"><button class="act-btn approve" data-approve="${d.decision_id || d.symbol}" data-sym="${d.symbol}" data-stop-propagation>Approve</button><button class="act-btn" data-reject="${d.decision_id || d.symbol}" data-sym="${d.symbol}" data-stop-propagation>Reject</button></span>`
       : `<span></span>`;
-    return `<div class="${rowCls}" style="grid-template-columns:${COLS}">
+    return `<div class="${rowCls}" style="grid-template-columns:${COLS}" data-decision="${d.decision_id || d.symbol}">
       <span class="symcell"><span class="sym">${d.symbol}</span><span class="${sevCls}">${sev === "live" ? "LIVE" : "STALE"}</span></span>
       <span>${tagChip(String(d.decision || "").toUpperCase(), decTone(d.decision))}</span>
       <span class="num">${d.rank == null ? "—" : "#" + d.rank}</span>
@@ -58,8 +59,9 @@ function buildDecisions(data) {
 
 function wire(items) {
   const by = (id) => items.find((d) => (d.decision_id || d.symbol) === id) || {};
-  document.querySelectorAll("[data-approve]").forEach((b) => b.onclick = () => openApprove(by(b.dataset.approve), b.dataset.sym));
-  document.querySelectorAll("[data-reject]").forEach((b) => b.onclick = () => openReject(by(b.dataset.reject), b.dataset.sym));
+  document.querySelectorAll("[data-approve]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); openApprove(by(b.dataset.approve), b.dataset.sym); });
+  document.querySelectorAll("[data-reject]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); openReject(by(b.dataset.reject), b.dataset.sym); });
+  document.querySelectorAll("[data-decision]").forEach((el) => { el.onclick = () => openDecisionDrawer(el.dataset.decision); });
 }
 
 function openApprove(d, sym) {

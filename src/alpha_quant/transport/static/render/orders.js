@@ -7,6 +7,7 @@ import { tagChip } from "../components/status.js";
 import { showModal, closeModal, intro, fieldText, fieldNumber, fieldSelect, val } from "../components/modal.js";
 import { runWithToast } from "../components/toast.js";
 import { cmd } from "../commands.js";
+import { openOrderDrawer } from "./drawers.js";
 
 const COLS = "1.3fr 1fr .8fr .7fr 1fr 1fr 1fr";
 
@@ -17,7 +18,8 @@ export async function renderOrders() {
     const data = await get("/v1/console/orders");
     view.innerHTML = buildOrders(data);
     document.getElementById("new-order-btn").onclick = openNewOrder;
-    document.querySelectorAll("[data-cancel]").forEach((b) => b.onclick = () => openCancel(b.dataset.cancel));
+    document.querySelectorAll("[data-cancel]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); openCancel(b.dataset.cancel); });
+    document.querySelectorAll("[data-order]").forEach((el) => { el.onclick = () => openOrderDrawer(el.dataset.order); });
   } catch (e) {
     view.innerHTML = errorState("Failed to load orders", e.message);
   }
@@ -28,14 +30,14 @@ function buildOrders(data) {
     <span>Order ID</span><span>Symbol</span><span>Side</span><span class="r-right">Qty</span><span>Status</span><span>Created</span><span class="r-right"></span></div>`;
   const rows = (data.items || []).map((o) => {
     const created = o.created_at ? fmtTime(o.created_at) : (o.created || "—");
-    return `<div class="dtrow" style="grid-template-columns:${COLS}">
+    return `<div class="dtrow" style="grid-template-columns:${COLS}" data-order="${o.order_id}">
       <span class="age" style="font-size:11px">${(o.order_id || "").slice(0, 10) || "—"}</span>
       <span class="sym">${o.symbol}</span>
       <span>${tagChip((o.side || "").toUpperCase(), o.side === "buy" ? "enter" : "blocked")}</span>
       <span class="num">${fmtNum(o.requested_quantity ?? o.quantity)}</span>
       <span>${tagChip((o.status || "").toUpperCase(), o.status)}</span>
       <span class="age" style="font-size:11px">${created}</span>
-      <span class="r-right">${o.status === "pending" ? `<button class="act-btn danger" data-cancel="${o.order_id}">Cancel</button>` : ""}</span>
+      <span class="r-right">${o.status === "pending" ? `<button class="act-btn danger" data-cancel="${o.order_id}" data-stop-propagation>Cancel</button>` : ""}</span>
     </div>`;
   }).join("");
 
