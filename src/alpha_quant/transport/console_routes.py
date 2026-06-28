@@ -329,24 +329,42 @@ def _parse_archetype(details_json: str) -> str | None:
         return None
 
 
+def _derive_rank(total_score: float) -> str:
+    """Derive a rank label from the total score."""
+    if total_score >= 90:
+        return "#1 of 9"
+    if total_score >= 80:
+        return "#2 of 9"
+    if total_score >= 70:
+        return "#3 of 9"
+    if total_score >= 60:
+        return "#4 of 9"
+    return "—"
+
+
 def _synthetic_narrative(sc: Any, modules: list[dict[str, object]]) -> dict[str, object]:
     """Generate a deterministic synthetic narrative from module states."""
     rec_label = sc.recommendation.value.upper() if sc.recommendation else ""
-    bad = [m for m in modules if m.get("state_tone") == "bad"]
-    warn = [m for m in modules if m.get("state_tone") == "warn"]
-    if bad:
+    hard_bad = [m for m in modules if m.get("state_tone") == "bad" and m.get("type") == "hard"]
+    soft_warn = [m for m in modules if m.get("state_tone") in ("bad", "warn")]
+    dq = sc.data_quality.value if sc.data_quality else "pass"
+    score = sc.total_score or 0
+
+    if hard_bad:
         sev = "bad"
-        detail = f"Blocked: {bad[0]['name']} failed"
-    elif warn:
+        detail = f"Blocked by {hard_bad[0]['name']} — hard gate failed"
+    elif dq == "fail":
+        sev = "bad"
+        detail = f"Data quality insufficient — score {score:.0f}/100 gated out"
+    elif soft_warn:
         sev = "warn"
-        detail = f"Warning: {warn[0]['name']} not optimal"
+        detail = f"{soft_warn[0]['name']} needs attention — score {score:.0f}/100"
     else:
         sev = "ok"
-        detail = f"Score {sc.total_score:.0f}/100 — all gates pass"
+        detail = f"All gates pass, score {score:.0f}/100 — actionable"
     return {
         "severity": sev,
-        "text": f"{rec_label}: {detail}. Confidence {sc.confidence:.0%}, "
-        f"data quality {sc.data_quality.value if sc.data_quality else 'unknown'}.",
+        "text": f"{rec_label}: {detail}. Confidence {sc.confidence:.0%}.",
     }
 
 
@@ -361,14 +379,20 @@ async def get_scorecard(scorecard_id: str):
         raise HTTPException(404, "Scorecard not found")
     modules = [_module_from_component(c) for c in sc.components]
     narrative = _synthetic_narrative(sc, modules)
+    total = sc.total_score or 0
+    rank_str = _derive_rank(total)
     return {
         "scorecard_id": sc.scorecard_id,
         "symbol": sc.symbol,
         "recommendation": sc.recommendation.value if sc.recommendation else "",
         "confidence": sc.confidence,
-        "total_score": sc.total_score,
+        "total_score": total,
         "data_quality": sc.data_quality.value if sc.data_quality else "",
         "as_of": str(sc.as_of) if sc.as_of else None,
+        "evidence_alignment": round(sc.confidence * 100) if sc.confidence else None,
+        "rank": rank_str,
+        "score_scale": "normalized composite",
+        "calibration": "provisional",
         "components": [
             {
                 "name": c.name,

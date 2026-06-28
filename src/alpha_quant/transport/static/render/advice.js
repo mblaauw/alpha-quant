@@ -24,7 +24,7 @@ let _scorecardCache = {};
 // ── Advice card ──
 
 function buildCard(c) {
-  const recMap = { add: "ADD", consider_entry: "CONSIDER ENTRY", hold: "HOLD", reduce: "REDUCE", exit: "EXIT", watch: "WATCH", do_nothing: "—" };
+  const recMap = { add: "ADD", consider_entry: "CONSIDER ENTRY", hold: "HOLD", reduce: "REDUCE", exit: "EXIT", watch: "WATCH", do_nothing: "NO ACTION" };
   const recLabel = recMap[c.recommendation] || (c.recommendation || "").toUpperCase();
   const engSize = c.suggested_qty ? `Engine size <b>${c.suggested_qty} sh</b> · ${fmtCurrency(c.notional)} · risk ${fmtCurrency(c.risk_at_stop)}` : "";
   return `<div class="acard" data-rec="${c.recommendation}" data-scorecard="${c.scorecard_id}">
@@ -113,7 +113,7 @@ function buildScorecardDrawer(s, symbol) {
 // ── Helpers ──
 
 function recLabel(rec) {
-  const m = { add: "ADD", consider_entry: "CONSIDER ENTRY", hold: "HOLD", reduce: "REDUCE", exit: "EXIT", watch: "WATCH", do_nothing: "—" };
+  const m = { add: "ADD", consider_entry: "CONSIDER ENTRY", hold: "HOLD", reduce: "REDUCE", exit: "EXIT", watch: "WATCH", do_nothing: "NO ACTION" };
   return m[rec] || (rec || "").toUpperCase();
 }
 
