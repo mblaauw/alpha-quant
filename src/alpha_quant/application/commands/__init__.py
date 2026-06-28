@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
 
 from sqlalchemy import text
 
@@ -41,12 +41,16 @@ def _book_immediate_fill(
 
     from alpha_quant.contracts.operational import FillBookingCommand, FillQuality, OrderSide
 
-    # Resolve security_id from symbol
+    # Resolve security_id from symbol; fall back to a deterministic UUID
     sec_row = uow.store.session.execute(
         text("SELECT security_id FROM core.security_reference WHERE symbol = :sym"),
         {"sym": symbol},
     ).fetchone()
-    sec_id = str(sec_row._mapping["security_id"]) if sec_row else symbol
+    sec_id_str = (
+        str(sec_row._mapping["security_id"])
+        if sec_row
+        else uuid5(UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8"), symbol)
+    )
 
     # Get current price from positions or use a default
     sql_pos = "SELECT current_price FROM projection.position_current WHERE book_id = :bid AND symbol = :sym"  # noqa: E501
@@ -56,23 +60,16 @@ def _book_immediate_fill(
     ).fetchone()
     price = float(pos_row._mapping["current_price"]) if pos_row else 100.0
 
+    sec_uuid: UUID = (
+        UUID(sec_id_str)
+        if isinstance(sec_id_str, str) and len(sec_id_str) == 36
+        else uuid5(UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8"), symbol)
+    )
     fill_cmd = FillBookingCommand(
         order_id=UUID(order_id),
         decision_run_id=UUID("00000000-0000-0000-0000-000000000001"),
         portfolio_book_id=book_id,
-        security_id=UUID(sec_id)
-        if len(sec_id) == 36
-        else UUID(
-            sec_id[:8]
-            + "-"
-            + sec_id[8:12]
-            + "-"
-            + sec_id[12:16]
-            + "-"
-            + sec_id[16:20]
-            + "-"
-            + sec_id[20:]
-        ),
+        security_id=sec_uuid,
         symbol=symbol,
         side=OrderSide(side),
         quantity=Decimal(str(quantity)),
@@ -108,7 +105,7 @@ def _book_immediate_fill(
         """),
         {
             "bid": str(book_id),
-            "sid": sec_id,
+            "sid": str(sec_id_str),
             "sym": symbol,
             "qty": qty_delta,
             "avg": cost_delta / max(qty_delta, Decimal("1")),
@@ -270,20 +267,18 @@ def approve_candidate_handler(cmd: Command) -> tuple[CommandStatus, str | None, 
     uow = create_unit_of_work()
     with uow:
         payload: dict = json.loads(cmd.payload_json) if cmd.payload_json else {}
-        decision_id: str | None = payload.get("decision_id")
         symbol: str | None = payload.get("symbol")
         quantity_raw = payload.get("quantity")
         if not symbol or quantity_raw is None:
             return CommandStatus.FAILED, None, "Missing required fields: symbol, quantity"
+        book_id = cmd.book_id or UUID("00000000-0000-0000-0000-000000000001")
         order_id = uow.store.create_order(
             symbol=symbol,
             side="buy",
             quantity=float(quantity_raw),
             order_type="market",
-            book_id=cmd.book_id or UUID("00000000-0000-0000-0000-000000000001"),
-            decision_id=decision_id,
+            book_id=book_id,
         )
-        book_id = cmd.book_id or UUID("00000000-0000-0000-0000-000000000001")
         _book_immediate_fill(
             uow,
             order_id,
