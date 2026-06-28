@@ -1,14 +1,13 @@
 import store from "../state.js";
-import { get } from "../api.js";
 import { showBanner, clearBanner } from "../components/banner.js";
 import { showModal, closeModal, intro, fieldStatic } from "../components/modal.js";
 import { runWithToast } from "../components/toast.js";
 import { cmd } from "../commands.js";
 import { fmtDateTime } from "../formatters.js";
-import { loadFreshness, paintFeedPill } from "../freshness.js";
+import { setFreshness, paintFeedPill } from "../freshness.js";
 import "../components/tooltip.js";
 
-let pollTimer = null;
+let eventSource = null;
 
 export async function initShell() {
   store.theme = localStorage.getItem("aq-theme") || "light";
@@ -24,8 +23,9 @@ export async function initShell() {
   tickClock();
   setInterval(tickClock, 30000);
 
-  await Promise.all([refreshContext(), refreshFreshness()]);
-  pollTimer = setInterval(() => { refreshContext(); refreshFreshness(); }, 15000);
+  // Initial fetch, then switch to SSE
+  await initialFetch();
+  connectSSE();
 }
 
 function applyTheme() {
@@ -38,21 +38,58 @@ function tickClock() {
   document.getElementById("header-time").textContent = s.toUpperCase() + " · LIVE";
 }
 
-async function refreshContext() {
+async function initialFetch() {
+  // One-shot fetch to paint the UI before SSE pushes its first event.
   try {
-    const ctx = await get("/v1/console/context");
+    const [ctx, fr] = await Promise.all([
+      fetch("/v1/console/context").then(r => r.json()),
+      fetch("/v1/console/freshness").then(r => r.json()),
+    ]);
     store.context = ctx;
     store.bookId = ctx.active_book_id;
+    store.freshness = fr;
     paintShell(ctx);
+    paintFeedPill(fr);
     clearBanner();
   } catch (e) {
-    showBanner("Context load failed: " + e.message, "warning", "Offline");
+    showBanner("Initial load failed: " + e.message, "warning", "Offline");
   }
 }
 
-async function refreshFreshness() {
-  const fr = await loadFreshness();
-  paintFeedPill(fr);
+function applyContext(ctx) {
+  const prevId = store.bookId;
+  store.context = ctx;
+  store.bookId = ctx.active_book_id;
+  paintShell(ctx);
+  clearBanner();
+  // If book changed, dispatch a custom event so views can re-render.
+  if (prevId && prevId !== ctx.active_book_id) {
+    window.dispatchEvent(new CustomEvent("bookchange", { detail: { bookId: ctx.active_book_id } }));
+  }
+}
+
+function connectSSE() {
+  if (eventSource) eventSource.close();
+  eventSource = new EventSource("/v1/console/stream");
+
+  eventSource.addEventListener("context", (e) => {
+    try { applyContext(JSON.parse(e.data)); } catch {}
+  });
+
+  eventSource.addEventListener("freshness", (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      setFreshness(data);
+      paintFeedPill(data);
+    } catch {}
+  });
+
+  eventSource.onerror = () => {
+    // EventSource auto-reconnects; close and restart after a delay on hard failure.
+    if (eventSource.readyState === EventSource.CLOSED) {
+      setTimeout(connectSSE, 5000);
+    }
+  };
 }
 
 function paintShell(ctx) {
@@ -77,7 +114,7 @@ function openRunModal() {
       + fieldStatic("Decision as of", "Latest — live data"),
     [
       { label: "Cancel", class: "btn", onclick: closeModal },
-      { label: "▶ Run", class: "btn btn-primary", onclick: () => { closeModal(); runWithToast(() => cmd.runCycle(store.bookId), "Decision cycle — latest", refreshContext); } },
+      { label: "▶ Run", class: "btn btn-primary", onclick: () => { closeModal(); runWithToast(() => cmd.runCycle(store.bookId), "Decision cycle — latest"); } },
     ],
   );
 }

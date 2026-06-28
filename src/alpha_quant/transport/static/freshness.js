@@ -43,8 +43,14 @@ export function freshnessFor(symbol) {
   return fr.symbols.find((s) => s.symbol === symbol) || null;
 }
 
+/* Accept freshness data pushed from the SSE stream. */
+export function setFreshness(data) {
+  store.freshness = data;
+}
+
 /* Fetch /v1/console/freshness, caching on the store. Tolerant: if the endpoint
-   is not yet implemented, returns null and the UI falls back to per-item blocks. */
+   is not yet implemented, returns null and the UI falls back to per-item blocks.
+   Used as fallback when SSE is unavailable. */
 export async function loadFreshness() {
   try {
     const fr = await get("/v1/console/freshness");
