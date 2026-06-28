@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from alpha_quant.application.query.shared import DEFAULT_BOOK_ID, with_uow
+from alpha_quant.application.query.shared import (
+    resolve_active_book_id,
+    with_uow,
+)
 
 
 class CommandCenterService:
     def summary(self) -> dict[str, object]:
-        book_id = DEFAULT_BOOK_ID
+        book_id = resolve_active_book_id()
 
         def _query(uow):
             uow.store.list_strategies()
@@ -43,7 +46,7 @@ class CommandCenterService:
         return with_uow(_query)
 
     def readiness(self) -> dict[str, object]:
-        book_id = DEFAULT_BOOK_ID
+        book_id = resolve_active_book_id()
 
         def _query(uow):
             halt = uow.store.current_halt(book_id)

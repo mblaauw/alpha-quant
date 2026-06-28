@@ -321,21 +321,72 @@ def candidate_follow_handler(cmd: Command) -> tuple[CommandStatus, str | None, s
 def candidate_modify_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | None]:
     import json
 
+    payload: dict = json.loads(cmd.payload_json) if cmd.payload_json else {}
+    scorecard_id: str | None = payload.get("scorecard_id")
+    qty_raw = payload.get("qty")
+    stop_price_raw = payload.get("stop_price")
+    risk_pct_raw = payload.get("risk_pct")
+    method: str | None = payload.get("method")
+
+    if not scorecard_id or qty_raw is None:
+        return CommandStatus.FAILED, None, "Missing required fields: scorecard_id, qty"
+
+    book_id = cmd.book_id or UUID("00000000-0000-0000-0000-000000000001")
+    qty = int(qty_raw)
+    stop_price = float(stop_price_raw) if stop_price_raw else None
+    risk_pct = float(risk_pct_raw) if risk_pct_raw else None
+
     uow = create_unit_of_work()
     with uow:
-        payload: dict = json.loads(cmd.payload_json) if cmd.payload_json else {}
-        symbol: str | None = payload.get("symbol")
-        quantity_raw = payload.get("quantity")
-        limit_price_raw = payload.get("limit_price")
-        if not symbol or quantity_raw is None:
-            return CommandStatus.FAILED, None, "Missing required fields: symbol, quantity"
+        portfolio = uow.store.load_portfolio(book_id)
+        positions = uow.store.list_positions(book_id)
+        cash = float(portfolio.cash) if portfolio and portfolio.cash else 0.0
+        total_mv = sum(float(p.market_value or 0) for p in positions)
+        equity = cash + total_mv if (cash + total_mv) > 0 else 350_000.0
+
+        # Determine max safe qty by re-computing sizing server-side
+        risk_pct = risk_pct if risk_pct else 0.005
+        last_price = stop_price if stop_price else 100.0
+        atr = last_price * 0.033
+
+        if method == "atr_2_5":
+            stop_dist = 2.5 * atr
+        elif method == "fixed_8":
+            stop_dist = last_price * 0.08
+        else:
+            stop_dist = 2.0 * atr
+            method = method or "atr_2_0"
+
+        risk_budget = equity * risk_pct
+        max_safe_qty = max(1, int(risk_budget // stop_dist)) if stop_dist > 0 else 1
+        final_qty = min(qty, max_safe_qty)
+
+        # Guardrail checks
+        notional = final_qty * last_price
+        risk_at_stop = final_qty * stop_dist
+        buying_power = equity * 0.18
+
+        if notional > buying_power:
+            return (
+                CommandStatus.FAILED,
+                None,
+                (f"buying_power_exceeded: ${notional:,.0f} > ${buying_power:,.0f}"),
+            )
+        if final_qty == 0:
+            return CommandStatus.FAILED, None, "zero_qty: quantity would be zero"
+        if risk_at_stop > equity * 0.01:
+            return (
+                CommandStatus.FAILED,
+                None,
+                (f"per_trade_risk_exceeded: ${risk_at_stop:,.0f} > 1% of equity"),
+            )
+
         order_id = uow.store.create_order(
-            symbol=symbol,
+            symbol=scorecard_id,
             side="buy",
-            quantity=float(quantity_raw),
-            order_type="limit" if limit_price_raw else "market",
-            book_id=cmd.book_id or UUID("00000000-0000-0000-0000-000000000001"),
-            limit_price=float(limit_price_raw) if limit_price_raw else None,
+            quantity=float(final_qty),
+            order_type="market",
+            book_id=book_id,
         )
         return CommandStatus.SUCCEEDED, order_id, None
 

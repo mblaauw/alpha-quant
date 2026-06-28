@@ -18,12 +18,9 @@ def _check_lake_health() -> bool:
 
 
 def _resolve_book_id() -> str:
-    try:
-        from alpha_quant.application.query.shared import DEFAULT_BOOK_ID
+    from alpha_quant.application.query.shared import resolve_active_book_id
 
-        return str(DEFAULT_BOOK_ID)
-    except Exception:
-        return "00000000-0000-0000-0000-000000000001"
+    return str(resolve_active_book_id())
 
 
 def _check_postgres_health() -> bool:
@@ -65,7 +62,15 @@ class SystemService:
                 "last_run_status": run.status.value if run else None,
                 "last_run_as_of": str(run.decision_as_of) if run and run.decision_as_of else None,
                 "active_book_id": str(book_id),
-                "books": [{"id": str(b.book_id), "name": b.name, "kind": b.kind} for b in books],
+                "books": [
+                    {
+                        "book_id": str(b.book_id),
+                        "label": b.name,
+                        "mode": b.kind,
+                        "policy": "full",
+                    }
+                    for b in books
+                ],
                 "mode": "PAPER",
                 "snapshot": None,
                 "lake_healthy": lake_healthy,

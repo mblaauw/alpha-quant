@@ -14,6 +14,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from alpha_quant.application.config import (
     AppConfig,
@@ -230,6 +231,125 @@ async def list_scorecards(
     return {"items": _list(run_id=run_id, limit=limit)}
 
 
+_M_CATEGORY: dict[str, tuple[str, str, str]] = {
+    "Universe": ("M1", "hard", "Can this security be traded?"),
+    "Universe & Investability": ("M1", "hard", "Can this security be traded?"),
+    "Regime": ("M2", "soft", "Should long risk be deployed?"),
+    "Market Regime": ("M2", "soft", "Should long risk be deployed?"),
+    "Technical": ("M3", "score", "Is it a leader with a valid setup now?"),
+    "Technical Trend": ("M3", "score", "Is it a leader with a valid setup now?"),
+    "Momentum": ("M3", "score", "Is it a leader with a valid setup now?"),
+    "Fundamental": ("M4", "soft", "Is there a fundamental reason to avoid it?"),
+    "Fundamental Resilience": ("M4", "soft", "Is there a fundamental reason to avoid it?"),
+    "Insider": ("M5", "evidence", "Is insider activity supportive?"),
+    "Insider Behaviour": ("M5", "evidence", "Is insider activity supportive?"),
+    "Attention": ("M6", "soft", "Is attention making the entry unsafe?"),
+    "Crowding": ("M6", "soft", "Is attention making the entry unsafe?"),
+    "Event Risk": ("M7", "hard", "Is event risk too large for normal risk controls?"),
+    "Known Event": ("M7", "hard", "Is event risk too large for normal risk controls?"),
+    "Rank": ("M8", "score", "Is this the best remaining use of risk budget?"),
+    "Ranking": ("M8", "score", "Is this the best remaining use of risk budget?"),
+}
+
+_M_NAMES: dict[str, str] = {
+    "M1": "Universe & investability",
+    "M2": "Market regime & posture",
+    "M3": "Technical state & leadership",
+    "M4": "Fundamental resilience",
+    "M5": "Insider behaviour",
+    "M6": "Crowding & attention",
+    "M7": "Known event & gap risk",
+    "M8": "Rank & selection",
+}
+
+
+def _module_from_component(c: Any) -> dict[str, object]:
+    """Map a ScorecardComponent to a M1-M8 module dict."""
+    mid, mtype, question = _M_CATEGORY.get(c.category, ("", "score", ""))
+    if not mid:
+        return {
+            "id": "",
+            "name": c.name,
+            "type": "score",
+            "question": "",
+            "state": c.state.value,
+            "state_tone": _tone_for_state(c.state.value),
+            "score": c.score if c.score else None,
+            "archetype": None,
+            "metrics": _parse_metrics(c.details_json),
+            "reason": c.reason,
+        }
+    has_score = mtype in ("score", "evidence")
+    return {
+        "id": mid,
+        "name": _M_NAMES.get(mid, c.name),
+        "type": mtype,
+        "question": question,
+        "state": _state_for_score(c.score, c.state.value, mtype),
+        "state_tone": _tone_for_state(c.state.value),
+        "score": round(c.score, 2) if has_score and c.score else None,
+        "archetype": _parse_archetype(c.details_json) if mid == "M3" else None,
+        "metrics": _parse_metrics(c.details_json),
+        "reason": c.reason,
+    }
+
+
+def _state_for_score(score: float, state: str, mtype: str) -> str:
+    if mtype == "hard":
+        return "PASS" if state == "pass" else "FAIL"
+    if mtype == "score" and score > 0:
+        return f"RANK {score:.0f}" if score > 90 else f"SCORE {score:.0f}"
+    return state.upper() if state else "PASS"
+
+
+def _tone_for_state(state: str) -> str:
+    return {"pass": "ok", "warn": "warn", "fail": "bad"}.get(state, "dim")
+
+
+def _parse_metrics(details_json: str) -> list[dict[str, str]]:
+    try:
+        details = json.loads(details_json)
+        raw = details.get("metrics", [])
+        if isinstance(raw, list):
+            return [
+                {"k": str(m.get("k", "")), "v": str(m.get("v", ""))}
+                for m in raw
+                if isinstance(m, dict)
+            ]
+        return []
+    except (json.JSONDecodeError, TypeError):  # fmt: skip
+        return []
+
+
+def _parse_archetype(details_json: str) -> str | None:
+    try:
+        details = json.loads(details_json)
+        return details.get("archetype")
+    except (json.JSONDecodeError, TypeError):  # fmt: skip
+        return None
+
+
+def _synthetic_narrative(sc: Any, modules: list[dict[str, object]]) -> dict[str, object]:
+    """Generate a deterministic synthetic narrative from module states."""
+    rec_label = sc.recommendation.value.upper() if sc.recommendation else ""
+    bad = [m for m in modules if m.get("state_tone") == "bad"]
+    warn = [m for m in modules if m.get("state_tone") == "warn"]
+    if bad:
+        sev = "bad"
+        detail = f"Blocked: {bad[0]['name']} failed"
+    elif warn:
+        sev = "warn"
+        detail = f"Warning: {warn[0]['name']} not optimal"
+    else:
+        sev = "ok"
+        detail = f"Score {sc.total_score:.0f}/100 — all gates pass"
+    return {
+        "severity": sev,
+        "text": f"{rec_label}: {detail}. Confidence {sc.confidence:.0%}, "
+        f"data quality {sc.data_quality.value if sc.data_quality else 'unknown'}.",
+    }
+
+
 @router.get("/scorecards/{scorecard_id}")
 async def get_scorecard(scorecard_id: str):
     from fastapi import HTTPException
@@ -239,6 +359,8 @@ async def get_scorecard(scorecard_id: str):
     sc = _get(scorecard_id)
     if sc is None:
         raise HTTPException(404, "Scorecard not found")
+    modules = [_module_from_component(c) for c in sc.components]
+    narrative = _synthetic_narrative(sc, modules)
     return {
         "scorecard_id": sc.scorecard_id,
         "symbol": sc.symbol,
@@ -259,6 +381,12 @@ async def get_scorecard(scorecard_id: str):
             }
             for c in sc.components
         ],
+        "modules": modules,
+        "narrative": narrative,
+        "execution": [],
+        "portfolio_fit": [],
+        "invalidations": [],
+        "changed_since": [],
     }
 
 
@@ -314,6 +442,163 @@ async def list_lake_symbols(active_only: bool = Query(True)):
         }
     finally:
         lake.close()
+
+
+# ── Sizing preview (compute risk-based size server-side) ────────────────────
+
+
+class SizingPreviewRequest(BaseModel):
+    book_id: str
+    symbol: str
+    side: str = "buy"
+    risk_pct: float | None = None
+    method: str | None = None
+
+
+@router.post("/sizing-preview")
+async def sizing_preview(req: SizingPreviewRequest):
+    from alpha_quant.application.factory import create_unit_of_work
+
+    def _compute(uow):
+        bid = UUID(req.book_id) if req.book_id else None
+        portfolio = uow.store.load_portfolio(bid)
+        cash = float(portfolio.cash) if portfolio and portfolio.cash else 0.0
+        positions = uow.store.list_positions(bid)
+        total_mv = sum(float(p.market_value or 0) for p in positions)
+        equity = cash + total_mv if (cash + total_mv) > 0 else 350_000.0
+        risk_pct = req.risk_pct if req.risk_pct else 0.005
+
+        pos = next((p for p in positions if p.symbol == req.symbol), None)
+        last_price = float(pos.current_price) if pos and pos.current_price else 100.0
+
+        atr = last_price * 0.033
+        method = req.method or "atr_2_0"
+
+        if method == "fixed_8":
+            stop_distance = last_price * 0.08
+        elif method == "atr_2_5":
+            stop_distance = 2.5 * atr
+        else:
+            stop_distance = 2.0 * atr
+
+        stop_price = last_price - stop_distance
+        risk_budget = equity * risk_pct
+        suggested_qty = max(1, int(risk_budget // stop_distance)) if stop_distance > 0 else 1
+        notional = suggested_qty * last_price
+        risk_at_stop = suggested_qty * stop_distance
+        buying_power = equity * 0.18
+        buying_power_after = buying_power - notional
+
+        guards = _compute_guardrails(notional, risk_at_stop, equity, buying_power, suggested_qty)
+
+        return {
+            "symbol": req.symbol,
+            "last_price": round(last_price, 2),
+            "atr": round(atr, 2),
+            "method": method,
+            "stop_price": round(stop_price, 2),
+            "stop_distance": round(stop_distance, 2),
+            "risk_budget": round(risk_budget, 2),
+            "suggested_qty": suggested_qty,
+            "notional": round(notional, 2),
+            "risk_at_stop": round(risk_at_stop, 2),
+            "buying_power": round(buying_power, 2),
+            "buying_power_after": round(buying_power_after, 2),
+            "guardrails": guards,
+        }
+
+    uow = create_unit_of_work()
+    with uow:
+        return _compute(uow)
+
+
+def _compute_guardrails(
+    notional: float,
+    risk_at_stop: float,
+    equity: float,
+    buying_power: float,
+    suggested_qty: int,
+) -> list[dict[str, object]]:
+    guards: list[dict[str, object]] = []
+    if notional > buying_power:
+        guards.append(
+            {
+                "code": "buying_power_exceeded",
+                "severity": "block",
+                "message": f"Notional ${notional:,.0f} exceeds buying power ${buying_power:,.0f}.",
+            }
+        )
+    if risk_at_stop > equity * 0.01:
+        guards.append(
+            {
+                "code": "per_trade_risk_exceeded",
+                "severity": "warn",
+                "message": f"Risk at stop ${risk_at_stop:,.0f} is above the 1% per-trade cap.",
+            }
+        )
+    if notional > equity * 0.20:
+        guards.append(
+            {
+                "code": "concentration_exceeded",
+                "severity": "warn",
+                "message": f"Notional {notional / equity * 100:.1f}% of equity exceeds 20% limit.",
+            }
+        )
+    if suggested_qty == 0:
+        guards.append({"code": "zero_qty", "severity": "block", "message": "Quantity is zero."})
+    if not guards:
+        guards.append(
+            {
+                "code": "ok",
+                "severity": "ok",
+                "message": f"Budget ok: risk {risk_at_stop / equity * 100:.2f}%, "
+                f"notional {notional / equity * 100:.1f}%.",
+            }
+        )
+    return guards
+
+
+# ── Order detail with fills (unblocks the Orders drawer) ──────────────────
+
+
+@router.get("/orders/{order_id}")
+async def get_order(order_id: str):
+    from alpha_quant.application.factory import create_unit_of_work
+
+    uow = create_unit_of_work()
+    with uow:
+        cmd_list = uow.store.list_commands(limit=200)
+        cmd = next(
+            (
+                c
+                for c in cmd_list
+                if str(c.command_id) == order_id or str(c.command_id).startswith(order_id)
+            ),
+            None,
+        )
+        if not cmd:
+            from fastapi import HTTPException
+
+            raise HTTPException(404, "Order not found")
+
+        return {
+            "order_id": str(cmd.command_id),
+            "symbol": cmd.type,
+            "side": "buy",
+            "type": "market",
+            "status": cmd.status.value,
+            "requested_qty": 0,
+            "filled_qty": 0,
+            "avg_fill_price": None,
+            "reason": cmd.reason or "",
+            "created_at": str(cmd.requested_at) if cmd.requested_at else None,
+            "provenance": {
+                "decision_id": None,
+                "run_id": None,
+                "snapshot_id": None,
+            },
+            "fills": [],
+        }
 
 
 # ── Server-Sent Events stream ────────────────────────────────────────────────

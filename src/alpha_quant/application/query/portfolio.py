@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from alpha_quant.application.query.shared import DEFAULT_BOOK_ID, with_uow
+from alpha_quant.application.query.shared import (
+    resolve_active_book_id,
+    with_uow,
+)
 
 
 class PortfolioService:
     def summary(self, book_id: str | None = None) -> dict[str, object]:
-        bid = UUID(book_id) if book_id else DEFAULT_BOOK_ID
+        bid = UUID(book_id) if book_id else resolve_active_book_id()
 
         def _query(uow):
             positions = uow.store.list_positions(bid)
@@ -24,7 +27,7 @@ class PortfolioService:
         return with_uow(_query)
 
     def list_positions(self, book_id: str | None = None) -> list[dict[str, object]]:
-        bid = UUID(book_id) if book_id else DEFAULT_BOOK_ID
+        bid = UUID(book_id) if book_id else resolve_active_book_id()
 
         def _query(uow):
             positions = uow.store.list_positions(bid)
@@ -45,7 +48,7 @@ class PortfolioService:
 
     def get_position(self, position_id: str) -> dict[str, object] | None:
         def _query(uow):
-            positions = uow.store.list_positions(DEFAULT_BOOK_ID)
+            positions = uow.store.list_positions(resolve_active_book_id())
             pos = next((p for p in positions if p.symbol == position_id), None)
             if not pos:
                 return None

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from alpha_quant.application.query.shared import DEFAULT_BOOK_ID, with_uow
+from alpha_quant.application.query.shared import (
+    resolve_active_book_id,
+    with_uow,
+)
 
 
 class RunService:
@@ -13,7 +16,7 @@ class RunService:
         cursor: str | None = None,
         limit: int = 50,
     ) -> dict[str, object]:
-        bid = UUID(book_id) if book_id else DEFAULT_BOOK_ID
+        bid = UUID(book_id) if book_id else resolve_active_book_id()
 
         def _query(uow):
             runs = uow.store.list_decision_runs(bid, limit=limit)
@@ -36,7 +39,7 @@ class RunService:
 
     def get_run(self, run_id: str) -> dict[str, object] | None:
         def _query(uow):
-            runs = uow.store.list_decision_runs(DEFAULT_BOOK_ID, limit=200)
+            runs = uow.store.list_decision_runs(resolve_active_book_id(), limit=200)
             run = next((r for r in runs if str(r.decision_run_id) == run_id), None)
             if not run:
                 return None

@@ -18,3 +18,18 @@ def with_uow(query_fn: Callable, database_url: str | None = None) -> Any:
     uow = create_unit_of_work(database_url or DEFAULT_DATABASE_URL)
     with uow:
         return query_fn(uow)
+
+
+def resolve_active_book_id() -> UUID:
+    """Return the first registered book as the active default."""
+    try:
+        from alpha_quant.application.factory import create_unit_of_work
+
+        uow = create_unit_of_work()
+        with uow:
+            books = uow.store.list_books()
+            if books:
+                return books[0].book_id
+    except Exception:
+        pass
+    return DEFAULT_BOOK_ID
