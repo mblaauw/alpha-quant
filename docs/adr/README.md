@@ -60,7 +60,8 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0052](./0052-user-overrides-as-audited-commands.md) | User Overrides Are Audited Commands | Accepted | 2026-06-27 |
 | [0053](./0053-risk-methods-as-user-visible-policy.md) | Risk Methods Are User-Visible Deterministic Policies | Accepted | 2026-06-27 |
 | [0054](./0054-evolved-desk-advice-tab.md) | Desk Redesigned with Advice-First Tab | Accepted | 2026-06-27 |
-| [0055](./0055-risk-desk-placeholder-contract.md) | Risk Desk Uses a Stable Placeholder Contract Before the Real Risk Engine | Accepted | 2026-06-28 |
+| [0055](./0055-risk-desk-placeholder-contract.md) | Risk Desk Uses a Stable Placeholder Contract Before the Real Risk Engine | Superseded by 0056 | 2026-06-28 |
+| [0056](./0056-real-risk-engine.md) | Real Risk Engine Replaces Placeholder Calculations | Accepted | 2026-06-28 |
 
 ## Status Meanings
 
