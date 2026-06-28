@@ -1,6 +1,11 @@
-export function openDrawer(title, content) {
-  document.getElementById("drawer-title").textContent = title;
+export function openDrawer(title, content, subtitle) {
+  document.getElementById("drawer-title").innerHTML = title;
   document.getElementById("drawer-body").innerHTML = content;
+  const sub = document.getElementById("drawer-sub");
+  if (sub) {
+    sub.textContent = subtitle ?? "";
+    sub.style.display = subtitle ? "" : "none";
+  }
   document.getElementById("drawer").classList.add("open");
   document.getElementById("drawer-overlay").classList.add("open");
 }

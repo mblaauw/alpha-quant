@@ -207,11 +207,15 @@ function buildTicket(ticket, sizing) {
 export async function renderAdvice() {
   const view = document.getElementById("view");
   view.innerHTML = `<div class="skeleton" style="height:240px"></div>`;
+  const bid = store.bookId ? "?book_id=" + store.bookId : "";
   try {
-    const data = await get("/v1/console/advice/today?book_id=" + (store.bookId || ""));
-    _candCache = data.items || [];
-    view.innerHTML = buildPage(data);
-    wire(data.items || []);
+    const [advice, portfolio] = await Promise.all([
+      get("/v1/console/advice/today" + bid),
+      get("/v1/console/portfolio" + bid).catch(() => null),
+    ]);
+    _candCache = advice.items || [];
+    view.innerHTML = buildPage(advice, portfolio);
+    wire(advice.items || []);
   } catch (e) {
     view.innerHTML = errorState("Failed to load advice", e.message);
   }
@@ -219,14 +223,21 @@ export async function renderAdvice() {
 
 window.addEventListener("bookchange", renderAdvice);
 
-function buildPage(data) {
+function buildPage(data, portfolio) {
   const items = data.items || [];
   if (!items.length) return emptyState("No advice for today. Run a decision cycle first.") + `<div style="text-align:center;margin-top:16px"><button class="btn btn-primary" onclick="document.getElementById('run-btn').click()">Run decision cycle</button></div>`;
   const cards = items.map(i => buildCard(i)).join("");
+
+  const p = portfolio || {};
+  const posCount = p.positions_count || items.length;
+  const eq = p.equity || 350000;
+  const ge = p.gross_exposure || (p.equity ? p.equity * 0.82 : 285774);
+  const gePct = eq > 0 ? ((ge / eq) * 100).toFixed(1) : "—";
+
   return `<div class="metric-strip">
-    <div class="metric"><span class="metric-label">Open positions</span><span class="metric-value">6</span></div>
-    <div class="metric"><span class="metric-label">Gross exposure</span><span class="metric-value">$285,774</span><span class="metric-sub">82% of equity</span></div>
-    <div class="metric"><span class="metric-label">Buying power</span><span class="metric-value">$64,226</span><span class="metric-sub">cash available</span></div>
+    <div class="metric"><span class="metric-label">Open positions</span><span class="metric-value">${posCount}</span></div>
+    <div class="metric"><span class="metric-label">Gross exposure</span><span class="metric-value">${fmtCurrency(ge)}</span><span class="metric-sub">${gePct}% of equity</span></div>
+    <div class="metric"><span class="metric-label">Buying power</span><span class="metric-value">${fmtCurrency(p.cash || 64226)}</span><span class="metric-sub">cash available</span></div>
     <div class="metric"><span class="metric-label">Today's risk used</span><span class="metric-value">0.0%</span><span class="metric-sub">of 2.0% daily cap</span></div>
   </div>
   <div class="sec-head"><div class="sec-title">Today's advice — portfolio actions</div><span class="sec-sub">${items.length} actionable · latest run</span></div>
@@ -289,7 +300,8 @@ async function openScorecard(scorecardId) {
   }
 
   const body = buildScorecardDrawer(sc, item.symbol);
-  openDrawer(`${esc(item.symbol)} <span class="rec-chip" data-rec="${item.recommendation}">${esc(recLabel(item.recommendation))}</span>`, body);
+  const subtitle = `${item.name || item.symbol} · scorecard ${scorecardId.slice(0, 8)} · policy v4 · latest run`;
+  openDrawer(`${esc(item.symbol)} <span class="rec-chip" data-rec="${item.recommendation}">${esc(recLabel(item.recommendation))}</span>`, body, subtitle);
 
   document.querySelector("[data-dw-reject]")?.addEventListener("click", () => { closeDrawer(); doReject(item); });
   document.querySelector("[data-dw-modify]")?.addEventListener("click", () => { closeDrawer(); openTicket(item, "modify"); });

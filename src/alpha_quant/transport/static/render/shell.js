@@ -94,10 +94,10 @@ function connectSSE() {
 function paintShell(ctx) {
   const sel = document.getElementById("book-selector");
   if (ctx.books) {
-    sel.innerHTML = ctx.books.map((b) => `<option value="${b.id}"${b.id === ctx.active_book_id ? " selected" : ""}>${b.name}</option>`).join("");
+    sel.innerHTML = ctx.books.map((b) => `<option value="${b.book_id}"${b.book_id === ctx.active_book_id ? " selected" : ""}>${b.label}</option>`).join("");
     sel.onchange = () => { store.bookId = sel.value; window.dispatchEvent(new CustomEvent("bookchange", { detail: { bookId: sel.value } })); };
-    const active = ctx.books.find((b) => b.id === ctx.active_book_id);
-    document.getElementById("book-label").textContent = "Book — " + (active ? active.name : "—");
+    const active = ctx.books.find((b) => b.book_id === ctx.active_book_id);
+    document.getElementById("book-label").textContent = "Book — " + (active ? active.label : "—");
   }
   document.getElementById("mode-badge").textContent = ctx.mode || "PAPER";
   document.getElementById("last-run-label").textContent = ctx.last_run ? "Last run " + fmtDateTime(ctx.last_run) : "No runs yet";
@@ -109,7 +109,7 @@ function openRunModal() {
   showModal(
     "Run decision cycle",
     intro("Evaluates the strategy policy against the latest knowable Lake facts. Stale symbols are excluded automatically.")
-      + fieldStatic("Book", (store.context && store.context.active_book_name) || "Active paper book")
+      + fieldStatic("Book", (store.context && store.context.books && store.context.books.find((b) => b.book_id === store.bookId)?.label) || "Active paper book")
       + fieldStatic("Decision as of", "Latest — live data"),
     [
       { label: "Cancel", class: "btn", onclick: closeModal },
