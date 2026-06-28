@@ -14,8 +14,9 @@ const COLS = "1.3fr 1fr .8fr .7fr 1fr 1fr 1fr";
 export async function renderOrders() {
   const view = document.getElementById("view");
   view.innerHTML = `<div class="skeleton" style="height:240px"></div>`;
+  const bid = store.bookId ? "?book_id=" + store.bookId : "";
   try {
-    const data = await get("/v1/console/orders");
+    const data = await get("/v1/console/orders" + bid);
     view.innerHTML = buildOrders(data);
     document.getElementById("new-order-btn").onclick = openNewOrder;
     document.querySelectorAll("[data-cancel]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); openCancel(b.dataset.cancel); });
@@ -24,6 +25,8 @@ export async function renderOrders() {
     view.innerHTML = errorState("Failed to load orders", e.message);
   }
 }
+
+window.addEventListener("bookchange", renderOrders);
 
 function buildOrders(data) {
   const header = `<div class="dthead" style="grid-template-columns:${COLS}">
@@ -46,10 +49,21 @@ function buildOrders(data) {
     ${(data.items || []).length ? `<div class="dtable">${header}${rows}</div>` : emptyState("No orders")}`;
 }
 
+let _lakeSymbols = ["AAPL", "MSFT", "NVDA", "AMZN", "META", "JPM"];
+
+async function loadLakeSymbols() {
+  try {
+    const res = await fetch("/v1/console/lake-symbols?active_only=true");
+    const data = await res.json();
+    if (data.items && data.items.length) _lakeSymbols = data.items.map(i => i.symbol);
+  } catch {}
+}
+
 function openNewOrder() {
+  loadLakeSymbols();
   showModal("Manual order intent",
     intro("Submits a paper order intent. Rejected if the symbol's Lake data is stale.")
-      + fieldSelect("o_sym", "Symbol", ["AAPL", "MSFT", "NVDA", "AMZN", "META", "JPM"])
+      + fieldSelect("o_sym", "Symbol", _lakeSymbols)
       + fieldSelect("o_side", "Side", ["buy", "sell"])
       + fieldNumber("o_qty", "Quantity", 100)
       + fieldText("o_reason", "Reason", "Discretionary rationale"),

@@ -262,6 +262,8 @@ export async function renderAdvice() {
   }
 }
 
+window.addEventListener("bookchange", renderAdvice);
+
 function buildPage(data) {
   const items = data.items || [];
   if (!items.length) return emptyState("No advice for today. Run a decision cycle first.") + `<div style="text-align:center;margin-top:16px"><button class="btn btn-primary" onclick="document.getElementById('run-btn').click()">Run decision cycle</button></div>`;

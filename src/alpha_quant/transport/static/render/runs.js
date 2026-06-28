@@ -14,8 +14,9 @@ const COLS = "1.2fr 1fr 1fr 1fr 1fr .7fr";
 export async function renderRuns() {
   const view = document.getElementById("view");
   view.innerHTML = `<div class="skeleton" style="height:240px"></div>`;
+  const bid = store.bookId ? "?book_id=" + store.bookId : "";
   try {
-    const data = await get("/v1/console/runs");
+    const data = await get("/v1/console/runs" + bid);
     view.innerHTML = buildRuns(data);
     document.getElementById("bt-btn").onclick = openBacktest;
     document.querySelectorAll("[data-run]").forEach((el) => { el.onclick = () => openRunDrawer(el.dataset.run); });
@@ -23,6 +24,8 @@ export async function renderRuns() {
     view.innerHTML = errorState("Failed to load runs", e.message);
   }
 }
+
+window.addEventListener("bookchange", renderRuns);
 
 function buildRuns(data) {
   const header = `<div class="dthead" style="grid-template-columns:${COLS}">
