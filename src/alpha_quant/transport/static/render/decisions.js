@@ -15,14 +15,18 @@ const COLS = "1.5fr 1fr .6fr .6fr 2.2fr 1.2fr";
 export async function renderDecisions() {
   const view = document.getElementById("view");
   view.innerHTML = `<div class="skeleton" style="height:240px"></div>`;
+  const bid = store.bookId ? "book_id=" + store.bookId : "";
+  const filters = new URLSearchParams(store.filters).toString();
   try {
-    const data = await get("/v1/console/decisions?" + new URLSearchParams(store.filters).toString());
+    const data = await get("/v1/console/decisions?" + (bid ? bid + "&" : "") + filters);
     view.innerHTML = buildDecisions(data);
     wire(data.items || []);
   } catch (e) {
     view.innerHTML = errorState("Failed to load decisions", e.message);
   }
 }
+
+window.addEventListener("bookchange", renderDecisions);
 
 function decTone(d) {
   return { enter: "enter", hold: "hold", blocked: "blocked", rejected: "rejected", exclude: "dim" }[d] || "dim";

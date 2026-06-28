@@ -9,13 +9,16 @@ import store from "../state.js";
 export async function renderDesk() {
   const view = document.getElementById("view");
   view.innerHTML = `<div class="skeleton" style="height:240px"></div>`;
+  const bid = store.bookId ? "?book_id=" + store.bookId : "";
   try {
-    const data = await get("/v1/console/desk");
+    const data = await get("/v1/console/desk" + bid);
     view.innerHTML = buildDesk(data);
   } catch (e) {
     view.innerHTML = errorState("Failed to load desk", e.message);
   }
 }
+
+window.addEventListener("bookchange", renderDesk);
 
 function buildDesk(data) {
   const p = data.portfolio || {};

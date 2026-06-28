@@ -28,6 +28,8 @@ export async function renderRisk() {
   }
 }
 
+window.addEventListener("bookchange", renderRisk);
+
 // ── Gaussian tail histogram ──
 
 function tailBars(z) {

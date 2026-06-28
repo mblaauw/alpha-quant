@@ -14,14 +14,17 @@ const COLS = "1.7fr .7fr .9fr .9fr 1fr 1fr .7fr 1.3fr";
 export async function renderPortfolio() {
   const view = document.getElementById("view");
   view.innerHTML = `<div class="skeleton" style="height:240px"></div>`;
+  const bid = store.bookId ? "?book_id=" + store.bookId : "";
   try {
-    const [data, positions] = await Promise.all([get("/v1/console/portfolio"), get("/v1/console/positions")]);
+    const [data, positions] = await Promise.all([get("/v1/console/portfolio" + bid), get("/v1/console/positions" + bid)]);
     view.innerHTML = buildPortfolio(data, positions.items || []);
     wire(positions.items || []);
   } catch (e) {
     view.innerHTML = errorState("Failed to load portfolio", e.message);
   }
 }
+
+window.addEventListener("bookchange", renderPortfolio);
 
 function symFresh(pos) {
   const f = pos.freshness || freshnessFor(pos.symbol);

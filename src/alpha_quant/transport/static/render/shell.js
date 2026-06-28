@@ -96,7 +96,7 @@ function paintShell(ctx) {
   const sel = document.getElementById("book-selector");
   if (ctx.books) {
     sel.innerHTML = ctx.books.map((b) => `<option value="${b.id}"${b.id === ctx.active_book_id ? " selected" : ""}>${b.name}</option>`).join("");
-    sel.onchange = () => { store.bookId = sel.value; };
+    sel.onchange = () => { store.bookId = sel.value; window.dispatchEvent(new CustomEvent("bookchange", { detail: { bookId: sel.value } })); };
     const active = ctx.books.find((b) => b.id === ctx.active_book_id);
     document.getElementById("book-label").textContent = "Book — " + (active ? active.name : "—");
   }
