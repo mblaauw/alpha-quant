@@ -6,11 +6,14 @@ No route performs direct state mutation.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import os
 from typing import Any, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import StreamingResponse
 
 from alpha_quant.application.config import (
     AppConfig,
@@ -311,3 +314,63 @@ async def list_lake_symbols(active_only: bool = Query(True)):
         }
     finally:
         lake.close()
+
+
+# ── Server-Sent Events stream ────────────────────────────────────────────────
+# Replaces the client-side 15s polling for freshness, context, and command status.
+
+
+async def _sse_generator(request: Request) -> Any:  # noqa: C901, PLR0912
+    """Async generator that yields SSE events for the live stream."""
+    freshness = _freshness_service()
+    poll_seconds = 15
+    last_freshness: str | None = None
+    last_context: str | None = None
+
+    async def _send(event: str, data: object) -> str:
+        payload = f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
+        return payload
+
+    while True:
+        try:
+            if await request.is_disconnected():
+                break
+
+            # Freshness
+            try:
+                fr = freshness.summary([])
+                fr_json = json.dumps(fr, default=str)
+                if fr_json != last_freshness:
+                    last_freshness = fr_json
+                    yield await _send("freshness", fr)
+            except Exception:
+                pass
+
+            # Context
+            try:
+                ctx = SystemService().context()
+                ctx_json = json.dumps(ctx, default=str)
+                if ctx_json != last_context:
+                    last_context = ctx_json
+                    yield await _send("context", ctx)
+            except Exception:
+                pass
+
+            await asyncio.sleep(poll_seconds)
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            await asyncio.sleep(poll_seconds)
+
+
+@router.get("/stream")
+async def stream_events(request: Request):
+    return StreamingResponse(
+        _sse_generator(request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
