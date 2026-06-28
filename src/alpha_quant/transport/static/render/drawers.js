@@ -3,7 +3,7 @@ import { openDrawer } from "../components/drawer.js";
 import { runWithToast } from "../components/toast.js";
 import { cmd } from "../commands.js";
 import store from "../state.js";
-import { fmtCurrency, fmtPrice, fmtPct } from "../formatters.js";
+import { fmtCurrency, fmtPrice, fmtPct, fmtDateTime } from "../formatters.js";
 
 function esc(s) {
   const d = document.createElement("div");
@@ -226,7 +226,3 @@ export async function openRunDrawer(runId) {
   }
 }
 
-function fmtDateTime(iso) {
-  if (!iso) return "—";
-  try { return new Date(iso).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }); } catch { return String(iso).slice(0, 16); }
-}

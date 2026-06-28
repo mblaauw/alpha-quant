@@ -5,7 +5,7 @@ import { fmtCurrency, fmtNum } from "../formatters.js";
 import { emptyState } from "../components/empty_state.js";
 import { errorState } from "../components/error_state.js";
 import { runWithToast } from "../components/toast.js";
-import { openDrawer } from "../components/drawer.js";
+import { openDrawer, closeDrawer } from "../components/drawer.js";
 
 const EQUITY = 350000;
 const CASH = 64226;
@@ -342,7 +342,6 @@ async function openScorecard(scorecardId) {
   const c = { symbol: item.symbol, name: "", rec: item.recommendation, price: 100, atr: 3.3 };
   const body = buildScorecardDrawer(sc, c);
   openDrawer(`${esc(item.symbol)} <span class="rec-chip" data-rec="${item.recommendation}">${esc((item.recommendation || "").toUpperCase())}</span>`, body);
-  openDrawer(document.getElementById("drawer-title")?.textContent || "", body);
 
   document.querySelector("[data-dw-reject]")?.addEventListener("click", () => { closeDrawer(); doReject(item); });
   document.querySelector("[data-dw-modify]")?.addEventListener("click", () => { closeDrawer(); openTicket(item, "modify"); });
@@ -356,6 +355,8 @@ async function openTicket(item, mode) {
       book_id: store.bookId,
       symbol: item.symbol,
       side: "buy",
+      risk_pct: mode === "modify" ? 0.5 : null,
+      method: mode === "modify" ? "atr_2_0" : null,
     });
   } catch {
     sizing = { suggested_qty: 100, last_price: 100, atr: 3.3, stop_price: 94, stop_distance: 6, risk_budget: 1750, notional: 10000, risk_at_stop: 600, buying_power: 63000, buying_power_after: 53000, guardrails: [] };
@@ -423,11 +424,4 @@ function doReject(item) {
   const reason = prompt("Reason for rejecting " + item.symbol + "?", "Operator override");
   if (!reason) return;
   runWithToast(() => cmd.reject(store.bookId, { scorecard_id: item.scorecard_id }, reason), "Reject — " + item.symbol);
-}
-
-function closeDrawer() {
-  const overlay = document.getElementById("drawer-overlay");
-  const drawer = document.getElementById("drawer");
-  if (overlay) overlay.classList.remove("open");
-  if (drawer) drawer.classList.remove("open");
 }

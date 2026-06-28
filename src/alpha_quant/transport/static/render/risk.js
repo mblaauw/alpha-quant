@@ -170,7 +170,11 @@ function buildRisk(data) {
   const postIcon = data.halted ? "●" : "⚠";
   const postLabel = data.halted ? "HALTED" : (postState === "ready" ? "READY" : "ELEVATED");
 
-  return `<div class="posture" data-s="${postState}"><span class="pi">${postIcon}</span><span>${esc(posture.text || "Risk posture is within normal parameters.")}</span></div>
+  return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <span class="post-badge" data-s="${postState}"><span class="d"></span>${postLabel}</span>
+      <button class="halt-btn" data-act="${haltAct}" data-halt="${haltAct}">${haltLabel}</button>
+    </div>
+    <div class="posture" data-s="${postState}"><span class="pi">${postIcon}</span><span>${esc(posture.text || "Risk posture is within normal parameters.")}</span></div>
     <div class="hstrip">${headlineHTML}</div>
     <div class="rgrid">
       <!-- VaR & ES -->
@@ -249,13 +253,9 @@ function wire(data) {
   // Halt/resume button
   document.querySelector("[data-halt]")?.addEventListener("click", () => openConfirm(data.halted));
 
-  // VaR mode toggle
+  // VaR mode toggle — simply re-renders (server returns all percentiles)
   document.querySelectorAll("[data-var-mode]").forEach(b => {
-    b.addEventListener("click", () => {
-      // Re-render with new mode — for now just toggle active state
-      document.querySelectorAll("[data-var-mode]").forEach(x => x.dataset.on = "false");
-      b.dataset.on = "true";
-    });
+    b.addEventListener("click", () => renderRisk());
   });
 }
 
