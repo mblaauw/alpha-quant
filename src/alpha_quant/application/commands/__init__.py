@@ -295,14 +295,34 @@ def approve_candidate_handler(cmd: Command) -> tuple[CommandStatus, str | None, 
 
 def reject_candidate_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | None]:
     import json
+    from datetime import UTC, datetime
 
     uow = create_unit_of_work()
     with uow:
         payload: dict = json.loads(cmd.payload_json) if cmd.payload_json else {}
         decision_id: str | None = payload.get("decision_id") or payload.get("scorecard_id")
+        symbol: str | None = payload.get("symbol")
         if not decision_id:
             return CommandStatus.FAILED, None, "Missing decision_id or scorecard_id"
         uow.store.mark_operator_excluded(decision_id, cmd.reason)
+
+        # Write audit event with symbol
+        now = datetime.now(UTC)
+        sym_part = f" — {symbol}" if symbol else ""
+        uow.store.session.execute(
+            text("""
+                INSERT INTO audit.audit_event
+                    (event_id, decision_run_id, event_type, payload_json, created_at)
+                VALUES (:eid, :rid, :et, :pj, :now)
+            """),
+            {
+                "eid": str(uuid4()),
+                "rid": None,
+                "et": f"candidate.rejected{sym_part}",
+                "pj": f'{{"decision_id":"{decision_id}","symbol":"{symbol or ""}"}}',  # noqa: E501
+                "now": now,
+            },
+        )
         return CommandStatus.SUCCEEDED, decision_id, None
 
 

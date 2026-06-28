@@ -94,6 +94,7 @@ def _format_event_message(event_type: str, row: Any) -> str:
     if run_kind:
         base += f" ({run_kind})"
 
+    symbol: str | None = None
     try:
         payload = json.loads(row._mapping["payload_json"])
         symbol = payload.get("symbol")
@@ -118,6 +119,19 @@ def _format_event_message(event_type: str, row: Any) -> str:
 
         if details:
             base += " — " + " ".join(details)
-    except json.JSONDecodeError, TypeError:
+    except (json.JSONDecodeError, TypeError):  # fmt: skip
         pass
+
+    # Append decision_id/scorecard_id as fallback detail when no symbol found
+    if not symbol:
+        try:
+            fb_payload = json.loads(row._mapping["payload_json"])
+            for fb_key in ("decision_id", "scorecard_id"):
+                fb_val = fb_payload.get(fb_key)
+                if fb_val:
+                    base += f" — {str(fb_val)[:12]}"
+                    break
+        except (json.JSONDecodeError, TypeError):  # fmt: skip
+            pass
+
     return base

@@ -447,7 +447,8 @@ function wireTicket() {
 }
 
 function doReject(item) {
-  const reason = prompt("Reason for rejecting " + item.symbol + "?", "Operator override");
-  if (!reason) return;
-  runWithToast(() => cmd.reject(store.bookId, { scorecard_id: item.scorecard_id }, reason), "Reject — " + item.symbol);
+  runWithToast(
+    () => cmd.reject(store.bookId, { scorecard_id: item.scorecard_id }, "Operator override"),
+    "Reject advice — " + item.symbol,
+  );
 }
