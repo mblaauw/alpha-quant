@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
 from alpha_quant.application.commands import submit_command
@@ -11,6 +12,10 @@ from alpha_quant.application.factory import create_unit_of_work
 from alpha_quant.contracts.operational import CommandEnvelope
 
 router = APIRouter(prefix="/v1/commands", tags=["commands"])
+
+
+def _unit_of_work() -> Any:
+    return create_unit_of_work()
 
 
 class CommandRequest(BaseModel):
@@ -43,9 +48,7 @@ async def post_command(
 
 
 @router.get("/{command_id}")
-async def get_command(command_id: str):
-
-    uow = create_unit_of_work()
+async def get_command(command_id: str, uow: Any = Depends(_unit_of_work)):
     with uow:
         cmd = uow.store.get_command(UUID(command_id))
         if cmd is None:
@@ -67,9 +70,9 @@ async def get_command(command_id: str):
 
 
 @router.get("")
-async def list_commands(limit: int = 50, book_id: str | None = None):
-
-    uow = create_unit_of_work()
+async def list_commands(
+    limit: int = 50, book_id: str | None = None, uow: Any = Depends(_unit_of_work)
+):
     with uow:
         cmds = uow.store.list_commands(book_id=UUID(book_id) if book_id else None, limit=limit)
         return {
@@ -89,10 +92,9 @@ async def list_commands(limit: int = 50, book_id: str | None = None):
 
 
 @router.post("/{command_id}/cancel")
-async def cancel_command(command_id: str):
+async def cancel_command(command_id: str, uow: Any = Depends(_unit_of_work)):
     from alpha_quant.contracts.operational import CommandStatus
 
-    uow = create_unit_of_work()
     with uow:
         cmd = uow.store.get_command(UUID(command_id))
         if cmd is None:

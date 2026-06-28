@@ -154,6 +154,12 @@ The operational console is a static vanilla JavaScript SPA served by FastAPI, st
 | Journal | Immutable timeline of all system events |
 | System | Operational dependencies and configuration |
 
+The Risk tab binds to the final `/v1/console/risk` response contract. Until the
+full real risk engine lands in
+[#612](https://github.com/mblaauw/alpha-quant/issues/612), VaR/ES, component
+VaR, stress, factor, and liquidity analytics are deterministic placeholders and
+are marked with `var.method_params.placeholder = true`.
+
 All mutations use authenticated, idempotent, audited commands. The browser never talks directly to PostgreSQL, Alpha-Lake, or object storage.
 
 ## Repo Structure

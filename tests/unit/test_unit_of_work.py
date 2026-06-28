@@ -6,16 +6,15 @@ from uuid import uuid4
 import pytest
 import sqlalchemy as sa
 
-from alpha_quant.adapters.postgres import create_engine, create_session
+from alpha_quant.adapters.postgres import create_session
 from alpha_quant.adapters.postgres.engine import init_schema
 from alpha_quant.adapters.postgres.unit_of_work import OperationalUnitOfWork
+from tests.conftest import require_postgres_engine
 
 
 @pytest.fixture(scope="module")
 def engine():
-    e = create_engine(
-        "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant",
-    )
+    e = require_postgres_engine()
     init_schema(e)
     yield e
     e.dispose()

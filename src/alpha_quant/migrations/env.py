@@ -26,7 +26,11 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = create_engine(config.get_main_option("sqlalchemy.url"))
+    database_url = config.get_main_option("sqlalchemy.url")
+    if database_url is None:
+        msg = "Missing sqlalchemy.url in Alembic config"
+        raise RuntimeError(msg)
+    connectable = create_engine(database_url)
     with connectable.connect() as connection:
         context.configure(
             connection=connection,

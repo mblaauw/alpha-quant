@@ -7,11 +7,18 @@ No route performs direct state mutation.
 from __future__ import annotations
 
 import os
+from typing import Any, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 
-from alpha_quant.application.config import AppConfig, FreshnessConfig, load_config
+from alpha_quant.application.config import (
+    AppConfig,
+    AppLLMConfig,
+    DataConfig,
+    LakeConfig,
+    load_config,
+)
 from alpha_quant.application.factory import (
     create_alpha_lake_reader,
     create_freshness_service,
@@ -25,6 +32,7 @@ from alpha_quant.application.query.portfolio import PortfolioService
 from alpha_quant.application.query.risk import RiskService
 from alpha_quant.application.query.runs import RunService
 from alpha_quant.application.query.system import SystemService
+from alpha_quant.domain.risk import RiskConfig
 from alpha_quant.transport.deps import svc_depends
 
 router = APIRouter(prefix="/v1/console", tags=["console"])
@@ -36,22 +44,21 @@ def _freshness_service() -> FreshnessService:  # noqa: B008
         config = load_config(cfg_path)
     else:
         config = AppConfig(
-            data={"mode": "fixture"},
-            risk={
-                "stop_atr_mult": 2.0,
-                "trail_after_r": 1.0,
-                "partial_take_at_r": 2.0,
-                "time_stop_days": 30,
-            },
-            llm={"provider": "openrouter", "model": "anthropic/claude-sonnet-4"},
-            lake={
-                "mode": "rest",
-                "base_url": os.environ.get("ALPHA_QUANT_LAKE__BASE_URL", "http://localhost:8000"),
-            },
-            freshness=FreshnessConfig(),
+            data=DataConfig(mode="fixture"),
+            risk=RiskConfig(
+                stop_atr_mult=2.0,
+                trail_after_r=1.0,
+                partial_take_at_r=2.0,
+                time_stop_days=30,
+            ),
+            llm=AppLLMConfig(provider="openrouter", model="anthropic/claude-sonnet-4"),
+            lake=LakeConfig(
+                mode="rest",
+                base_url=os.environ.get("ALPHA_QUANT_LAKE__BASE_URL", "http://localhost:8000"),
+            ),
         )
     lake = create_alpha_lake_reader(config)
-    return create_freshness_service(lake, config.freshness)  # type: ignore[return-value]
+    return create_freshness_service(lake, config.freshness)
 
 
 @router.get("/context")
@@ -81,7 +88,7 @@ async def list_positions(
     freshness: FreshnessService = Depends(_freshness_service),
 ):
     items = svc.list_positions(book_id=book_id)
-    symbols = [p.get("symbol", "") for p in items if p.get("symbol")]
+    symbols = [str(p.get("symbol", "")) for p in items if p.get("symbol")]
     freshness_map = {f["symbol"]: f for f in freshness.for_symbols(symbols)}
     for item in items:
         sym = item.get("symbol", "")
@@ -97,7 +104,7 @@ async def get_position(
 ):
     result = svc.get_position(position_id)
     if result and result.get("symbol"):
-        result["freshness"] = freshness.for_symbol(result["symbol"])
+        result["freshness"] = freshness.for_symbol(str(result["symbol"]))
     return result
 
 
@@ -115,8 +122,8 @@ async def list_decisions(
     result = svc.list_decisions(
         book_id=book_id, cursor=cursor, limit=limit, sort=sort, symbol=symbol, run_id=run_id
     )
-    items = result.get("items", [])
-    symbols = [d.get("symbol", "") for d in items if d.get("symbol")]
+    items = cast(list[dict[str, Any]], result.get("items", []))
+    symbols = [str(d.get("symbol", "")) for d in items if d.get("symbol")]
     freshness_map = {f["symbol"]: f for f in freshness.for_symbols(symbols)}
     for item in items:
         sym = item.get("symbol", "")

@@ -52,12 +52,15 @@ class SystemService:
 
         def _query(uow):
             halt = uow.store.current_halt(book_id)
+            active_halt = halt if halt is not None and halt.halted else None
             runs = uow.store.list_decision_runs(book_id, limit=1)
             run = runs[0] if runs else None
             books = uow.store.list_books()
             return {
-                "halted": halt is not None and halt.halted,
-                "halt_reason": halt.reason.value if halt and halt.reason else None,
+                "halted": active_halt is not None,
+                "halt_reason": active_halt.reason.value
+                if active_halt and active_halt.reason
+                else None,
                 "last_run_id": str(run.decision_run_id) if run else None,
                 "last_run_status": run.status.value if run else None,
                 "last_run_as_of": str(run.decision_as_of) if run and run.decision_as_of else None,

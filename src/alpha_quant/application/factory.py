@@ -14,6 +14,8 @@ from alpha_quant.adapters.real.llm_adapter import OpenAILikeLLM
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session, sessionmaker
 
+    from alpha_quant.application.query.freshness import FreshnessService
+
 from alpha_quant.application.config import AppConfig, FreshnessConfig
 from alpha_quant.ports.alpha_lake import AlphaLakeReadPort
 from alpha_quant.ports.clock import Clock
@@ -65,7 +67,7 @@ def create_llm(config: AppConfig) -> LLM:
 def create_freshness_service(
     lake: AlphaLakeReadPort,
     freshness_cfg: FreshnessConfig,
-) -> object:
+) -> FreshnessService:
     from alpha_quant.application.query.freshness import FreshnessService
 
     return FreshnessService(

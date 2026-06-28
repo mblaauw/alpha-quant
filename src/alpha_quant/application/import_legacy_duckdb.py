@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 import duckdb
@@ -55,9 +56,9 @@ class LegacyDuckDBImporter:
     ) -> None:
         self._duckdb_path = duckdb_path
         self._postgres_url = postgres_url
-        self._ddb: duckdb.DuckDBPyConnection | None = None
-        self._session = None
-        self._session_factory = None
+        self._ddb: Any = None
+        self._session: Any = None
+        self._session_factory: Any = None
         self._symbol_cache: dict[str, str] = {}
         self._default_book_id: str | None = None
         self._default_strategy_version_id: str | None = None

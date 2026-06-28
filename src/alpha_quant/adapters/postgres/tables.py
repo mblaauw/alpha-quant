@@ -2,18 +2,21 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from enum import Enum as PyEnum
 from uuid import UUID
 
 from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
-    Enum,
     ForeignKey,
     Integer,
     Numeric,
     String,
     Text,
+)
+from sqlalchemy import (
+    Enum as SAEnum,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, registry
 
@@ -92,12 +95,12 @@ def date_opt():
     return mapped_column(Date, nullable=True)
 
 
-def enum_field(e: type):
-    return mapped_column(Enum(e, create_constraint=False), nullable=False)
+def enum_field(e: type[PyEnum]):
+    return mapped_column(SAEnum(e, create_constraint=False), nullable=False)
 
 
-def enum_opt(e: type):
-    return mapped_column(Enum(e, create_constraint=False), nullable=True)
+def enum_opt(e: type[PyEnum]):
+    return mapped_column(SAEnum(e, create_constraint=False), nullable=True)
 
 
 def pk_uuid():

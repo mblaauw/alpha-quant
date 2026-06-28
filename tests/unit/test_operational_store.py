@@ -9,7 +9,6 @@ from sqlalchemy import text
 
 from alpha_quant.adapters.postgres import (
     PostgresOperationalStore,
-    create_engine,
     create_session,
     health_check,
 )
@@ -28,16 +27,12 @@ from alpha_quant.contracts.operational import (
     RunReservation,
     RunStatus,
 )
+from tests.conftest import require_postgres_engine
 
 
 @pytest.fixture(scope="module")
 def engine():
-    e = create_engine(
-        pytest.importorskip("os").environ.get(
-            "DATABASE_URL",
-            "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant",
-        )
-    )
+    e = require_postgres_engine()
     init_schema(e)
     yield e
     e.dispose()

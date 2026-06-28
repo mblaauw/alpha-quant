@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Any, cast
 
 import pytest
 from pydantic import ValidationError
@@ -68,8 +69,9 @@ class TestCandidate:
         assert c.scores["technical"] == 0.9
 
     def test_missing_required_fields_raises_error(self) -> None:
+        candidate_model = cast(Any, Candidate)
         with pytest.raises(ValidationError):
-            Candidate(  # type: ignore[call-arg]
+            candidate_model(
                 symbol="AAPL",
                 date=date(2026, 6, 11),
             )
