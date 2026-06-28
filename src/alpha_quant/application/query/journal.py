@@ -97,11 +97,27 @@ def _format_event_message(event_type: str, row: Any) -> str:
     try:
         payload = json.loads(row._mapping["payload_json"])
         symbol = payload.get("symbol")
-        if symbol:
-            base += f" — {symbol}"
+        side = payload.get("side")
+        quantity = payload.get("quantity")
+        price = payload.get("price")
+        stop_price = payload.get("stop_price")
         reason = payload.get("reason")
+
+        details: list[str] = []
+        if side and quantity:
+            side_upper = side.upper()
+            details.append(f"{side_upper} {quantity}")
+        if symbol:
+            details.append(symbol)
+        if price:
+            details.append(f"@ ${float(price):.2f}")
+        if stop_price:
+            details.append(f"stop ${float(stop_price):.2f}")
         if reason:
-            base += f" · {reason[:40]}"
+            details.append(f"· {reason[:60]}")
+
+        if details:
+            base += " — " + " ".join(details)
     except json.JSONDecodeError, TypeError:
         pass
     return base

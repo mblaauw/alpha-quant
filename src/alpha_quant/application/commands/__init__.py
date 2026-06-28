@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from uuid import UUID
+from typing import Any
+from uuid import UUID, uuid4
+
+from sqlalchemy import text
 
 from alpha_quant.application.factory import create_unit_of_work
 from alpha_quant.contracts.operational import (
@@ -21,6 +24,145 @@ DEFAULT_DATABASE_URL = (
 )
 
 CommandHandler = Callable[[Command], tuple[CommandStatus, str | None, str | None]]
+
+
+def _book_immediate_fill(
+    uow: Any,
+    order_id: str,
+    book_id: UUID,
+    symbol: str,
+    side: str,
+    quantity: float,
+    reason: str = "execution",
+) -> None:
+    """Book an immediate fill for a market order and rebuild projections."""
+    from datetime import UTC, datetime
+    from decimal import Decimal
+
+    from alpha_quant.contracts.operational import FillBookingCommand, FillQuality, OrderSide
+
+    # Resolve security_id from symbol
+    sec_row = uow.store.session.execute(
+        text("SELECT security_id FROM core.security_reference WHERE symbol = :sym"),
+        {"sym": symbol},
+    ).fetchone()
+    sec_id = str(sec_row._mapping["security_id"]) if sec_row else symbol
+
+    # Get current price from positions or use a default
+    sql_pos = "SELECT current_price FROM projection.position_current WHERE book_id = :bid AND symbol = :sym"  # noqa: E501
+    pos_row = uow.store.session.execute(
+        text(sql_pos),
+        {"bid": str(book_id), "sym": symbol},
+    ).fetchone()
+    price = float(pos_row._mapping["current_price"]) if pos_row else 100.0
+
+    fill_cmd = FillBookingCommand(
+        order_id=UUID(order_id),
+        decision_run_id=UUID("00000000-0000-0000-0000-000000000001"),
+        portfolio_book_id=book_id,
+        security_id=UUID(sec_id)
+        if len(sec_id) == 36
+        else UUID(
+            sec_id[:8]
+            + "-"
+            + sec_id[8:12]
+            + "-"
+            + sec_id[12:16]
+            + "-"
+            + sec_id[16:20]
+            + "-"
+            + sec_id[20:]
+        ),
+        symbol=symbol,
+        side=OrderSide(side),
+        quantity=Decimal(str(quantity)),
+        price=Decimal(str(price)),
+        fill_key=f"cmd-{order_id[:8]}",
+        idempotency_key=order_id,
+        quality=FillQuality.OPEN,
+        reason=reason,
+    )
+    uow.store.book_fill(fill_cmd)
+
+    # Update position_current directly (upsert)
+    sign = 1 if side == "buy" else -1
+    qty_delta = Decimal(str(quantity)) * sign
+    cost_delta = Decimal(str(price)) * Decimal(str(quantity))
+    uow.store.session.execute(
+        text("""
+            INSERT INTO projection.position_current
+                (book_id, security_id, symbol, quantity, avg_cost,
+                 current_price, market_value, unrealized_pl, stop_price)
+            VALUES (:bid, :sid, :sym, :qty, :avg, :pr, :mv, 0, :stop)
+            ON CONFLICT (book_id, security_id) DO UPDATE SET
+                quantity = projection.position_current.quantity + :qty2,
+                avg_cost = CASE
+                    WHEN projection.position_current.quantity + :qty3 > 0
+                    THEN (projection.position_current.avg_cost
+                          * ABS(projection.position_current.quantity) + :cost)
+                         / (projection.position_current.quantity + :qty4)
+                    ELSE :avg2
+                END,
+                market_value = (projection.position_current.quantity + :qty5) * :pr2,
+                current_price = :pr3
+        """),
+        {
+            "bid": str(book_id),
+            "sid": sec_id,
+            "sym": symbol,
+            "qty": qty_delta,
+            "avg": cost_delta / max(qty_delta, Decimal("1")),
+            "pr": float(price),
+            "mv": float(price) * float(quantity) * sign,
+            "stop": float(price) * 0.95,
+            "qty2": qty_delta,
+            "qty3": qty_delta,
+            "qty4": qty_delta,
+            "qty5": qty_delta,
+            "cost": cost_delta,
+            "avg2": cost_delta / max(qty_delta, Decimal("1")),
+            "pr2": float(price),
+            "pr3": float(price),
+        },
+    )
+
+    # Update portfolio_current cash (decrease for buys, increase for sells)
+    cash_sign = -1 if side == "buy" else 1
+    cash_delta = cash_sign * float(price) * float(quantity)
+    uow.store.session.execute(
+        text("""
+            INSERT INTO projection.portfolio_current
+                (book_id, cash, equity, gross_exposure, regime, updated_at)
+            VALUES (:bid, :cash, 0, 0, 'RISK_ON', :now)
+            ON CONFLICT (book_id) DO UPDATE SET
+                cash = projection.portfolio_current.cash + :cash2,
+                updated_at = :now2
+        """),
+        {
+            "bid": str(book_id),
+            "cash": -cash_delta,
+            "cash2": cash_delta,
+            "now": datetime.now(UTC),
+            "now2": datetime.now(UTC),
+        },
+    )
+
+    # Write audit event for the position change
+    now = datetime.now(UTC)
+    uow.store.session.execute(
+        text("""
+            INSERT INTO audit.audit_event
+                (event_id, decision_run_id, event_type, payload_json, created_at)
+            VALUES (:eid, :rid, :et, :pj, :now)
+        """),
+        {
+            "eid": str(uuid4()),
+            "rid": None,
+            "et": f"position.{symbol}.filled.{side}",
+            "pj": f'{{"symbol":"{symbol}","side":"{side}","quantity":{quantity}}}',  # noqa: E501
+            "now": now,
+        },
+    )
 
 
 def submit_command(
@@ -115,6 +257,10 @@ def submit_order_handler(cmd: Command) -> tuple[CommandStatus, str | None, str |
             book_id=cmd.book_id or UUID("00000000-0000-0000-0000-000000000001"),
             limit_price=payload.get("limit_price"),
         )
+        book_id = cmd.book_id or UUID("00000000-0000-0000-0000-000000000001")
+        _book_immediate_fill(
+            uow, order_id, book_id, symbol, side, float(quantity_raw), cmd.reason or "Manual order"
+        )
         return CommandStatus.SUCCEEDED, order_id, None
 
 
@@ -136,6 +282,16 @@ def approve_candidate_handler(cmd: Command) -> tuple[CommandStatus, str | None, 
             order_type="market",
             book_id=cmd.book_id or UUID("00000000-0000-0000-0000-000000000001"),
             decision_id=decision_id,
+        )
+        book_id = cmd.book_id or UUID("00000000-0000-0000-0000-000000000001")
+        _book_immediate_fill(
+            uow,
+            order_id,
+            book_id,
+            symbol,
+            "buy",
+            float(quantity_raw),
+            cmd.reason or "Follow advice",
         )
         return CommandStatus.SUCCEEDED, order_id, None
 
@@ -176,6 +332,16 @@ def flatten_position_handler(cmd: Command) -> tuple[CommandStatus, str | None, s
             order_type="market",
             book_id=cmd.book_id or UUID("00000000-0000-0000-0000-000000000001"),
         )
+        book_id = cmd.book_id or UUID("00000000-0000-0000-0000-000000000001")
+        _book_immediate_fill(
+            uow,
+            order_id,
+            book_id,
+            target.symbol,
+            side,
+            abs(float(target.quantity)),
+            cmd.reason or "Flatten position",
+        )
         return CommandStatus.SUCCEEDED, order_id, None
 
 
@@ -189,10 +355,29 @@ def set_stop_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | Non
         stop_price_raw = payload.get("stop_price")
         if not position_id or stop_price_raw is None:
             return CommandStatus.FAILED, None, "Missing position_id or stop_price"
+        book_id = cmd.book_id or UUID("00000000-0000-0000-0000-000000000001")
         uow.store.update_position_stop(
             symbol=position_id,
             stop_price=float(stop_price_raw),
-            book_id=cmd.book_id or UUID("00000000-0000-0000-0000-000000000001"),
+            book_id=book_id,
+        )
+        # Audit event for stop update
+        from datetime import UTC, datetime
+
+        now = datetime.now(UTC)
+        uow.store.session.execute(
+            text("""
+                INSERT INTO audit.audit_event
+                    (event_id, decision_run_id, event_type, payload_json, created_at)
+                VALUES (:eid, :rid, :et, :pj, :now)
+            """),
+            {
+                "eid": str(uuid4()),
+                "rid": None,
+                "et": f"position.{position_id}.stop_updated",
+                "pj": f'{{"symbol":"{position_id}","stop_price":{stop_price_raw}}}',
+                "now": now,
+            },
         )
         return CommandStatus.SUCCEEDED, position_id, None
 
@@ -374,6 +559,9 @@ def candidate_modify_handler(cmd: Command) -> tuple[CommandStatus, str | None, s
             quantity=float(final_qty),
             order_type="market",
             book_id=book_id,
+        )
+        _book_immediate_fill(
+            uow, order_id, book_id, symbol, "buy", float(final_qty), cmd.reason or "Modified order"
         )
         return CommandStatus.SUCCEEDED, order_id, None
 
