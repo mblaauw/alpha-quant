@@ -111,6 +111,8 @@ def compute_all(
     weights: list[float],
 ) -> list[dict[str, Any]]:
     """Return all scenarios ordered by severity (absolute P&L descending)."""
+    if not positions or equity <= 0:
+        return []
     scenarios = historical_scenarios(positions, equity, sectors, weights) + hypothetical_shocks(
         positions, equity, sectors, weights
     )
