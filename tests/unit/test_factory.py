@@ -26,7 +26,6 @@ def _fixture_config() -> AppConfig:
             "shadow": {},
             "llm": {},
             "alpaca": {},
-            "dashboard": {},
         }
     )
 
@@ -43,7 +42,6 @@ def _live_config() -> AppConfig:
             "shadow": {},
             "llm": {},
             "alpaca": {"api_key": "test_key", "secret_key": "test_secret"},
-            "dashboard": {},
         }
     )
 

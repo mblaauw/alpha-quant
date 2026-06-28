@@ -111,18 +111,11 @@
 - **Issue:** Only checks `today <= event_date <= window_end`. Earnings announced yesterday are not covered. By design but worth documenting.
 - **Effort:** Small (1 file, ~3 lines)
 
-### P2.8: Legacy DuckDB state files still active — 9 files, ~40+ references
-- **Files:** `src/app/store/*.py` (7 files), `src/app/dashboard.py`, `src/adapters/real/event_sink.py`
-- **Issue:** Production system has two parallel state stores (DuckDB legacy + PostgreSQL new). The DuckDB path is the active runtime path; PostgreSQL is only used by CLI commands.
-- **Fix:** Complete the DuckDB → PostgreSQL migration and delete the legacy store files.
-- **Effort:** Large (blocked on Phase 3+ pipeline integration)
-- **Dependency:** Blocked on `streamlit + pandas + duckdb` cleanup
+### ~~P2.8: Legacy DuckDB state files still active — 9 files, ~40+ references~~  ✔ RESOLVED
+- **Status:** DuckDB → PostgreSQL migration complete. Legacy `src/app/store/` and `src/app/dashboard.py` deleted. DuckDB retained only for `import_legacy_duckdb.py` (one-time migration tool) and `generate_fixtures.py` (fixture seeding).
 
-### P2.9: Streamlit dashboard still the only operator surface
-- **Files:** `src/app/dashboard.py`
-- **Issue:** Streamlit depends on DuckDB. Cannot remove either dependency until FastAPI dashboard exists.
-- **Fix:** Implement Phase 6 (FastAPI dashboard)
-- **Effort:** Large (Phase 6 scope)
+### ~~P2.9: Streamlit dashboard still the only operator surface~~  ✔ RESOLVED
+- **Status:** Replaced by vanilla JS SPA served from FastAPI (Phase 6 complete). The Docker `api` service now runs the same FastAPI app under the legacy `dashboard` CLI name.
 
 ### P2.10: `alpha_quant/__init__.py` empty
 - **Files:** `src/alpha_quant/__init__.py`

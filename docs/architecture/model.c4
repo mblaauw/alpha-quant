@@ -167,14 +167,14 @@ model {
       technology 'typer, Python 3.14+'
     }
 
-    monitoredProcess dashboardProcess 'Streamlit Process' {
-      description 'Read-only dashboard. Serves on localhost:8501. Auto-refresh every 60s.'
-      technology 'Streamlit, Starlette'
+    monitoredProcess dashboardProcess 'FastAPI SPA' {
+      description 'Operational console. Vanilla JS SPA served by FastAPI on localhost:8501/8099. SSE live updates.'
+      technology 'Vanilla JS, FastAPI, Server-Sent Events'
     }
   }
 
-  user -> alphaQuant 'Reads journal, asks questions, monitors dashboard' {
-    technology 'CLI, Streamlit browser'
+  user -> alphaQuant 'Reads journal, operates dashboard' {
+    technology 'CLI, Browser SPA'
   }
 
   alphaQuant -> alphaLake 'reads decision panel, contract, universe' {

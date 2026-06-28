@@ -352,10 +352,6 @@ slippage_bps = 5
 provider = "openrouter"
 model = "anthropic/claude-sonnet-4"
 
-[dashboard]
-host = "localhost"
-port = 8501
-refresh_seconds = 60
 ```
 
 ## 9. Related Documents

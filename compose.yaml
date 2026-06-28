@@ -40,8 +40,6 @@ services:
       ALPHA_QUANT_LAKE__MODE: rest
       ALPHA_QUANT_LAKE__BASE_URL: "${ALPHA_QUANT_LAKE__BASE_URL:-http://host.docker.internal:8000}"
       ALPHA_LAKE_API_KEY: "${ALPHA_LAKE_API_KEY:-}"
-      ALPHA_QUANT_DASHBOARD__HOST: 0.0.0.0
-      ALPHA_QUANT_DASHBOARD__PORT: 8501
     depends_on:
       migrate:
         condition: service_completed_successfully
