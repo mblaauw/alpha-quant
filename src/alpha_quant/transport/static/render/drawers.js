@@ -127,7 +127,11 @@ export async function openPositionDrawer(positionId) {
 
     document.getElementById("dr-edit-stop")?.addEventListener("click", () => openStopModal(pos));
     document.getElementById("dr-flatten")?.addEventListener("click", () => {
-      runWithToast(() => cmd.flatten(store.bookId, pos.position_id || positionId, "Flatten from drawer"), "Flatten " + (pos.symbol || positionId));
+      runWithToast(
+        () => cmd.flatten(store.bookId, pos.position_id || positionId, "Flatten from drawer"),
+        "Flatten " + (pos.symbol || positionId),
+        () => { import("./portfolio.js").then(m => m.renderPortfolio()); },
+      );
     });
   } catch (e) {
     openDrawer("Position", `<div class="error-state"><div class="error-state-title">Failed to load</div><div class="error-state-detail">${esc(e.message)}</div></div>`);
@@ -297,7 +301,7 @@ function openStopModal(pos) {
           const px = parseFloat(val("st_price"));
           if (!px) return;
           closeModal();
-          runWithToast(() => cmd.setStop(store.bookId, pos.position_id || sym, px, "Stop update from drawer"), sym + " stop " + px);
+          runWithToast(() => cmd.setStop(store.bookId, pos.position_id || sym, px, "Stop update from drawer"), sym + " stop " + px, () => { import("./portfolio.js").then(m => m.renderPortfolio()); });
         } },
     ]);
 }
