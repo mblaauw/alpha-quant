@@ -400,7 +400,7 @@ function wireTicket() {
     } else {
       runWithToast(() => cmd.approve(bookId, {
         scorecard_id: _activeTicket.scorecardId, symbol: _activeTicket.sym,
-        qty,
+        quantity: qty,
       }, reason), "Follow — " + _activeTicket.sym);
     }
     close();
