@@ -27,31 +27,70 @@ function fillRow(f) {
 
 export async function openPositionDrawer(positionId) {
   try {
-    const data = await get(`/v1/console/positions/${encodeURIComponent(positionId)}`);
-    const pos = data.position || data;
+    const bid = store.bookId ? "?book_id=" + store.bookId : "";
+    const [posResp, positionsResp] = await Promise.all([
+      get(`/v1/console/positions/${encodeURIComponent(positionId)}`),
+      get("/v1/console/positions" + bid).catch(() => ({ items: [] })),
+    ]);
+    const pos = posResp.position || posResp;
+    const allPositions = positionsResp.items || [];
+
+    // Find matching position in list for weight etc.
+    const listPos = allPositions.find((p) => p.symbol === (pos.symbol || positionId));
+
     const mv = pos.market_value || 0;
     const pl = pos.unrealized_pl || 0;
+    const equity = store.context?.equity || 350000;
+    const wt = listPos?.portfolio_weight || (mv / equity);
+
     const stats = [
       statBlock("Qty", esc(pos.quantity)),
       statBlock("Avg cost", fmtPrice(pos.avg_cost)),
       statBlock("Price", fmtPrice(pos.current_price)),
       statBlock("Mkt value", fmtCurrency(mv)),
       statBlock("Unreal. P&L", fmtCurrency(pl), pl >= 0 ? "up" : "down"),
+      statBlock("Weight", (wt * 100).toFixed(1) + "%"),
     ].join("");
 
-    const comps = (data.scorecard?.components || data.components || []).map((c) =>
-      `<div><div class="comp-row"><span class="comp-name">${esc(c.name)}</span><span class="comp-score" data-tone="${c.tone || "dim"}">${esc(c.score)}</span></div><div class="comp-reason">${esc(c.reason || "")}</div></div>`
-    ).join("");
+    // Fetch scorecard for this symbol
+    let comps = "";
+    let recChip = "";
+    try {
+      const scList = await get(`/v1/console/symbols/${encodeURIComponent(pos.symbol)}/scorecard`).catch(() => null);
+      const items = (scList && scList.items) || [];
+      if (items.length > 0) {
+        const latest = items[0];
+        if (latest.recommendation) {
+          const tone = latest.recommendation === "add" || latest.recommendation === "consider_entry" ? "ok" : "info";
+          recChip = `<span class="chip" data-tone="${tone}">${esc(latest.recommendation.toUpperCase())}</span>`;
+        }
+        // Try to fetch full scorecard detail for modules
+        try {
+          const scDetail = await get(`/v1/console/scorecards/${latest.scorecard_id}`).catch(() => null);
+          if (scDetail && scDetail.modules) {
+            const filtered = scDetail.modules.filter(m => m.id);
+            if (filtered.length) {
+              comps = filtered.map((m) =>
+                `<div><div class="comp-row"><span class="comp-name">${esc(m.name)}</span><span class="comp-score" data-tone="${m.state_tone || "dim"}">${esc(m.score != null ? m.score.toFixed(2) : m.state || "")}</span></div><div class="comp-reason">${esc(m.reason || "")}</div></div>`
+              ).join("");
+            }
+          } else if (scDetail && scDetail.components) {
+            comps = scDetail.components.map((c) =>
+              `<div><div class="comp-row"><span class="comp-name">${esc(c.name)}</span><span class="comp-score" data-tone="${c.passed ? "up" : "dim"}">${esc(c.score != null ? c.score.toFixed(2) : c.state || "")}</span></div><div class="comp-reason">${esc(c.reason || "")}</div></div>`
+            ).join("");
+          }
+        } catch {}
+      }
+    } catch {}
 
-    const fills = (data.fills || []).map(fillRow).join("");
-
+    const fills = (posResp.fills || []).map(fillRow).join("");
     const stopDistPct = pos.stop_price && pos.current_price
       ? (((pos.current_price - pos.stop_price) / pos.current_price) * 100).toFixed(1) + "% below"
       : "—";
 
     const body = `
       <div class="dr-stats">${stats}</div>
-      ${comps ? `<div class="dr-section"><div class="dr-sechead"><span class="t">Today's advice</span><span class="n">scorecard ${pos.scorecard_id || ""}</span></div><div class="dr-card">${comps}</div></div>` : ""}
+      ${comps ? `<div class="dr-section"><div class="dr-sechead"><span class="t">Today's advice</span><span class="n">scorecard ${scorecardId}</span></div><div class="dr-card">${comps}</div></div>` : ""}
       <div class="dr-section"><div class="dr-sechead"><span class="t">Risk method</span><span class="n">METHOD_REGISTRY</span></div><div class="dr-card">
         ${provLine("Active method", "ATR trail 2.0×", "pv")}
         ${provLine("Current stop", pos.stop_price ? fmtPrice(pos.stop_price) : "—")}
@@ -64,18 +103,16 @@ export async function openPositionDrawer(positionId) {
           <span class="method-opt">Drawdown ladder</span>
         </div>
       </div></div>
-      ${fills ? `<div class="dr-section"><div class="dr-sechead"><span class="t">Fills that built this position</span><span class="n">${data.fills.length} fills</span></div><div class="dr-card"><div class="trace">${fills}</div></div></div>` : ""}
+      ${fills ? `<div class="dr-section"><div class="dr-sechead"><span class="t">Fills that built this position</span><span class="n">${posResp.fills.length} fills</span></div><div class="dr-card"><div class="trace">${fills}</div></div></div>` : ""}
       <div class="dr-actions">
         <button class="btn" id="dr-edit-stop">Edit stop</button>
         <button class="btn" data-variant="danger" id="dr-flatten">Flatten position</button>
       </div>`;
 
-    const title = `${esc(pos.symbol || positionId)} <span class="chip" data-tone="${pl >= 0 ? "ok" : "dim"}">${pl >= 0 ? "OPEN" : "LOSS"}</span>`;
+    const title = `${esc(pos.symbol || positionId)} ${recChip || `<span class="chip" data-tone="${pl >= 0 ? "ok" : "dim"}">${pl >= 0 ? "OPEN" : "LOSS"}</span>`}`;
     openDrawer(title, body);
 
-    document.getElementById("dr-edit-stop")?.addEventListener("click", () => {
-      openStopModal(pos);
-    });
+    document.getElementById("dr-edit-stop")?.addEventListener("click", () => openStopModal(pos));
     document.getElementById("dr-flatten")?.addEventListener("click", () => {
       runWithToast(() => cmd.flatten(store.bookId, pos.position_id || positionId, "Flatten from drawer"), "Flatten " + (pos.symbol || positionId));
     });
