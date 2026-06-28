@@ -125,19 +125,17 @@ def approve_candidate_handler(cmd: Command) -> tuple[CommandStatus, str | None, 
     with uow:
         payload: dict = json.loads(cmd.payload_json) if cmd.payload_json else {}
         decision_id: str | None = payload.get("decision_id")
-        scorecard_id: str | None = payload.get("scorecard_id")
         symbol: str | None = payload.get("symbol")
         quantity_raw = payload.get("quantity")
         if not symbol or quantity_raw is None:
             return CommandStatus.FAILED, None, "Missing required fields: symbol, quantity"
-        provenance_id = decision_id or scorecard_id
         order_id = uow.store.create_order(
             symbol=symbol,
             side="buy",
             quantity=float(quantity_raw),
             order_type="market",
             book_id=cmd.book_id or UUID("00000000-0000-0000-0000-000000000001"),
-            decision_id=provenance_id,
+            decision_id=decision_id,
         )
         return CommandStatus.SUCCEEDED, order_id, None
 
