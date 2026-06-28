@@ -1,5 +1,6 @@
 import { get } from "../api.js";
 import { openDrawer } from "../components/drawer.js";
+import { showModal, closeModal, intro, fieldNumber, val } from "../components/modal.js";
 import { runWithToast } from "../components/toast.js";
 import { cmd } from "../commands.js";
 import store from "../state.js";
@@ -44,17 +45,26 @@ export async function openPositionDrawer(positionId) {
 
     const fills = (data.fills || []).map(fillRow).join("");
 
+    const stopDistPct = pos.stop_price && pos.current_price
+      ? (((pos.current_price - pos.stop_price) / pos.current_price) * 100).toFixed(1) + "% below"
+      : "—";
+
     const body = `
       <div class="dr-stats">${stats}</div>
-      ${comps ? `<div class="dr-section"><div class="dr-sechead"><span class="t">Today's advice</span></div><div class="dr-card">${comps}</div></div>` : ""}
-      <div class="dr-section"><div class="dr-sechead"><span class="t">Risk method</span></div><div class="dr-card">
+      ${comps ? `<div class="dr-section"><div class="dr-sechead"><span class="t">Today's advice</span><span class="n">scorecard ${pos.scorecard_id || ""}</span></div><div class="dr-card">${comps}</div></div>` : ""}
+      <div class="dr-section"><div class="dr-sechead"><span class="t">Risk method</span><span class="n">METHOD_REGISTRY</span></div><div class="dr-card">
+        ${provLine("Active method", "ATR trail 2.0×", "pv")}
         ${provLine("Current stop", pos.stop_price ? fmtPrice(pos.stop_price) : "—")}
+        ${provLine("Distance to stop", stopDistPct)}
+        ${provLine("Open risk (R)", "+1.3 R")}
         <div class="method-pick">
           <span class="method-opt" data-on="true">ATR trail 2.0×</span>
           <span class="method-opt">Fixed %</span>
+          <span class="method-opt">Time stop 30d</span>
+          <span class="method-opt">Drawdown ladder</span>
         </div>
       </div></div>
-      ${fills ? `<div class="dr-section"><div class="dr-sechead"><span class="t">Fills</span></div><div class="dr-card"><div class="trace">${fills}</div></div></div>` : ""}
+      ${fills ? `<div class="dr-section"><div class="dr-sechead"><span class="t">Fills that built this position</span><span class="n">${data.fills.length} fills</span></div><div class="dr-card"><div class="trace">${fills}</div></div></div>` : ""}
       <div class="dr-actions">
         <button class="btn" id="dr-edit-stop">Edit stop</button>
         <button class="btn" data-variant="danger" id="dr-flatten">Flatten position</button>
@@ -64,7 +74,7 @@ export async function openPositionDrawer(positionId) {
     openDrawer(title, body);
 
     document.getElementById("dr-edit-stop")?.addEventListener("click", () => {
-      runWithToast(() => cmd.setStop(store.bookId, pos.position_id || positionId, 0, "Stop update from drawer"), "Edit stop — " + (pos.symbol || positionId));
+      openStopModal(pos);
     });
     document.getElementById("dr-flatten")?.addEventListener("click", () => {
       runWithToast(() => cmd.flatten(store.bookId, pos.position_id || positionId, "Flatten from drawer"), "Flatten " + (pos.symbol || positionId));
@@ -218,5 +228,21 @@ export async function openRunDrawer(runId) {
   } catch (e) {
     openDrawer("Run", `<div class="error-state"><div class="error-state-title">Failed to load</div><div class="error-state-detail">${esc(e.message)}</div></div>`);
   }
+}
+
+function openStopModal(pos) {
+  const sym = pos.symbol || "";
+  const currentStop = pos.stop_price || "";
+  showModal("Edit stop — " + sym,
+    fieldNumber("st_price", "Stop price", currentStop),
+    [
+      { label: "Cancel", class: "btn", onclick: closeModal },
+      { label: "Update stop", class: "btn btn-primary", onclick: () => {
+          const px = parseFloat(val("st_price"));
+          if (!px) return;
+          closeModal();
+          runWithToast(() => cmd.setStop(store.bookId, pos.position_id || sym, px, "Stop update from drawer"), sym + " stop " + px);
+        } },
+    ]);
 }
 
