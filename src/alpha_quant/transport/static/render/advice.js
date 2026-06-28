@@ -27,14 +27,19 @@ function buildCard(c) {
   const recMap = { add: "ADD", consider_entry: "CONSIDER ENTRY", hold: "HOLD", reduce: "REDUCE", exit: "EXIT", watch: "WATCH", do_nothing: "NO ACTION" };
   const recLabel = recMap[c.recommendation] || (c.recommendation || "").toUpperCase();
   const engSize = c.suggested_qty ? `Engine size <b>${c.suggested_qty} sh</b> · ${fmtCurrency(c.notional)} · risk ${fmtCurrency(c.risk_at_stop)}` : "";
+
+  // Generate synthetic thesis from available data
+  const conf = Math.round((c.confidence || 0) * 100);
+  const thesis = c.thesis || `${recLabel} — confidence ${conf}%, score ${fmtNum(c.total_score)}${c.suggested_qty ? `, engine sizes ${c.suggested_qty} sh` : ""}.`;
+
   return `<div class="acard" data-rec="${c.recommendation}" data-scorecard="${c.scorecard_id}">
     <div class="acard-sym"><span class="s">${esc(c.symbol)}</span>${c.name ? `<span class="n">${esc(c.name)}</span>` : ""}</div>
     <div class="acard-mid">
       <div class="acard-rec">
         <span class="rec-chip" data-rec="${c.recommendation}">${recLabel}</span>
-        <span class="acard-meta"><b>${Math.round((c.confidence || 0) * 100)}%</b> confidence · score <b>${fmtNum(c.total_score)}</b></span>
+        <span class="acard-meta"><b>${conf}%</b> confidence · score <b>${fmtNum(c.total_score)}</b></span>
       </div>
-      ${c.thesis ? `<div class="acard-thesis">${esc(c.thesis)}</div>` : ""}
+      <div class="acard-thesis">${esc(thesis)}</div>
       ${engSize ? `<div class="acard-size">${engSize}</div>` : ""}
     </div>
     <div class="acard-acts-wrap">
@@ -142,7 +147,7 @@ function buildTicket(ticket, sizing) {
   const equity = sizing.equity || 350000;
 
   return `<div class="tk-head">
-    <div class="tt"><span class="tk-title">${esc(ticket.sym)} <span class="rec-chip" data-rec="${ticket.rec}">${esc(ticket.recLabel)}</span></span><span class="tk-sub">market order · paper book</span></div>
+    <div class="tt"><span class="tk-title">${esc(ticket.sym)} <span class="rec-chip" data-rec="${ticket.rec}">${esc(ticket.recLabel)}</span></span><span class="tk-sub">${esc(ticket.name || ticket.sym)} · market order · paper book</span></div>
     <button class="tk-close" id="tk-close-btn">✕</button>
   </div>
   <div class="tk-body">
@@ -322,7 +327,7 @@ async function openTicket(item, mode) {
     params.method = "atr_2_0";
   }
   _activeTicket = {
-    sym: item.symbol, rec: item.recommendation, recLabel: recLabel(item.recommendation),
+    sym: item.symbol, name: item.name || "", rec: item.recommendation, recLabel: recLabel(item.recommendation),
     mode: mode || "recommended", riskPct: 0.5, method: "atr_2_0", qtyOverride: null,
     scorecardId: item.scorecard_id,
   };
