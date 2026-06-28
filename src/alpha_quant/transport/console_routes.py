@@ -476,10 +476,14 @@ async def sizing_preview(req: SizingPreviewRequest):
 
         if method == "fixed_8":
             stop_distance = last_price * 0.08
+            stop_basis = f"8% × ${last_price:,.2f}"
         elif method == "atr_2_5":
             stop_distance = 2.5 * atr
+            stop_basis = f"2.5 × ATR ${atr:,.2f}"
         else:
             stop_distance = 2.0 * atr
+            stop_basis = f"2.0 × ATR ${atr:,.2f}"
+            method = "atr_2_0"
 
         stop_price = last_price - stop_distance
         risk_budget = equity * risk_pct
@@ -496,6 +500,7 @@ async def sizing_preview(req: SizingPreviewRequest):
             "last_price": round(last_price, 2),
             "atr": round(atr, 2),
             "method": method,
+            "stop_basis": stop_basis,
             "stop_price": round(stop_price, 2),
             "stop_distance": round(stop_distance, 2),
             "risk_budget": round(risk_budget, 2),
@@ -504,6 +509,7 @@ async def sizing_preview(req: SizingPreviewRequest):
             "risk_at_stop": round(risk_at_stop, 2),
             "buying_power": round(buying_power, 2),
             "buying_power_after": round(buying_power_after, 2),
+            "equity": round(equity, 2),
             "guardrails": guards,
         }
 

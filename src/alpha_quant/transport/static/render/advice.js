@@ -26,14 +26,16 @@ let _scorecardCache = {};
 function buildCard(c) {
   const recMap = { add: "ADD", consider_entry: "CONSIDER ENTRY", hold: "HOLD", reduce: "REDUCE", exit: "EXIT", watch: "WATCH", do_nothing: "—" };
   const recLabel = recMap[c.recommendation] || (c.recommendation || "").toUpperCase();
+  const engSize = c.suggested_qty ? `Engine size <b>${c.suggested_qty} sh</b> · ${fmtCurrency(c.notional)} · risk ${fmtCurrency(c.risk_at_stop)}` : "";
   return `<div class="acard" data-rec="${c.recommendation}" data-scorecard="${c.scorecard_id}">
-    <div class="acard-sym"><span class="s">${esc(c.symbol)}</span></div>
+    <div class="acard-sym"><span class="s">${esc(c.symbol)}</span>${c.name ? `<span class="n">${esc(c.name)}</span>` : ""}</div>
     <div class="acard-mid">
       <div class="acard-rec">
         <span class="rec-chip" data-rec="${c.recommendation}">${recLabel}</span>
         <span class="acard-meta"><b>${Math.round((c.confidence || 0) * 100)}%</b> confidence · score <b>${fmtNum(c.total_score)}</b></span>
       </div>
-      <div class="acard-size">Engine size from server</div>
+      ${c.thesis ? `<div class="acard-thesis">${esc(c.thesis)}</div>` : ""}
+      ${engSize ? `<div class="acard-size">${engSize}</div>` : ""}
     </div>
     <div class="acard-acts-wrap">
       <div class="acard-acts">
@@ -137,7 +139,7 @@ function buildTicket(ticket, sizing) {
   const isMod = ticket.mode === "modify" && (ticket.qtyOverride != null || ticket.riskPct !== 0.5 || ticket.method !== "atr_2_0");
   const qty = ticket.qtyOverride != null ? ticket.qtyOverride : sizing.suggested_qty;
   const notional = qty * sizing.last_price;
-  const pctEquity = notional / (sizing.risk_budget / (sizing.risk_budget / (sizing.suggested_qty * sizing.stop_distance || 1)));
+  const equity = sizing.equity || 350000;
 
   return `<div class="tk-head">
     <div class="tt"><span class="tk-title">${esc(ticket.sym)} <span class="rec-chip" data-rec="${ticket.rec}">${esc(ticket.recLabel)}</span></span><span class="tk-sub">market order · paper book</span></div>
@@ -153,8 +155,8 @@ function buildTicket(ticket, sizing) {
         <div class="size-qty">${qty}<small>shares</small></div>
         <span class="size-tag" data-mod="${isMod}">${isMod ? "Modified" : "Engine sized"}</span>
       </div>
-      <div class="size-math">Risk budget <b>${fmtCurrency(sizing.risk_budget)}</b> <span class="op">=</span> ${pct1(ticket.riskPct / 100)} of equity<br>
-        Stop distance <b>${price(sizing.stop_distance)}</b> · method ${ticket.method.replace("_", " ").toUpperCase()}<br>
+      <div class="size-math">Risk budget <b>${fmtCurrency(sizing.risk_budget)}</b> <span class="op">=</span> ${pct1(ticket.riskPct / 100)} of <b>${fmtCurrency(sizing.equity || 350000)}</b><br>
+        Stop distance <b>${price(sizing.stop_distance)}</b> <span class="op">=</span> ${sizing.stop_basis || ticket.method.replace("_", " ").toUpperCase()}<br>
         Shares <span class="op">=</span> ${fmtCurrency(sizing.risk_budget)} <span class="op">÷</span> ${price(sizing.stop_distance)} <span class="op">=</span> <b>${sizing.suggested_qty}</b></div>
     </div>
     <div class="ctrl-block">
@@ -182,9 +184,9 @@ function buildTicket(ticket, sizing) {
       </div>
     </div>
     <div class="tk-metrics">
-      <div class="tk-metric"><div class="ml">Notional</div><div class="mv">${fmtCurrency(notional)}</div><div class="ms">${pct1(notional / (sizing.risk_budget / (ticket.riskPct / 100)))} of equity</div></div>
+      <div class="tk-metric"><div class="ml">Notional</div><div class="mv">${fmtCurrency(notional)}</div><div class="ms">${pct1(notional / equity)} of equity</div></div>
       <div class="tk-metric"><div class="ml">Stop price</div><div class="mv">${price(sizing.stop_price)}</div><div class="ms">−${price(sizing.stop_distance)} (${pct1(sizing.stop_distance / sizing.last_price)})</div></div>
-      <div class="tk-metric"><div class="ml">Risk at stop</div><div class="mv" data-tone="${sizing.risk_at_stop > 3500 ? "warn" : ""}">${fmtCurrency(sizing.risk_at_stop)}</div><div class="ms">${pct1(sizing.risk_at_stop / (sizing.risk_budget / (ticket.riskPct / 100)))} of equity · 1R</div></div>
+      <div class="tk-metric"><div class="ml">Risk at stop</div><div class="mv" data-tone="${sizing.risk_at_stop > 3500 ? "warn" : ""}">${fmtCurrency(sizing.risk_at_stop)}</div><div class="ms">${pct1(sizing.risk_at_stop / equity)} of equity · 1R</div></div>
       <div class="tk-metric"><div class="ml">Target 2R</div><div class="mv" data-tone="up">${fmtCurrency(sizing.risk_at_stop * 2)}</div><div class="ms">+${fmtCurrency(sizing.risk_at_stop * 2)} if hit</div></div>
       <div class="tk-metric"><div class="ml">Buying power after</div><div class="mv" data-tone="${sizing.buying_power_after < 0 ? "down" : ""}">${fmtCurrency(sizing.buying_power_after)}</div><div class="ms">from ${fmtCurrency(sizing.buying_power)}</div></div>
       <div class="tk-metric"><div class="ml">Avg cost basis</div><div class="mv">${price(sizing.last_price)}</div><div class="ms">last Lake mark</div></div>
