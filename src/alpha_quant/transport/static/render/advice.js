@@ -18,7 +18,6 @@ function pct1(v) { return (v * 100).toFixed(1) + "%"; }
 let _candCache = [];
 let _activeTicket = null;
 let _ticketSizing = null;
-let _ticketLoading = false;
 let _scorecardCache = {};
 
 // ── Advice card ──
@@ -27,8 +26,6 @@ function buildCard(c) {
   const recMap = { add: "ADD", consider_entry: "CONSIDER ENTRY", hold: "HOLD", reduce: "REDUCE", exit: "EXIT", watch: "WATCH", do_nothing: "NO ACTION" };
   const recLabel = recMap[c.recommendation] || (c.recommendation || "").toUpperCase();
   const engSize = c.suggested_qty ? `Engine size <b>${c.suggested_qty} sh</b> · ${fmtCurrency(c.notional)} · risk ${fmtCurrency(c.risk_at_stop)}` : "";
-
-  // Generate synthetic thesis from available data
   const conf = Math.round((c.confidence || 0) * 100);
   const thesis = c.thesis || `${recLabel} — confidence ${conf}%, score ${fmtNum(c.total_score)}${c.suggested_qty ? `, engine sizes ${c.suggested_qty} sh` : ""}.`;
 
@@ -55,7 +52,7 @@ function buildCard(c) {
 
 // ── Scorecard drawer (rich M1→M8) ──
 
-function buildScorecardDrawer(s, symbol) {
+function buildScorecardDrawer(s) {
   const TYPE_LABEL = { hard: "Hard gate", soft: "Posture", score: "Score", evidence: "Evidence" };
   const ICON = { ok: "✓", info: "●", warn: "⚠", bad: "✕" };
 
@@ -69,7 +66,7 @@ function buildScorecardDrawer(s, symbol) {
         <span class="dmod-name">${esc(m.name || "")}</span>
         <span class="dmod-type" data-t="${esc(m.type || "score")}">${esc(TYPE_LABEL[m.type] || m.type || "")}</span>
         <span class="dmod-spacer"></span>
-        ${hasScore ? `<span class="dmod-score">${esc(Math.round(m.score * 100) + "%")}</span>` : ""}
+        ${hasScore ? `<span class="dmod-score">${esc(m.score.toFixed(2))}</span>` : ""}
         <span class="dmod-state" data-tone="${esc(m.state_tone || "dim")}">${esc(m.state || "")}</span>
       </div>
       ${m.archetype ? `<div class="dmod-archetype">◆ ${esc(m.archetype)}</div>` : ""}
@@ -122,29 +119,45 @@ function recLabel(rec) {
   return m[rec] || (rec || "").toUpperCase();
 }
 
-async function fetchSizing(params) {
-  _ticketLoading = true;
-  try {
-    const res = await post("/v1/console/sizing-preview", params);
-    _ticketSizing = res;
-    return res;
-  } catch (e) {
-    throw e;
-  } finally {
-    _ticketLoading = false;
+const RISK_PCT_FRAC = 0.005; // 0.5%
+
+function _qtyGuardrails(qty, sizing, equity) {
+  const notional = qty * sizing.last_price;
+  const riskAtStop = qty * sizing.stop_distance;
+  const bpAfter = sizing.buying_power - notional;
+  const guards = [];
+  if (notional > sizing.buying_power) {
+    guards.push({ severity: "block", icon: "⛔", message: `Notional ${fmtCurrency(notional)} exceeds buying power ${fmtCurrency(sizing.buying_power)} by ${fmtCurrency(notional - sizing.buying_power)}.` });
   }
+  if (riskAtStop > equity * 0.01) {
+    guards.push({ severity: "warn", icon: "⚠", message: `Risk at stop ${fmtCurrency(riskAtStop)} is above the 1% per-trade cap (${fmtCurrency(equity * 0.01)}).` });
+  }
+  if (notional > equity * 0.20) {
+    guards.push({ severity: "warn", icon: "⚠", message: `Notional ${pct1(notional / equity)} of equity — above 20% single-name guide.` });
+  }
+  if (qty === 0) {
+    guards.push({ severity: "block", icon: "⛔", message: "Quantity is zero — nothing to submit." });
+  }
+  if (!guards.length) {
+    guards.push({ severity: "ok", icon: "✓", message: `Within budget: risk ${fmtCurrency(riskAtStop)} (${pct1(riskAtStop / equity)}) and notional ${pct1(notional / equity)} of equity pass.` });
+  }
+  return guards;
 }
 
 // ── Ticket build ──
 
 function buildTicket(ticket, sizing) {
   const lock = ticket.mode !== "modify";
-  const g = (sizing.guardrails || []);
-  const blocked = g.some(x => x.severity === "block");
-  const isMod = ticket.mode === "modify" && (ticket.qtyOverride != null || ticket.riskPct !== 0.5 || ticket.method !== "atr_2_0");
+  const equity = sizing.equity || 350000;
   const qty = ticket.qtyOverride != null ? ticket.qtyOverride : sizing.suggested_qty;
   const notional = qty * sizing.last_price;
-  const equity = sizing.equity || 350000;
+  const riskAtStop = qty * sizing.stop_distance;
+  const bpAfter = sizing.buying_power - notional;
+  const targetPrice = sizing.last_price + 2 * sizing.stop_distance;
+  const targetGain = 2 * riskAtStop;
+  const guards = _qtyGuardrails(qty, sizing, equity);
+  const blocked = guards.some(g => g.severity === "block");
+  const isMod = ticket.mode === "modify" && (ticket.qtyOverride != null || ticket.riskPct !== 0.5 || ticket.method !== "atr_2_0");
 
   return `<div class="tk-head">
     <div class="tt"><span class="tk-title">${esc(ticket.sym)} <span class="rec-chip" data-rec="${ticket.rec}">${esc(ticket.recLabel)}</span></span><span class="tk-sub">${esc(ticket.name || ticket.sym)} · market order · paper book</span></div>
@@ -152,16 +165,16 @@ function buildTicket(ticket, sizing) {
   </div>
   <div class="tk-body">
     <div class="mode-toggle">
-      <button data-on="${!isMod}" id="tk-rec-mode">Recommended</button>
-      <button data-on="${isMod}" id="tk-mod-mode">Modify</button>
+      <button data-on="${ticket.mode === "recommended"}" id="tk-rec-mode">Recommended</button>
+      <button data-on="${ticket.mode === "modify"}" id="tk-mod-mode">Modify</button>
     </div>
     <div class="size-hero">
       <div class="size-hero-top">
         <div class="size-qty">${qty}<small>shares</small></div>
         <span class="size-tag" data-mod="${isMod}">${isMod ? "Modified" : "Engine sized"}</span>
       </div>
-      <div class="size-math">Risk budget <b>${fmtCurrency(sizing.risk_budget)}</b> <span class="op">=</span> ${pct1(ticket.riskPct / 100)} of <b>${fmtCurrency(sizing.equity || 350000)}</b><br>
-        Stop distance <b>${price(sizing.stop_distance)}</b> <span class="op">=</span> ${sizing.stop_basis || ticket.method.replace("_", " ").toUpperCase()}<br>
+      <div class="size-math">Risk budget <b>${fmtCurrency(sizing.risk_budget)}</b> <span class="op">=</span> ${pct1(ticket.riskPct / 100)} of <b>${fmtCurrency(equity)}</b><br>
+        Stop distance <b>${price(sizing.stop_distance)}</b> <span class="op">=</span> ${sizing.stop_basis || ticket.method.replace(/_/g, " ").toUpperCase()}<br>
         Shares <span class="op">=</span> ${fmtCurrency(sizing.risk_budget)} <span class="op">÷</span> ${price(sizing.stop_distance)} <span class="op">=</span> <b>${sizing.suggested_qty}</b></div>
     </div>
     <div class="ctrl-block">
@@ -191,12 +204,12 @@ function buildTicket(ticket, sizing) {
     <div class="tk-metrics">
       <div class="tk-metric"><div class="ml">Notional</div><div class="mv">${fmtCurrency(notional)}</div><div class="ms">${pct1(notional / equity)} of equity</div></div>
       <div class="tk-metric"><div class="ml">Stop price</div><div class="mv">${price(sizing.stop_price)}</div><div class="ms">−${price(sizing.stop_distance)} (${pct1(sizing.stop_distance / sizing.last_price)})</div></div>
-      <div class="tk-metric"><div class="ml">Risk at stop</div><div class="mv" data-tone="${sizing.risk_at_stop > 3500 ? "warn" : ""}">${fmtCurrency(sizing.risk_at_stop)}</div><div class="ms">${pct1(sizing.risk_at_stop / equity)} of equity · 1R</div></div>
-      <div class="tk-metric"><div class="ml">Target 2R</div><div class="mv" data-tone="up">${fmtCurrency(sizing.risk_at_stop * 2)}</div><div class="ms">+${fmtCurrency(sizing.risk_at_stop * 2)} if hit</div></div>
-      <div class="tk-metric"><div class="ml">Buying power after</div><div class="mv" data-tone="${sizing.buying_power_after < 0 ? "down" : ""}">${fmtCurrency(sizing.buying_power_after)}</div><div class="ms">from ${fmtCurrency(sizing.buying_power)}</div></div>
+      <div class="tk-metric"><div class="ml">Risk at stop</div><div class="mv" data-tone="${riskAtStop > equity * 0.01 ? "warn" : ""}">${fmtCurrency(riskAtStop)}</div><div class="ms">${pct1(riskAtStop / equity)} of equity · 1R</div></div>
+      <div class="tk-metric"><div class="ml">Target 2R</div><div class="mv" data-tone="up">${price(targetPrice)}</div><div class="ms">+${fmtCurrency(targetGain)} if hit</div></div>
+      <div class="tk-metric"><div class="ml">Buying power after</div><div class="mv" data-tone="${bpAfter < 0 ? "down" : ""}">${fmtCurrency(bpAfter)}</div><div class="ms">from ${fmtCurrency(sizing.buying_power)}</div></div>
       <div class="tk-metric"><div class="ml">Avg cost basis</div><div class="mv">${price(sizing.last_price)}</div><div class="ms">last Lake mark</div></div>
     </div>
-    ${g.map(g => `<div class="guard" data-sev="${g.severity}"><span class="gi">${g.severity === "block" ? "⛔" : g.severity === "warn" ? "⚠" : "✓"}</span><span>${esc(g.message)}</span></div>`).join("")}
+    ${guards.map(g => `<div class="guard" data-sev="${g.severity}"><span class="gi">${g.icon}</span><span>${esc(g.message)}</span></div>`).join("")}
   </div>
   <div class="tk-foot">
     <div class="left"><button class="btn" data-variant="danger" id="tk-reject">Reject advice</button></div>
@@ -304,7 +317,7 @@ async function openScorecard(scorecardId) {
     }
   }
 
-  const body = buildScorecardDrawer(sc, item.symbol);
+  const body = buildScorecardDrawer(sc);
   const subtitle = `${item.name || item.symbol} · scorecard ${scorecardId.slice(0, 8)} · policy v4 · latest run`;
   openDrawer(`${esc(item.symbol)} <span class="rec-chip" data-rec="${item.recommendation}">${esc(recLabel(item.recommendation))}</span>`, body, subtitle);
 
@@ -319,13 +332,9 @@ async function openTicket(item, mode) {
     book_id: store.bookId,
     symbol: item.symbol,
     side: "buy",
-    risk_pct: 0.5,
+    risk_pct: RISK_PCT_FRAC,
     method: "atr_2_0",
   };
-  if (mode === "modify") {
-    params.risk_pct = 0.5;
-    params.method = "atr_2_0";
-  }
   _activeTicket = {
     sym: item.symbol, name: item.name || "", rec: item.recommendation, recLabel: recLabel(item.recommendation),
     mode: mode || "recommended", riskPct: 0.5, method: "atr_2_0", qtyOverride: null,
@@ -337,7 +346,7 @@ async function openTicket(item, mode) {
 
   try {
     await fetchSizing(params);
-  } catch (e) {
+  } catch (_e) {
     _ticketSizing = null;
     renderTicket();
     wireTicket();
@@ -345,6 +354,12 @@ async function openTicket(item, mode) {
   }
   renderTicket();
   wireTicket();
+}
+
+async function fetchSizing(params) {
+  const res = await post("/v1/console/sizing-preview", params);
+  _ticketSizing = res;
+  return res;
 }
 
 function renderTicket() {
@@ -371,7 +386,7 @@ function wireTicket() {
 
   document.getElementById("tk-rec-mode")?.addEventListener("click", async () => {
     _activeTicket.mode = "recommended"; _activeTicket.riskPct = 0.5; _activeTicket.method = "atr_2_0"; _activeTicket.qtyOverride = null;
-    try { await fetchSizing({ book_id: store.bookId, symbol: _activeTicket.sym, side: "buy", risk_pct: 0.5, method: "atr_2_0" }); } catch {}
+    try { await fetchSizing({ book_id: store.bookId, symbol: _activeTicket.sym, side: "buy", risk_pct: RISK_PCT_FRAC, method: "atr_2_0" }); } catch {}
     renderTicket(); wireTicket();
   });
   document.getElementById("tk-mod-mode")?.addEventListener("click", () => { _activeTicket.mode = "modify"; renderTicket(); wireTicket(); });
@@ -404,11 +419,14 @@ function wireTicket() {
 
   document.getElementById("tk-submit")?.addEventListener("click", () => {
     if (!_ticketSizing) return;
-    const blocked = _ticketSizing.guardrails?.some(g => g.severity === "block");
+    const qty = _activeTicket.qtyOverride ?? _ticketSizing.suggested_qty;
+    const equity = _ticketSizing.equity || 350000;
+    const riskAtStop = qty * _ticketSizing.stop_distance;
+    const notional = qty * _ticketSizing.last_price;
+    const blocked = notional > _ticketSizing.buying_power || riskAtStop > equity * 0.01 || qty === 0;
     if (blocked) return;
     const isMod = _activeTicket.qtyOverride != null || _activeTicket.riskPct !== 0.5 || _activeTicket.method !== "atr_2_0";
     const bookId = store.bookId;
-    const qty = _activeTicket.qtyOverride ?? _ticketSizing.suggested_qty;
     const reason = "Order from Desk";
     if (isMod) {
       runWithToast(() => cmd.modify(bookId, {
