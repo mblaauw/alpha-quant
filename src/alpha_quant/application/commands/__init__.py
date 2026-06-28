@@ -297,9 +297,9 @@ def reject_candidate_handler(cmd: Command) -> tuple[CommandStatus, str | None, s
     uow = create_unit_of_work()
     with uow:
         payload: dict = json.loads(cmd.payload_json) if cmd.payload_json else {}
-        decision_id: str | None = payload.get("decision_id")
+        decision_id: str | None = payload.get("decision_id") or payload.get("scorecard_id")
         if not decision_id:
-            return CommandStatus.FAILED, None, "Missing decision_id"
+            return CommandStatus.FAILED, None, "Missing decision_id or scorecard_id"
         uow.store.mark_operator_excluded(decision_id, cmd.reason)
         return CommandStatus.SUCCEEDED, decision_id, None
 
