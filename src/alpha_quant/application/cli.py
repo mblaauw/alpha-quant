@@ -8,6 +8,7 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 
+from alpha_quant.adapters.postgres.engine import DEFAULT_DATABASE_URL
 from alpha_quant.application.config import AppConfig, ConfigError, load_config, redact_config
 
 __version__ = _version("alpha-quant")
@@ -22,8 +23,6 @@ app = typer.Typer(
     pretty_exceptions_show_locals=False,
     no_args_is_help=True,
 )
-
-DEFAULT_DATABASE_URL = "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant"
 
 
 def _database_url_opt() -> str:  # noqa: B008
@@ -252,8 +251,8 @@ def worker(
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session, sessionmaker
 
+    from alpha_quant.adapters.postgres.engine import DEFAULT_DATABASE_URL
     from alpha_quant.application.commands import dispatch
-    from alpha_quant.application.factory import DEFAULT_DATABASE_URL
 
     logger = structlog.get_logger("alpha_quant.worker")
     log = logger.info

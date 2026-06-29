@@ -9,6 +9,7 @@ import duckdb
 import structlog
 
 from alpha_quant.adapters.postgres import create_engine, create_session
+from alpha_quant.adapters.postgres.engine import DEFAULT_DATABASE_URL
 from alpha_quant.adapters.postgres.tables import (
     AuditEvent,
     CandidateEvaluation,
@@ -25,7 +26,6 @@ from alpha_quant.adapters.postgres.tables import (
     Strategy,
     StrategyVersion,
 )
-from alpha_quant.application.factory import DEFAULT_DATABASE_URL
 
 logger = structlog.get_logger()
 

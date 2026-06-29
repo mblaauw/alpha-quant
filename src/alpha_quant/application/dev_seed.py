@@ -98,19 +98,30 @@ def seed_dev_data(database_url: str | None = None) -> tuple[int, int]:
                 sector=sector,
             )
 
-        # --- Execution Profiles ---
-        ep_default = str(uuid4())
-        ep_aggressive = str(uuid4())
-        session.execute(
-            _txt(
-                "INSERT INTO core.execution_profile (profile_id, name, slippage_bps, spread_model) "
-                "VALUES (:pid, :name, :slippage, :model)"
-            ),
-            [
-                {"pid": ep_default, "name": "default", "slippage": 1, "model": "fixed"},
-                {"pid": ep_aggressive, "name": "aggressive", "slippage": 3, "model": "adaptive"},
-            ],
-        )
+        # --- Execution Profiles (idempotent — skip if already seeded) ---
+        existing_eps = {
+            r[0]
+            for r in session.execute(_txt("SELECT name FROM core.execution_profile")).fetchall()
+        }
+        if "default" not in existing_eps:
+            ep_default = str(uuid4())
+            ep_aggressive = str(uuid4())
+            session.execute(
+                _txt(
+                    "INSERT INTO core.execution_profile "
+                    "(profile_id, name, slippage_bps, spread_model) "
+                    "VALUES (:pid, :name, :slippage, :model)"
+                ),
+                [
+                    {"pid": ep_default, "name": "default", "slippage": 1, "model": "fixed"},
+                    {
+                        "pid": ep_aggressive,
+                        "name": "aggressive",
+                        "slippage": 3,
+                        "model": "adaptive",
+                    },
+                ],
+            )
 
         # --- Risk Methods ---
         rm_param = str(uuid4())
@@ -224,16 +235,24 @@ def seed_dev_data(database_url: str | None = None) -> tuple[int, int]:
                 upl=upl,
             )
 
-        # --- Position Risk Current ---
-        for sym in ["AAPL", "MSFT", "GOOGL", "NVDA", "AMZN"]:
+        # --- Position Risk Current (per-position stop based on entry price) ---
+        for sym, avg_cost in [
+            ("AAPL", 150.00),
+            ("MSFT", 395.00),
+            ("GOOGL", 165.00),
+            ("NVDA", 850.00),
+            ("AMZN", 175.00),
+        ]:
+            stop = round(avg_cost * 0.90, 2)  # 10% stop below entry
             _exec(
                 "INSERT INTO projection.position_risk_current (book_id, security_id, "
                 "risk_method_id, stop_price, trail_price, trail_activation_pct, "
                 "time_stop_date, auto_trail_enabled, last_adjusted_at, last_adjustment_reason) "
-                "VALUES (:bid, :sid, :rmid, 140.00, NULL, NULL, NULL, true, :now, 'Initial')",
+                "VALUES (:bid, :sid, :rmid, :sp, NULL, 5.0, NULL, true, :now, 'Initial')",
                 bid=bid,
                 sid=sec_ids[sym],
-                rmid=rm_param,
+                rmid=rm_hist,  # Historical VaR as default risk method
+                sp=stop,
                 now=now,
             )
 

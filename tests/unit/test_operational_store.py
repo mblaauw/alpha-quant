@@ -173,7 +173,7 @@ class TestDecisionBatch:
         sec_id = str(uuid4())
         session.execute(
             text("INSERT INTO core.security_reference (security_id, symbol) VALUES (:sid, :sym)"),
-            {"sid": sec_id, "sym": "AAPL"},
+            {"sid": sec_id, "sym": "TEST_BATCH"},
         )
         session.commit()
 
@@ -182,7 +182,7 @@ class TestDecisionBatch:
             decision_run_id=run.decision_run_id,
             portfolio_book_id=book_id,
             security_id=UUID(sec_id),
-            symbol="AAPL",
+            symbol="TEST_BATCH",
             composite_score=Decimal("85.5"),
             regime="bull",
             blocked=False,
@@ -207,7 +207,7 @@ class TestDecisionBatch:
 
         candidates = store.list_candidates(run.decision_run_id)
         assert len(candidates) == 1
-        assert candidates[0].symbol == "AAPL"
+        assert candidates[0].symbol == "TEST_BATCH"
         assert candidates[0].composite_score == Decimal("85.5")
 
         evals = store.list_policy_evals(run.decision_run_id)
@@ -238,7 +238,7 @@ class TestFills:
         sec_id = UUID(str(uuid4()))
         session.execute(
             text("INSERT INTO core.security_reference (security_id, symbol) VALUES (:sid, :sym)"),
-            {"sid": str(sec_id), "sym": "AAPL"},
+            {"sid": str(sec_id), "sym": "TEST_FILL"},
         )
 
         order_id = uuid4()
@@ -251,7 +251,7 @@ class TestFills:
                 "rid": str(run.decision_run_id),
                 "pbid": str(book_id),
                 "sid": str(sec_id),
-                "sym": "AAPL",
+                "sym": "TEST_FILL",
                 "s": "buy",
                 "q": "100",
                 "st": "pending",
@@ -265,7 +265,7 @@ class TestFills:
             decision_run_id=run.decision_run_id,
             portfolio_book_id=book_id,
             security_id=sec_id,
-            symbol="AAPL",
+            symbol="TEST_FILL",
             side=OrderSide.BUY,
             quantity=Decimal("100"),
             price=Decimal("150.00"),

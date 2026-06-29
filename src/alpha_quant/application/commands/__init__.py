@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from collections.abc import Callable
 from typing import Any
 from uuid import UUID, uuid4, uuid5
@@ -8,6 +7,7 @@ from uuid import UUID, uuid4, uuid5
 import structlog
 from sqlalchemy import text
 
+from alpha_quant.adapters.postgres.engine import DEFAULT_DATABASE_URL
 from alpha_quant.application.factory import create_unit_of_work
 from alpha_quant.contracts.operational import (
     Command,
@@ -17,11 +17,6 @@ from alpha_quant.contracts.operational import (
     HaltReason,
     RunKind,
     RunReservation,
-)
-
-DEFAULT_DATABASE_URL = (
-    os.environ.get("DATABASE_URL")
-    or "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant"
 )
 
 CommandHandler = Callable[[Command], tuple[CommandStatus, str | None, str | None]]
@@ -85,68 +80,9 @@ def _book_immediate_fill(
     )
     uow.store.book_fill(fill_cmd)
 
-    # Update position_current directly (upsert)
-    sign = 1 if side == "buy" else -1
-    qty_delta = Decimal(str(quantity)) * sign
-    cost_delta = Decimal(str(price)) * Decimal(str(quantity))
-    uow.store.session.execute(
-        text("""
-            INSERT INTO projection.position_current
-                (book_id, security_id, symbol, quantity, avg_cost,
-                 current_price, market_value, unrealized_pl, stop_price)
-            VALUES (:bid, :sid, :sym, :qty, :avg, :pr, :mv, 0, :stop)
-            ON CONFLICT (book_id, security_id) DO UPDATE SET
-                quantity = projection.position_current.quantity + :qty2,
-                avg_cost = CASE
-                    WHEN projection.position_current.quantity + :qty3 > 0
-                    THEN (projection.position_current.avg_cost
-                          * ABS(projection.position_current.quantity) + :cost)
-                         / (projection.position_current.quantity + :qty4)
-                    ELSE :avg2
-                END,
-                market_value = (projection.position_current.quantity + :qty5) * :pr2,
-                current_price = :pr3
-        """),
-        {
-            "bid": str(book_id),
-            "sid": str(sec_id_str),
-            "sym": symbol,
-            "qty": qty_delta,
-            "avg": cost_delta / max(qty_delta, Decimal("1")),
-            "pr": float(price),
-            "mv": float(price) * float(quantity) * sign,
-            "stop": float(price) * 0.95,
-            "qty2": qty_delta,
-            "qty3": qty_delta,
-            "qty4": qty_delta,
-            "qty5": qty_delta,
-            "cost": cost_delta,
-            "avg2": cost_delta / max(qty_delta, Decimal("1")),
-            "pr2": float(price),
-            "pr3": float(price),
-        },
-    )
-
-    # Update portfolio_current cash (decrease for buys, increase for sells)
-    cash_sign = -1 if side == "buy" else 1
-    cash_delta = cash_sign * float(price) * float(quantity)
-    uow.store.session.execute(
-        text("""
-            INSERT INTO projection.portfolio_current
-                (book_id, cash, equity, gross_exposure, regime, updated_at)
-            VALUES (:bid, :cash, 0, 0, 'RISK_ON', :now)
-            ON CONFLICT (book_id) DO UPDATE SET
-                cash = projection.portfolio_current.cash + :cash2,
-                updated_at = :now2
-        """),
-        {
-            "bid": str(book_id),
-            "cash": -cash_delta,
-            "cash2": cash_delta,
-            "now": datetime.now(UTC),
-            "now2": datetime.now(UTC),
-        },
-    )
+    # Rebuild projections from fills — properly computes quantity, avg_cost,
+    # current_price, market_value, unrealized_pl, cash, equity, and gross_exposure.
+    uow.store.rebuild_projections(book_id)
 
     # Write audit event for the position change
     now = datetime.now(UTC)

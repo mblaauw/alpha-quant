@@ -1,3 +1,5 @@
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -386,47 +388,95 @@ class PostgresOperationalStore:
             text("DELETE FROM projection.portfolio_current WHERE book_id = :bid"),
             {"bid": str(book_id)},
         )
+        # Rebuild positions: compute quantity, avg_cost, and use latest fill price
+        # as current_price, then derive market_value and unrealized_pl.
         self.session.execute(
             text(
                 """
                 INSERT INTO projection.position_current
-                    (book_id, security_id, symbol, quantity, avg_cost)
+                    (book_id, security_id, symbol, quantity, avg_cost,
+                     current_price, market_value, unrealized_pl)
+                WITH position_agg AS (
+                    SELECT
+                        po.portfolio_book_id,
+                        pf.security_id,
+                        pf.symbol,
+                        SUM(CASE WHEN pf.side = 'buy' THEN pf.quantity ELSE -pf.quantity END) AS net_qty,
+                        CASE
+                            WHEN SUM(CASE WHEN pf.side = 'buy' THEN pf.quantity ELSE 0 END) > 0
+                            THEN SUM(
+                                pf.price * pf.quantity * CASE WHEN pf.side = 'buy' THEN 1 ELSE -1 END
+                            ) / SUM(CASE WHEN pf.side = 'buy' THEN pf.quantity ELSE 0 END)
+                            ELSE 0
+                        END AS avg_cost
+                    FROM trade.paper_fill pf
+                    JOIN trade.paper_order po ON pf.order_id = po.order_id
+                    WHERE po.portfolio_book_id = :bid
+                    GROUP BY po.portfolio_book_id, pf.security_id, pf.symbol
+                    HAVING SUM(CASE WHEN pf.side = 'buy' THEN pf.quantity ELSE -pf.quantity END) != 0
+                ),
+                latest_price AS (
+                    SELECT DISTINCT ON (pf.security_id)
+                        pf.security_id,
+                        pf.price AS last_price
+                    FROM trade.paper_fill pf
+                    JOIN trade.paper_order po ON pf.order_id = po.order_id
+                    WHERE po.portfolio_book_id = :bid2
+                    ORDER BY pf.security_id, pf.booked_at DESC
+                )
                 SELECT
-                    po.portfolio_book_id,
-                    pf.security_id,
-                    pf.symbol,
-                    SUM(CASE WHEN pf.side = 'buy' THEN pf.quantity ELSE -pf.quantity END),
-                    CASE
-                        WHEN SUM(CASE WHEN pf.side = 'buy' THEN pf.quantity ELSE 0 END) > 0
-                        THEN SUM(
-                            pf.price * pf.quantity * CASE WHEN pf.side = 'buy' THEN 1 ELSE -1 END
-                        ) / SUM(CASE WHEN pf.side = 'buy' THEN pf.quantity ELSE 0 END)
-                        ELSE 0
-                    END
-                FROM trade.paper_fill pf
-                JOIN trade.paper_order po ON pf.order_id = po.order_id
-                WHERE po.portfolio_book_id = :bid
-                GROUP BY po.portfolio_book_id, pf.security_id, pf.symbol
-                HAVING SUM(CASE WHEN pf.side = 'buy' THEN pf.quantity ELSE -pf.quantity END) != 0
+                    pa.portfolio_book_id,
+                    pa.security_id,
+                    pa.symbol,
+                    pa.net_qty,
+                    pa.avg_cost,
+                    COALESCE(lp.last_price, 0) AS current_price,
+                    CAST(pa.net_qty * COALESCE(lp.last_price, 0) AS NUMERIC(28,10)) AS market_value,
+                    CAST(
+                        (COALESCE(lp.last_price, 0) - pa.avg_cost)
+                        * CASE WHEN pa.net_qty > 0 THEN pa.net_qty ELSE 0 END
+                    AS NUMERIC(28,10)) AS unrealized_pl
+                FROM position_agg pa
+                LEFT JOIN latest_price lp ON pa.security_id = lp.security_id
                 """
             ),
-            {"bid": str(book_id)},
+            {"bid": str(book_id), "bid2": str(book_id)},
         )
+        # Rebuild portfolio: compute cash from ledger, equity/gross_exposure from positions.
+        # Row was already deleted above, so plain INSERT (no ON CONFLICT needed).
         self.session.execute(
             text(
                 """
                 INSERT INTO projection.portfolio_current
                     (book_id, cash, equity, gross_exposure, regime, updated_at)
-                VALUES
-                    (:bid, 0, 0, 0, 'unknown', :now)
-                ON CONFLICT (book_id) DO UPDATE SET
-                    cash = 0,
-                    equity = 0,
-                    gross_exposure = 0,
-                    updated_at = :now
+                WITH cash_agg AS (
+                    SELECT COALESCE(SUM(amount), 0) AS total_cash
+                    FROM trade.cash_ledger_entry
+                    WHERE portfolio_book_id = :bid
+                ),
+                pos_agg AS (
+                    SELECT
+                        COALESCE(SUM(market_value), 0) AS total_mv,
+                        COALESCE(SUM(ABS(market_value)), 0) AS total_exposure
+                    FROM projection.position_current
+                    WHERE book_id = :bid2
+                )
+                SELECT
+                    :bid3,
+                    c.total_cash,
+                    c.total_cash + p.total_mv AS equity,
+                    p.total_exposure,
+                    'unknown',
+                    :now
+                FROM cash_agg c, pos_agg p
                 """
             ),
-            {"bid": str(book_id), "now": datetime.now(UTC)},
+            {
+                "bid": str(book_id),
+                "bid2": str(book_id),
+                "bid3": str(book_id),
+                "now": datetime.now(UTC),
+            },
         )
 
     # --- Scorecards ---

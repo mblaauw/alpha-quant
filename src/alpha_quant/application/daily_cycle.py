@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_DNS, UUID, uuid4, uuid5
 
 import structlog
 from sqlalchemy import text
@@ -224,11 +224,12 @@ class DailyCycleService:
                 if sec_ref:
                     sec_id = str(sec_ref._mapping["security_id"])
                 else:
-                    sec_id = sc.security_id or sc.symbol
+                    sec_id = str(uuid5(NAMESPACE_DNS, sc.symbol + ".com"))
                     self._store.session.execute(
                         text("""
                             INSERT INTO core.security_reference (security_id, symbol)
                             VALUES (:sid, :sym)
+                            ON CONFLICT (security_id) DO NOTHING
                         """),
                         {"sid": sec_id, "sym": sc.symbol},
                     )
