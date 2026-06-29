@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from alpha_quant.adapters.fake.canned_llm import CannedLLM
 from alpha_quant.adapters.fake.virtual_clock import VirtualClock
+from alpha_quant.adapters.postgres.engine import DEFAULT_DATABASE_URL
 from alpha_quant.adapters.postgres.unit_of_work import OperationalUnitOfWork
 from alpha_quant.adapters.real.clock import SystemClock
 from alpha_quant.adapters.real.llm_adapter import OpenAILikeLLM
@@ -22,12 +23,6 @@ from alpha_quant.ports.alpha_lake import AlphaLakeReadPort
 from alpha_quant.ports.clock import Clock
 from alpha_quant.ports.llm import LLM
 from alpha_quant.ports.llm import LLMConfig as PortLLMConfig
-
-DEFAULT_DATABASE_URL = (
-    os.environ.get("DATABASE_URL")
-    or "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant"
-)
-
 
 # -- Factory functions for the Alpha-Lake reader --
 
