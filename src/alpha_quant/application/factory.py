@@ -12,6 +12,7 @@ from alpha_quant.adapters.real.clock import SystemClock
 from alpha_quant.adapters.real.llm_adapter import OpenAILikeLLM
 
 if TYPE_CHECKING:
+    from sqlalchemy import Engine
     from sqlalchemy.orm import Session, sessionmaker
 
     from alpha_quant.application.query.freshness import FreshnessService
@@ -85,10 +86,10 @@ def create_clock(config: AppConfig) -> Clock:
 
 # -- Engine cache (prevent connection pool exhaustion from repeated create_unit_of_work calls) --
 
-_engine_cache: dict[str, object] = {}
+_engine_cache: dict[str, Engine] = {}
 
 
-def _get_engine(url: str) -> object:
+def _get_engine(url: str) -> Engine:
     from sqlalchemy import create_engine as _ce
 
     if url not in _engine_cache:
