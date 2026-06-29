@@ -27,7 +27,6 @@ from alpha_quant.application.factory import (
     create_alpha_lake_reader,
     create_freshness_service,
 )
-from alpha_quant.application.query.command_center import CommandCenterService
 from alpha_quant.application.query.decisions import DecisionService
 from alpha_quant.application.query.freshness import FreshnessService
 from alpha_quant.application.query.journal import JournalService
@@ -78,16 +77,6 @@ async def get_context(svc: SystemService = svc_depends(SystemService)):
 async def set_mode(req: ModeRequest, svc: SystemService = svc_depends(SystemService)):
     svc.set_mock_mode(req.mock)
     return svc.context()
-
-
-@router.get("/desk")
-async def get_desk(
-    svc: CommandCenterService = svc_depends(CommandCenterService),
-    freshness: FreshnessService = Depends(_freshness_service),
-):
-    result = svc.summary()
-    result["freshness_summary"] = freshness.summary([])
-    return result
 
 
 @router.get("/portfolio")

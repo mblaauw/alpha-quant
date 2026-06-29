@@ -1,6 +1,5 @@
 import store from "./state.js";
 import { renderAdvice } from "./render/advice.js";
-import { renderDesk } from "./render/desk.js";
 import { renderPortfolio } from "./render/portfolio.js";
 import { renderDecisions } from "./render/decisions.js";
 import { renderOrders } from "./render/orders.js";
@@ -11,7 +10,6 @@ import { renderSystem } from "./render/system.js";
 
 const routes = {
   advice: renderAdvice,
-  desk: renderDesk,
   portfolio: renderPortfolio,
   decisions: renderDecisions,
   orders: renderOrders,
@@ -22,7 +20,7 @@ const routes = {
 };
 
 export function navigate(hash) {
-  const route = hash.replace(/^#\/?/, "").split("?")[0] || "desk";
+  const route = hash.replace(/^#\/?/, "").split("?")[0] || "advice";
   store.route = route;
   document.querySelectorAll("#tabs a").forEach((a) =>
     a.classList.toggle("active", a.getAttribute("href") === `#${route}`));
@@ -32,5 +30,5 @@ export function navigate(hash) {
 
 export function initRouter() {
   window.addEventListener("hashchange", () => navigate(location.hash));
-  navigate(location.hash || "#desk");
+  navigate(location.hash || "#advice");
 }

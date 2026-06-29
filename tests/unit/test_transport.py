@@ -4,7 +4,6 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from alpha_quant.application.query.command_center import CommandCenterService
 from alpha_quant.application.query.decisions import DecisionService
 from alpha_quant.application.query.journal import JournalService
 from alpha_quant.application.query.orders import OrderService
@@ -16,11 +15,6 @@ from alpha_quant.transport.app import app
 from alpha_quant.transport.commands import _unit_of_work
 from alpha_quant.transport.console_routes import _freshness_service
 from alpha_quant.transport.deps import service_provider
-
-
-class _FakeCommandCenterService:
-    def summary(self) -> dict[str, object]:
-        return {"pending_commands": 0, "positions_count": 0, "portfolio": None}
 
 
 class _FakePortfolioService:
@@ -112,7 +106,6 @@ class _FakeUnitOfWork:
 
 app.dependency_overrides.update(
     {
-        service_provider(CommandCenterService): _FakeCommandCenterService,
         service_provider(PortfolioService): _FakePortfolioService,
         service_provider(DecisionService): _FakeDecisionService,
         service_provider(OrderService): _FakeOrderService,
@@ -149,10 +142,6 @@ class TestConsoleAPI:
         assert resp.status_code == 200
         data = resp.json()
         assert "halted" in data
-
-    def test_console_desk(self) -> None:
-        resp = client.get("/v1/console/desk")
-        assert resp.status_code == 200
 
     def test_console_portfolio(self) -> None:
         resp = client.get("/v1/console/portfolio")

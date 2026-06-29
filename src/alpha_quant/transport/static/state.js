@@ -1,5 +1,5 @@
 const store = {
-  route: "desk",
+  route: "advice",
   theme: localStorage.getItem("aq-theme") || "light",
   bookId: null,
   context: null,
