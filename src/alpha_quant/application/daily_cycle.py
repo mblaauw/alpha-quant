@@ -217,15 +217,21 @@ class DailyCycleService:
             run_id_str = str(run.decision_run_id)
             book_id_str = str(book_id)
             for sc in scorecards:
-                sec_id = sc.security_id or sc.symbol
-                self._store.session.execute(
-                    text("""
-                        INSERT INTO core.security_reference (security_id, symbol)
-                        VALUES (:sid, :sym)
-                        ON CONFLICT (security_id) DO NOTHING
-                    """),
-                    {"sid": sec_id, "sym": sc.symbol},
-                )
+                sec_ref = self._store.session.execute(
+                    text("SELECT security_id FROM core.security_reference WHERE symbol = :sym"),
+                    {"sym": sc.symbol},
+                ).fetchone()
+                if sec_ref:
+                    sec_id = str(sec_ref._mapping["security_id"])
+                else:
+                    sec_id = sc.security_id or sc.symbol
+                    self._store.session.execute(
+                        text("""
+                            INSERT INTO core.security_reference (security_id, symbol)
+                            VALUES (:sid, :sym)
+                        """),
+                        {"sid": sec_id, "sym": sc.symbol},
+                    )
                 sc_with_ids = sc.model_copy(
                     update={
                         "portfolio_book_id": book_id_str,

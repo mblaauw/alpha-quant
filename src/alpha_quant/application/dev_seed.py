@@ -59,6 +59,7 @@ TABLE_ORDER_REVERSE = [
     "ops.command",
     "ops.run_lock_audit",
     "core.book_risk_profile",
+    "core.security_reference",
 ]
 
 

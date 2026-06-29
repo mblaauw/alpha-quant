@@ -42,32 +42,33 @@ def _book_immediate_fill(
 
     from alpha_quant.contracts.operational import FillBookingCommand, FillQuality, OrderSide
 
-    # Resolve security_id from symbol; fall back to a deterministic UUID
-    sec_row = uow.store.session.execute(
-        text("SELECT security_id FROM core.security_reference WHERE symbol = :sym"),
-        {"sym": symbol},
-    ).fetchone()
-    sec_id_str = (
-        str(sec_row._mapping["security_id"])
-        if sec_row
-        else uuid5(UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8"), symbol)
+    # Use a deterministic security_id via uuid5 to avoid duplicates from
+    # security_reference having multiple entries for the same symbol.
+    _sec_ns = UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+    sec_id_str = str(uuid5(_sec_ns, symbol + ".com"))
+    # Ensure security_reference has this entry (idempotent)
+    uow.store.session.execute(
+        text("""
+            INSERT INTO core.security_reference (security_id, symbol)
+            VALUES (:sid, :sym)
+            ON CONFLICT (security_id) DO NOTHING
+        """),
+        {"sid": sec_id_str, "sym": symbol},
     )
 
     # Get current price from positions or use a default
-    sql_pos = "SELECT current_price FROM projection.position_current WHERE book_id = :bid AND symbol = :sym"  # noqa: E501
-    pos_row = uow.store.session.execute(
-        text(sql_pos),
+    price_row = uow.store.session.execute(
+        text(
+            "SELECT current_price FROM projection.position_current "
+            "WHERE book_id = :bid AND symbol = :sym"
+        ),
         {"bid": str(book_id), "sym": symbol},
     ).fetchone()
-    raw_price = pos_row._mapping["current_price"] if pos_row else None
+    raw_price = price_row._mapping["current_price"] if price_row else None
     price = float(raw_price) if raw_price is not None else 100.0
     price = max(price, 0.01)  # prevent division by zero
 
-    sec_uuid: UUID = (
-        UUID(sec_id_str)
-        if isinstance(sec_id_str, str) and len(sec_id_str) == 36
-        else uuid5(UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8"), symbol)
-    )
+    sec_uuid = UUID(sec_id_str)
     fill_cmd = FillBookingCommand(
         order_id=UUID(order_id),
         decision_run_id=UUID("00000000-0000-0000-0000-000000000001"),
@@ -348,10 +349,13 @@ def flatten_position_handler(cmd: Command) -> tuple[CommandStatus, str | None, s
         if target is None:
             return CommandStatus.FAILED, None, f"Position not found: {position_id}"
         side = "sell" if target.quantity > 0 else "buy"
+        qty = abs(float(target.quantity)) if target.quantity else 0
+        if qty <= 0:
+            return CommandStatus.FAILED, None, f"Invalid quantity: {target.quantity}"
         order_id = uow.store.create_order(
             symbol=target.symbol,
             side=side,
-            quantity=abs(float(target.quantity)),
+            quantity=qty,
             order_type="market",
             book_id=cmd.book_id or UUID("00000000-0000-0000-0000-000000000001"),
         )
@@ -362,7 +366,7 @@ def flatten_position_handler(cmd: Command) -> tuple[CommandStatus, str | None, s
             book_id,
             target.symbol,
             side,
-            abs(float(target.quantity)),
+            qty,
             cmd.reason or "Flatten position",
         )
         return CommandStatus.SUCCEEDED, order_id, None

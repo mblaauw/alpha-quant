@@ -1088,14 +1088,15 @@ class PostgresOperationalStore:
         limit_price: float | None = None,
         decision_id: str | None = None,
     ) -> str:
+        from uuid import uuid5
+
         from alpha_quant.contracts.operational import OrderStatus
 
-        # Resolve security_id from symbol, defaulting to symbol as fallback
-        sec_row = self.session.execute(
-            text("SELECT security_id FROM core.security_reference WHERE symbol = :sym"),
-            {"sym": symbol},
-        ).fetchone()
-        security_id = str(sec_row._mapping["security_id"]) if sec_row else symbol
+        # Use deterministic security_id (uuid5 DNS hash of symbol) so orders,
+        # fills, and position_current all use the same ID regardless of
+        # security_reference duplicates.
+        _sec_ns = UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+        security_id = str(uuid5(_sec_ns, symbol + ".com"))
 
         order_id = str(uuid4())
         status = OrderStatus.PENDING.value
