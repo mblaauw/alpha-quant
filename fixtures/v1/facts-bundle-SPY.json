@@ -210,34 +210,8 @@
       }
     ]
   },
-  "insider_transactions": [
-    {
-      "effective_date": "2026-06-15",
-      "transaction_type": "buy",
-      "shares": 5000,
-      "price": 537.04,
-      "value": 2685200.0
-    },
-    {
-      "effective_date": "2026-06-10",
-      "transaction_type": "buy",
-      "shares": 2000,
-      "price": 542.52,
-      "value": 1085040.0
-    }
-  ],
-  "earnings_events": [
-    {
-      "effective_date": "2026-04-25",
-      "symbol": "SPY",
-      "surprise_pct": 4.2
-    },
-    {
-      "effective_date": "2026-01-28",
-      "symbol": "SPY",
-      "surprise_pct": 3.1
-    }
-  ],
+  "insider_transactions": [],
+  "earnings_events": [],
   "attention_mentions": [
     {
       "effective_date": "2026-06-25",

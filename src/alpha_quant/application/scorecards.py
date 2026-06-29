@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from statistics import mean, stdev
 
+import structlog
+
 from alpha_quant.contracts.alpha_lake import FactsBundle, FundamentalMetric
 from alpha_quant.domain.scorecard import (
     ComponentState,
@@ -13,6 +15,8 @@ from alpha_quant.domain.scorecard import (
     Scorecard,
     ScorecardComponent,
 )
+
+logger = structlog.get_logger()
 
 
 @dataclass
@@ -58,8 +62,6 @@ _COMPONENT_WEIGHTS: dict[str, float] = {
     "cash_impact": 0.04,
     "data_quality": 0.02,
 }
-
-_CRITICAL_COMPONENTS = {"data_quality"}
 
 
 # Mapping from scorecard engine readout IDs to actual Alpha-Lake v2 readout IDs.
@@ -107,9 +109,8 @@ def _parse_date(raw: str) -> date | None:
 
 
 def _score_technical_trend(bundle: FactsBundle) -> ScorecardComponent:
-    # Alpha-Lake v2: use trend.directional_bias and trend.regime instead of SMAs
     dir_bias = _readout_value(bundle, "directional_bias")
-    trend_regime = _readout_value(bundle, "regime")
+    trend_regime = _readout_value(bundle, "trend.regime")
 
     score = 50.0
     reasons: list[str] = []
@@ -210,7 +211,7 @@ def _score_momentum(bundle: FactsBundle) -> ScorecardComponent:
 def _score_volatility(bundle: FactsBundle) -> ScorecardComponent:
     atr_pct = _readout_value(bundle, "atr_pct_14")
     boll_width = _readout_value(bundle, "bollinger_width")
-    vol_regime = _readout_value(bundle, "regime")
+    vol_regime = _readout_value(bundle, "volatility.regime")
 
     reasons: list[str] = []
     score = 50.0
@@ -649,7 +650,7 @@ def _score_position_risk(
         )
     price = existing.current_price or existing.avg_cost
     pl_pct = ((price - existing.avg_cost) / existing.avg_cost) * 100
-    if pl_pct < -15:
+    if pl_pct <= -15:
         return ScorecardComponent(
             name="position_risk",
             category="risk",
@@ -658,7 +659,7 @@ def _score_position_risk(
             weight=_COMPONENT_WEIGHTS["position_risk"],
             reason=f"Position down {pl_pct:.1f}%",
         )
-    if pl_pct < -5:
+    if pl_pct <= -5:
         return ScorecardComponent(
             name="position_risk",
             category="risk",
@@ -666,7 +667,7 @@ def _score_position_risk(
             weight=_COMPONENT_WEIGHTS["position_risk"],
             reason=f"Position down {pl_pct:.1f}%",
         )
-    if pl_pct > 15:
+    if pl_pct >= 15:
         return ScorecardComponent(
             name="position_risk",
             category="risk",
@@ -708,7 +709,7 @@ def _score_cash_impact(
         )
     est_size = min(portfolio.cash, portfolio.equity * 0.1)
     cash_pct = (est_size / portfolio.cash) * 100 if portfolio.cash > 0 else 0
-    if cash_pct > 50:
+    if cash_pct >= 50:
         return ScorecardComponent(
             name="cash_impact",
             category="portfolio",
@@ -716,7 +717,7 @@ def _score_cash_impact(
             weight=_COMPONENT_WEIGHTS["cash_impact"],
             reason="Adequate cash available",
         )
-    if cash_pct > 20:
+    if cash_pct >= 20:
         return ScorecardComponent(
             name="cash_impact",
             category="portfolio",
@@ -777,6 +778,7 @@ def _apply_gates(
     components: dict[str, ScorecardComponent],
     portfolio: PortfolioContext,
     as_of: date,
+    symbol: str = "",
 ) -> list[str]:
     warnings: list[str] = []
 
@@ -789,6 +791,9 @@ def _apply_gates(
 
     if portfolio.regime == "CAUTION":
         warnings.append("Market regime: CAUTION — adopting defensive posture")
+
+    for w in warnings:
+        logger.warning("gate_triggered", symbol=symbol, warning=w)
 
     return warnings
 
@@ -869,7 +874,7 @@ def generate_scorecards(
         components["cash_impact"] = _score_cash_impact(symbol, portfolio)
         components["data_quality"] = _score_data_quality(bundle)
 
-        _apply_gates(components, portfolio, today)
+        _apply_gates(components, portfolio, today, symbol=symbol)
         total_score = _compute_total_score(list(components.values()), portfolio.regime)
 
         dq = components.get("data_quality")

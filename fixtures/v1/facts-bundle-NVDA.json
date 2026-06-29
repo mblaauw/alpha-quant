@@ -148,7 +148,7 @@
       "observations": [
         {
           "effective_date": "2026-06-29",
-          "value": 12.5
+          "value": 0.125
         }
       ]
     },
@@ -192,7 +192,7 @@
         "metric_id": "gross_margin_ttm",
         "name": "Gross Margin",
         "category": "profitability",
-        "value": 75.0,
+        "value": 0.75,
         "period_end": "2026-03-31",
         "unit": "%",
         "tone": "positive",
@@ -202,7 +202,7 @@
         "metric_id": "earnings_yield_ttm",
         "name": "Earnings Yield",
         "category": "valuation",
-        "value": 2.2,
+        "value": 0.022,
         "period_end": "2026-03-31",
         "unit": "%",
         "tone": "neutral",
@@ -212,30 +212,30 @@
   },
   "insider_transactions": [
     {
-      "effective_date": "2026-06-15",
-      "transaction_type": "buy",
-      "shares": 5000,
-      "price": 891.8,
-      "value": 4459000.0
+      "effective_date": "2026-06-01",
+      "transaction_type": "Buy",
+      "shares": 600,
+      "price": 845.0,
+      "value": 507000
     },
     {
-      "effective_date": "2026-06-10",
-      "transaction_type": "buy",
-      "shares": 2000,
-      "price": 900.9,
-      "value": 1801800.0
+      "effective_date": "2026-06-01",
+      "transaction_type": "Buy",
+      "shares": 400,
+      "price": 852.0,
+      "value": 340800
     }
   ],
   "earnings_events": [
     {
-      "effective_date": "2026-04-25",
+      "effective_date": "2026-06-01",
       "symbol": "NVDA",
       "surprise_pct": 4.2
     },
     {
-      "effective_date": "2026-01-28",
+      "effective_date": "2026-02-10",
       "symbol": "NVDA",
-      "surprise_pct": 3.1
+      "surprise_pct": 4.2
     }
   ],
   "attention_mentions": [
@@ -261,7 +261,7 @@
     },
     {
       "effective_date": "2026-06-29",
-      "count": 123,
+      "count": 830,
       "source": "alpha_lake"
     }
   ]

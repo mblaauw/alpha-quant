@@ -148,7 +148,7 @@
       "observations": [
         {
           "effective_date": "2026-06-29",
-          "value": -0.8
+          "value": -0.008
         }
       ]
     },
@@ -192,7 +192,7 @@
         "metric_id": "gross_margin_ttm",
         "name": "Gross Margin",
         "category": "profitability",
-        "value": 45.0,
+        "value": 0.45,
         "period_end": "2026-03-31",
         "unit": "%",
         "tone": "positive",
@@ -202,7 +202,7 @@
         "metric_id": "earnings_yield_ttm",
         "name": "Earnings Yield",
         "category": "valuation",
-        "value": 2.6,
+        "value": 0.026,
         "period_end": "2026-03-31",
         "unit": "%",
         "tone": "neutral",
@@ -212,30 +212,30 @@
   },
   "insider_transactions": [
     {
-      "effective_date": "2026-06-15",
-      "transaction_type": "buy",
-      "shares": 5000,
-      "price": 177.38,
-      "value": 886900.0
+      "effective_date": "2026-06-01",
+      "transaction_type": "Sell",
+      "shares": 200,
+      "price": 173.0,
+      "value": 34600
     },
     {
-      "effective_date": "2026-06-10",
-      "transaction_type": "buy",
-      "shares": 2000,
-      "price": 179.19,
-      "value": 358380.0
+      "effective_date": "2026-06-01",
+      "transaction_type": "Sell",
+      "shares": 300,
+      "price": 176.0,
+      "value": 52800
     }
   ],
   "earnings_events": [
     {
-      "effective_date": "2026-04-25",
+      "effective_date": "2026-05-01",
       "symbol": "AMZN",
       "surprise_pct": 4.2
     },
     {
-      "effective_date": "2026-01-28",
+      "effective_date": "2026-01-20",
       "symbol": "AMZN",
-      "surprise_pct": 3.1
+      "surprise_pct": 4.2
     }
   ],
   "attention_mentions": [

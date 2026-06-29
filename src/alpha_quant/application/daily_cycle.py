@@ -175,6 +175,19 @@ class DailyCycleService:
                 except Exception:
                     continue
 
+            # -- Determine market regime from SPY trend --
+            if spy_facts:
+                from alpha_quant.application.scorecards import _readout_value
+
+                spy_regime = _readout_value(spy_facts, "trend.regime")
+                if spy_regime is not None:
+                    if spy_regime >= 40:
+                        state.regime = "RISK_ON"
+                    elif spy_regime >= 20:
+                        state.regime = "CAUTION"
+                    else:
+                        state.regime = "RISK_OFF"
+
             # -- Generate scorecards --
             portfolio_ctx = PortfolioContext(
                 equity=float(state.equity),

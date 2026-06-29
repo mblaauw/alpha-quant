@@ -148,7 +148,7 @@
       "observations": [
         {
           "effective_date": "2026-06-29",
-          "value": 3.8
+          "value": 0.038
         }
       ]
     },
@@ -192,7 +192,7 @@
         "metric_id": "gross_margin_ttm",
         "name": "Gross Margin",
         "category": "profitability",
-        "value": 70.0,
+        "value": 0.7,
         "period_end": "2026-03-31",
         "unit": "%",
         "tone": "positive",
@@ -202,7 +202,7 @@
         "metric_id": "earnings_yield_ttm",
         "name": "Earnings Yield",
         "category": "valuation",
-        "value": 3.1,
+        "value": 0.031,
         "period_end": "2026-03-31",
         "unit": "%",
         "tone": "neutral",
@@ -212,30 +212,30 @@
   },
   "insider_transactions": [
     {
-      "effective_date": "2026-06-15",
-      "transaction_type": "buy",
-      "shares": 5000,
-      "price": 387.09999999999997,
-      "value": 1935500.0
+      "effective_date": "2026-06-01",
+      "transaction_type": "Buy",
+      "shares": 300,
+      "price": 390.0,
+      "value": 117000
     },
     {
-      "effective_date": "2026-06-10",
-      "transaction_type": "buy",
-      "shares": 2000,
-      "price": 391.05,
-      "value": 782100.0
+      "effective_date": "2026-06-01",
+      "transaction_type": "Buy",
+      "shares": 150,
+      "price": 395.0,
+      "value": 59250
     }
   ],
   "earnings_events": [
     {
-      "effective_date": "2026-04-25",
+      "effective_date": "2026-07-15",
       "symbol": "MSFT",
       "surprise_pct": 4.2
     },
     {
-      "effective_date": "2026-01-28",
+      "effective_date": "2026-04-28",
       "symbol": "MSFT",
-      "surprise_pct": 3.1
+      "surprise_pct": 4.2
     }
   ],
   "attention_mentions": [
@@ -261,7 +261,7 @@
     },
     {
       "effective_date": "2026-06-29",
-      "count": 136,
+      "count": 290,
       "source": "alpha_lake"
     }
   ]
