@@ -1,6 +1,6 @@
 import store from "../state.js";
 import { get, post } from "../api.js";
-import { cmd } from "../commands.js";
+import { cmd, refreshView } from "../commands.js";
 import { fmtCurrency, fmtNum, esc } from "../formatters.js";
 import { emptyState } from "../components/empty_state.js";
 import { errorState } from "../components/error_state.js";
@@ -433,12 +433,12 @@ function wireTicket() {
         scorecard_id: _activeTicket.scorecardId, symbol: _activeTicket.sym,
         qty, stop_price: _ticketSizing.stop_price,
         risk_pct: _activeTicket.riskPct / 100, method: _activeTicket.method,
-      }, reason), "Submit modified — " + _activeTicket.sym);
+      }, reason), "Submit modified — " + _activeTicket.sym, refreshView);
     } else {
       runWithToast(() => cmd.approve(bookId, {
         scorecard_id: _activeTicket.scorecardId, symbol: _activeTicket.sym,
         quantity: qty,
-      }, reason), "Follow — " + _activeTicket.sym);
+      }, reason), "Follow — " + _activeTicket.sym, refreshView);
     }
     close();
   });
@@ -450,5 +450,6 @@ function doReject(item) {
   runWithToast(
     () => cmd.reject(store.bookId, { scorecard_id: item.scorecard_id }, "Operator override"),
     "Reject advice — " + item.symbol,
+    refreshView,
   );
 }

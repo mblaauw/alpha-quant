@@ -12,6 +12,12 @@ export function generateKey() {
   return crypto.randomUUID();
 }
 
+/* Refresh the currently active view after a mutation completes.
+   All view renderers listen for this custom event. */
+export function refreshView() {
+  window.dispatchEvent(new CustomEvent("bookchange"));
+}
+
 /* ── Typed helpers for the redesign's new command types (see API plan §2). ──
    Each returns the submit response { command_id, status }. The caller drives
    the toast via runWithToast() in components/toast.js. */

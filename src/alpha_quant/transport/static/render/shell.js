@@ -2,7 +2,7 @@ import store from "../state.js";
 import { showBanner, clearBanner } from "../components/banner.js";
 import { showModal, closeModal, intro, fieldStatic } from "../components/modal.js";
 import { runWithToast } from "../components/toast.js";
-import { cmd } from "../commands.js";
+import { cmd, refreshView } from "../commands.js";
 import { fmtDateTime } from "../formatters.js";
 import { setFreshness, paintFeedPill } from "../freshness.js";
 
@@ -119,7 +119,7 @@ function openRunModal() {
       + fieldStatic("Decision as of", "Latest — live data"),
     [
       { label: "Cancel", class: "btn", onclick: closeModal },
-      { label: "▶ Run", class: "btn btn-primary", onclick: () => { closeModal(); runWithToast(() => cmd.runCycle(store.bookId), "Decision cycle — latest"); } },
+      { label: "▶ Run", class: "btn btn-primary", onclick: () => { closeModal(); runWithToast(() => cmd.runCycle(store.bookId), "Decision cycle — latest", refreshView); } },
     ],
   );
 }

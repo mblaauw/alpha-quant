@@ -2,7 +2,7 @@ import { get } from "../api.js";
 import { openDrawer } from "../components/drawer.js";
 import { showModal, closeModal, intro, fieldNumber, val } from "../components/modal.js";
 import { runWithToast } from "../components/toast.js";
-import { cmd } from "../commands.js";
+import { cmd, refreshView } from "../commands.js";
 import store from "../state.js";
 import { fmtCurrency, fmtPrice, fmtDateTime, esc } from "../formatters.js";
 
@@ -173,7 +173,7 @@ export async function openOrderDrawer(orderId) {
     openDrawer(title, body);
 
     document.getElementById("dr-cancel")?.addEventListener("click", () => {
-      runWithToast(() => cmd.orderCancel(store.bookId, data.order_id, "Cancelled from drawer"), "Cancel " + (data.order_id || "").slice(0, 8));
+      runWithToast(() => cmd.orderCancel(store.bookId, data.order_id, "Cancelled from drawer"), "Cancel " + (data.order_id || "").slice(0, 8), refreshView);
     });
   } catch (e) {
     openDrawer("Order", `<div class="error-state"><div class="error-state-title">Failed to load</div><div class="error-state-detail">${esc(e.message)}</div></div>`);
@@ -245,11 +245,11 @@ export async function openDecisionDrawer(decisionId) {
     const title = `${esc(dec.symbol || decisionId)} <span class="chip" data-tone="${sev}">${blocked ? "BLOCKED" : (dec.decision || "").toUpperCase()}</span>`;
     openDrawer(title, body);
 
-    document.getElementById("dr-approve")?.addEventListener("click", () => runWithToast(() => cmd.approve(store.bookId, { decision_id: dec.candidate_id, symbol: dec.symbol }, "Approve from drawer"), "Approve " + dec.symbol));
-    document.getElementById("dr-hold")?.addEventListener("click", () => runWithToast(() => cmd.approve(store.bookId, { decision_id: dec.candidate_id, symbol: dec.symbol }, "Hold from drawer"), "Hold " + dec.symbol));
-    document.getElementById("dr-reduce")?.addEventListener("click", () => runWithToast(() => cmd.approve(store.bookId, { decision_id: dec.candidate_id, symbol: dec.symbol, quantity: 0 }, "Reduce from drawer"), "Reduce " + dec.symbol));
-    document.getElementById("dr-exit")?.addEventListener("click", () => runWithToast(() => cmd.flatten(store.bookId, dec.symbol, "Exit from drawer"), "Exit " + dec.symbol));
-    document.getElementById("dr-stop")?.addEventListener("click", () => runWithToast(() => cmd.setStop(store.bookId, dec.symbol, 0, "Stop update from drawer"), "Edit stop — " + dec.symbol));
+    document.getElementById("dr-approve")?.addEventListener("click", () => runWithToast(() => cmd.approve(store.bookId, { decision_id: dec.candidate_id, symbol: dec.symbol }, "Approve from drawer"), "Approve " + dec.symbol, refreshView));
+    document.getElementById("dr-hold")?.addEventListener("click", () => runWithToast(() => cmd.approve(store.bookId, { decision_id: dec.candidate_id, symbol: dec.symbol }, "Hold from drawer"), "Hold " + dec.symbol, refreshView));
+    document.getElementById("dr-reduce")?.addEventListener("click", () => runWithToast(() => cmd.approve(store.bookId, { decision_id: dec.candidate_id, symbol: dec.symbol, quantity: 0 }, "Reduce from drawer"), "Reduce " + dec.symbol, refreshView));
+    document.getElementById("dr-exit")?.addEventListener("click", () => runWithToast(() => cmd.flatten(store.bookId, dec.symbol, "Exit from drawer"), "Exit " + dec.symbol, refreshView));
+    document.getElementById("dr-stop")?.addEventListener("click", () => runWithToast(() => cmd.setStop(store.bookId, dec.symbol, 0, "Stop update from drawer"), "Edit stop — " + dec.symbol, refreshView));
   } catch (e) {
     openDrawer("Decision", `<div class="error-state"><div class="error-state-title">Failed to load</div><div class="error-state-detail">${esc(e.message)}</div></div>`);
   }
