@@ -34,4 +34,5 @@ export const cmd = {
   setStop:        (bookId, positionId, stopPrice, reason) => submitCommand("position.set_stop", { position_id: positionId, stop_price: stopPrice }, { idempotency_key: generateKey(), book_id: bookId, reason }),
   modify:         (bookId, payload, reason) => submitCommand("candidate.modify", payload, { idempotency_key: generateKey(), book_id: bookId, reason }),
   backtest:       (bookId, payload, reason) => submitCommand("backtest.create", payload, { idempotency_key: generateKey(), book_id: bookId, reason }),
+  setMockMode:    (mock, reason) => submitCommand("system.set_mock_mode", { mock }, { idempotency_key: generateKey(), reason }),
 };
