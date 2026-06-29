@@ -173,6 +173,24 @@ def db_seed(
 
 
 @app.command(rich_help_panel="Database")
+def db_dev_seed(
+    database_url: str = _database_url_opt(),
+) -> None:
+    """Seed comprehensive mock data for development (clears all data first)."""
+    from alpha_quant.application.dev_seed import seed_dev_data
+
+    pos_count, sc_count = seed_dev_data(database_url)
+    _print_panel(
+        "Dev Seed",
+        [
+            ("Status", "[green]mock data created[/green]"),
+            ("Positions", f"[cyan]{pos_count}[/cyan]"),
+            ("Scorecards", f"[cyan]{sc_count}[/cyan]"),
+        ],
+    )
+
+
+@app.command(rich_help_panel="Database")
 def db_import(
     duckdb_path: str = typer.Option(  # noqa: B008
         "data/state.db",

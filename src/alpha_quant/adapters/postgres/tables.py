@@ -423,6 +423,15 @@ class RunLockAudit(Base):
     created_at: Mapped[datetime] = dt_field()
 
 
+class AppConfig(Base):
+    __tablename__ = "app_config"
+    __table_args__ = {"schema": "ops"}
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(String(255), nullable=False)
+    updated_at: Mapped[datetime] = dt_field()
+
+
 class RiskMethod(Base):
     __tablename__ = "risk_method"
     __table_args__ = {"schema": "core"}

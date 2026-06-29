@@ -177,7 +177,7 @@ def compute_all(
     hist = historical_var_multi(portfolio_returns)
     es_pct = expected_shortfall(portfolio_returns, 0.975)
 
-    levels: dict[str, dict[str, float]] = {}
+    levels: dict[str, dict[str, float | str]] = {}
     for key in ("p95", "p99"):
         pct_para = para.get(key, {}).get("parametric", 0.0)
         pct_hist = hist.get(key, {}).get("historical", 0.0)
@@ -187,17 +187,19 @@ def compute_all(
         levels[key] = {
             "pct": round(pct_para, 4),
             "usd": round(equity * pct_para, 2),
-            "parametric": round(pct_para, 4),
-            "historical": round(pct_hist, 4),
-            "monte_carlo": round(pct_mc, 4),
+            "parametric": f"{pct_para * 100:.1f}%",
+            "historical": f"{pct_hist * 100:.1f}%",
+            "monte_carlo": f"{pct_mc * 100:.1f}%",
         }
 
+    es_hist = expected_shortfall(portfolio_returns, 0.975)
+    es_mc = monte_carlo_var(weights, cov_matrix, confidence=0.975)
     levels["es975"] = {
         "pct": round(es_pct, 4),
         "usd": round(equity * es_pct, 2),
-        "parametric": round(es_pct, 4),
-        "historical": round(expected_shortfall(portfolio_returns, 0.975), 4),
-        "monte_carlo": round(monte_carlo_var(weights, cov_matrix, confidence=0.975), 4),
+        "parametric": f"{es_pct * 100:.1f}%",
+        "historical": f"{es_hist * 100:.1f}%",
+        "monte_carlo": f"{es_mc * 100:.1f}%",
     }
 
     return {

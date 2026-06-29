@@ -1,0 +1,34 @@
+{
+  "symbols": [
+    {
+      "symbol": "AAPL",
+      "added_at": "2026-01-01T00:00:00Z",
+      "active": true
+    },
+    {
+      "symbol": "MSFT",
+      "added_at": "2026-01-01T00:00:00Z",
+      "active": true
+    },
+    {
+      "symbol": "GOOGL",
+      "added_at": "2026-01-01T00:00:00Z",
+      "active": true
+    },
+    {
+      "symbol": "NVDA",
+      "added_at": "2026-01-01T00:00:00Z",
+      "active": true
+    },
+    {
+      "symbol": "AMZN",
+      "added_at": "2026-01-01T00:00:00Z",
+      "active": true
+    },
+    {
+      "symbol": "SPY",
+      "added_at": "2026-01-01T00:00:00Z",
+      "active": true
+    }
+  ]
+}

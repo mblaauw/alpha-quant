@@ -509,7 +509,7 @@ class PostgresOperationalStore:
         ).fetchone()
         if row is None:
             return None
-        return _row_to_scorecard(row, self.session)
+        return PostgresOperationalStore._row_to_scorecard(row, self.session)
 
     def load_scorecards_for_run(self, run_id: str) -> list[Scorecard]:
         rows = self.session.execute(
@@ -523,7 +523,7 @@ class PostgresOperationalStore:
             """),
             {"rid": run_id},
         ).fetchall()
-        return [_row_to_scorecard(r, self.session) for r in rows]
+        return [PostgresOperationalStore._row_to_scorecard(r, self.session) for r in rows]
 
     # --- Advice ---
 
@@ -1189,48 +1189,69 @@ class PostgresOperationalStore:
             failure_reason=r._mapping.get("failure_reason"),
         )
 
+    # --- App config (mock mode etc.) ---
 
-def _row_to_scorecard(row: Any, session: Session) -> Scorecard:
-    comp_rows = session.execute(
-        text("""
-            SELECT component_id, scorecard_id, name, category,
-                   score, state, weight, passed, reason, details_json
-            FROM run.scorecard_component
-            WHERE scorecard_id = :sid
-            ORDER BY name
-        """),
-        {"sid": row._mapping["scorecard_id"]},
-    ).fetchall()
+    def config_get(self, key: str, default: str | None = None) -> str | None:
+        row = self.session.execute(
+            text("SELECT value FROM ops.app_config WHERE key = :k"),
+            {"k": key},
+        ).one_or_none()
+        return row._mapping["value"] if row else default
 
-    components = [
-        ScorecardComponent(
-            name=r._mapping["name"],
-            category=r._mapping["category"],
-            score=float(r._mapping["score"]),
-            state=r._mapping["state"],
-            weight=float(r._mapping["weight"]),
-            passed=r._mapping["passed"],
-            reason=r._mapping["reason"] or "",
-            details_json=r._mapping["details_json"],
+    def config_set(self, key: str, value: str) -> None:
+        self.session.execute(
+            text(
+                """INSERT INTO ops.app_config (key, value, updated_at)
+                   VALUES (:k, :v, NOW())
+                   ON CONFLICT (key) DO UPDATE SET value = :v2, updated_at = NOW()"""
+            ),
+            {"k": key, "v": value, "v2": value},
         )
-        for r in comp_rows
-    ]
 
-    return Scorecard(
-        scorecard_id=row._mapping["scorecard_id"],
-        decision_run_id=row._mapping["decision_run_id"],
-        portfolio_book_id=row._mapping["portfolio_book_id"],
-        symbol=row._mapping["symbol"],
-        security_id=row._mapping["security_id"],
-        as_of=row._mapping["as_of"],
-        snapshot_id=row._mapping.get("snapshot_id"),
-        facts_hash=row._mapping["facts_hash"],
-        config_hash=row._mapping["config_hash"],
-        strategy_version=row._mapping["strategy_version"],
-        recommendation=row._mapping["recommendation"],
-        confidence=float(row._mapping["confidence"]),
-        total_score=float(row._mapping["total_score"]),
-        data_quality=row._mapping["data_quality"],
-        components=components,
-        created_at=row._mapping["created_at"],
-    )
+    # --- Row mappers ---
+
+    @staticmethod
+    def _row_to_scorecard(row: Any, session: Session) -> Scorecard:
+        comp_rows = session.execute(
+            text("""
+                SELECT component_id, scorecard_id, name, category,
+                       score, state, weight, passed, reason, details_json
+                FROM run.scorecard_component
+                WHERE scorecard_id = :sid
+                ORDER BY name
+            """),
+            {"sid": row._mapping["scorecard_id"]},
+        ).fetchall()
+
+        components = [
+            ScorecardComponent(
+                name=r._mapping["name"],
+                category=r._mapping["category"],
+                score=float(r._mapping["score"]),
+                state=r._mapping["state"],
+                weight=float(r._mapping["weight"]),
+                passed=r._mapping["passed"],
+                reason=r._mapping["reason"] or "",
+                details_json=r._mapping["details_json"],
+            )
+            for r in comp_rows
+        ]
+
+        return Scorecard(
+            scorecard_id=row._mapping["scorecard_id"],
+            decision_run_id=row._mapping["decision_run_id"],
+            portfolio_book_id=row._mapping["portfolio_book_id"],
+            symbol=row._mapping["symbol"],
+            security_id=row._mapping["security_id"],
+            as_of=row._mapping["as_of"],
+            snapshot_id=row._mapping.get("snapshot_id"),
+            facts_hash=row._mapping["facts_hash"],
+            config_hash=row._mapping["config_hash"],
+            strategy_version=row._mapping["strategy_version"],
+            recommendation=row._mapping["recommendation"],
+            confidence=float(row._mapping["confidence"]),
+            total_score=float(row._mapping["total_score"]),
+            data_quality=row._mapping["data_quality"],
+            components=components,
+            created_at=row._mapping["created_at"],
+        )

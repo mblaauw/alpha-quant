@@ -19,5 +19,6 @@ COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/src /app/src
 COPY --from=builder /app/alembic.ini /app/alembic.ini
 COPY --from=builder /app/config.toml /app/config.toml
+COPY fixtures/ fixtures/
 ENV PATH="/app/.venv/bin:$PATH"
 ENTRYPOINT ["alpha-quant"]

@@ -65,8 +65,18 @@ def _freshness_service() -> FreshnessService:  # noqa: B008
     return create_freshness_service(lake, config.freshness)
 
 
+class ModeRequest(BaseModel):
+    mock: bool
+
+
 @router.get("/context")
 async def get_context(svc: SystemService = svc_depends(SystemService)):
+    return svc.context()
+
+
+@router.post("/mode")
+async def set_mode(req: ModeRequest, svc: SystemService = svc_depends(SystemService)):
+    svc.set_mock_mode(req.mock)
     return svc.context()
 
 

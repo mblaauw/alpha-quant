@@ -67,18 +67,21 @@ def style_tilts(
                 z = [-x for x in z]
             raw_tilts[key] = _scale_to_unit(z)
 
-    n = max((len(v) for v in raw_tilts.values()), default=0)
+    n_positions = max((len(v) for v in raw_tilts.values()), default=0)
+    if n_positions == 0:
+        return [{"name": name, "tilt": 0.0} for name in style_names]
+
+    # Aggregate per-style mean tilt across all positions
     results: list[dict[str, Any]] = []
-    for i in range(n):
-        if i == 0:
-            for idx, key in enumerate(style_keys):
-                val = raw_tilts[key][i] if i < len(raw_tilts[key]) else 0.0
-                results.append(
-                    {
-                        "name": style_names[idx],
-                        "tilt": round(val, 4),
-                    }
-                )
+    for idx, key in enumerate(style_keys):
+        vals = raw_tilts[key][:n_positions]
+        mean_tilt = sum(vals) / len(vals) if vals else 0.0
+        results.append(
+            {
+                "name": style_names[idx],
+                "tilt": round(mean_tilt, 4),
+            }
+        )
     return results
 
 

@@ -63,10 +63,14 @@ class DecisionService:
             if run_id:
                 candidates = uow.store.list_candidates(UUID(run_id), limit=limit)
             else:
-                runs = uow.store.list_decision_runs(bid, limit=1)
+                runs = uow.store.list_decision_runs(bid, limit=50)
                 candidates = []
-                if runs:
-                    candidates = uow.store.list_candidates(runs[0].decision_run_id, limit=limit)
+                for r in runs:
+                    if r.status != "completed":
+                        continue
+                    candidates = uow.store.list_candidates(r.decision_run_id, limit=limit)
+                    if candidates:
+                        break
             items = [
                 {
                     "candidate_id": str(c.candidate_id),

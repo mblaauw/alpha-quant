@@ -33,6 +33,7 @@ class RiskInputs:
     symbols: list[str]
     sectors: list[str]
     halt_active: bool
+    halt_reason: str | None
     halt_details: str | None
 
 
@@ -105,6 +106,7 @@ def load_inputs(
             symbols=symbols,
             sectors=sectors,
             halt_active=active_halt is not None,
+            halt_reason=active_halt.reason.value if active_halt and active_halt.reason else None,
             halt_details=active_halt.details if active_halt else None,
         )
 

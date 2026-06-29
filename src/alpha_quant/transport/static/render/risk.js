@@ -7,6 +7,7 @@ import { cmd } from "../commands.js";
 
 function pct1(v) { return (v * 100).toFixed(1) + "%"; }
 function pct0(v) { return (v * 100).toFixed(0) + "%"; }
+function fmt(v, fn) { return v != null ? fn(v) : "—"; }
 
 export async function renderRisk() {
   const view = document.getElementById("view");
@@ -39,25 +40,25 @@ function tailBars(z) {
 function buildRisk(data) {
   const headline = data.headline || {};
   const posture = data.posture || {};
-  const postState = data.halted ? "halt" : (posture.state || "elevated");
+  const postState = data.halted ? "halt" : (posture.state || "ready");
   const varData = data.var || {};
   const varLevels = varData.levels || {};
   const methodParams = varData.method_params || {};
 
   // Use 99% VaR as default view
-  const v99 = varLevels.p99 || { pct: 0.036, usd: 12600, parametric: "3.6%", historical: "3.9%", monte_carlo: "3.7%" };
-  const v95 = varLevels.p95 || { pct: 0.025, usd: 8800, parametric: "2.5%", historical: "2.7%", monte_carlo: "2.6%" };
-  const ves = varLevels.es975 || { pct: 0.031, usd: 10850, parametric: "3.1%", historical: "3.4%", monte_carlo: "3.2%" };
+  const v99 = varLevels.p99 || null;
+  const v95 = varLevels.p95 || null;
+  const ves = varLevels.es975 || null;
 
   // Headline KPIs
   const hl = [
-    { label: "1-day VaR 99%", value: pct1(headline.var_1d_99_pct || 0.036), tone: "warn", sub: "$" + Math.round(headline.var_1d_99_usd || 12600).toLocaleString() + " · 90% of budget" },
-    { label: "Expected shortfall", value: pct1(headline.es_975_pct || 0.031), tone: "", sub: "ES 97.5% · $" + Math.round(headline.es_975_usd || 10850).toLocaleString() },
-    { label: "Ann. volatility", value: pct1(headline.ann_vol || 0.243), tone: "", sub: "EWMA λ" + (methodParams.ewma_lambda || 0.94) + " · daily " + pct1((headline.ann_vol || 0.243) / Math.sqrt(252)) },
-    { label: "Portfolio beta", value: (headline.beta || 1.28).toFixed(2), tone: "", sub: "to SPY · 105% net" },
-    { label: "Current drawdown", value: pct1(headline.drawdown || -0.018), tone: "", sub: "max " + pct1(headline.max_drawdown || -0.114) + " · limit " + pct1(headline.drawdown_limit || -0.10) },
-    { label: "Gross exposure", value: pct1(headline.gross_exposure || 0.816), tone: "", sub: "cap " + pct1(headline.gross_cap || 0.90) },
-    { label: "Effective bets", value: (headline.effective_bets || 5.5).toFixed(1), tone: "warn", sub: "of 6 · HHI " + (headline.hhi || 1820) },
+    { label: "1-day VaR 99%", value: fmt(headline.var_1d_99_pct, pct1), tone: "warn", sub: fmt(headline.var_1d_99_usd, v => "$" + Math.round(v).toLocaleString() + " · 90% of budget") },
+    { label: "Expected shortfall", value: fmt(headline.es_975_pct, pct1), tone: "", sub: fmt(headline.es_975_usd, v => "ES 97.5% · $" + Math.round(v).toLocaleString()) },
+    { label: "Ann. volatility", value: fmt(headline.ann_vol, pct1), tone: "", sub: fmt(headline.ann_vol, v => "EWMA λ" + (methodParams.ewma_lambda || 0.94) + " · daily " + pct1(v / Math.sqrt(252))) },
+    { label: "Portfolio beta", value: fmt(headline.beta, v => v.toFixed(2)), tone: "", sub: "to SPY · 105% net" },
+    { label: "Current drawdown", value: fmt(headline.drawdown, pct1), tone: "", sub: fmt(headline.max_drawdown, v => "max " + pct1(v)) + " · limit " + fmt(headline.drawdown_limit, pct1) },
+    { label: "Gross exposure", value: fmt(headline.gross_exposure, pct1), tone: "", sub: fmt(headline.gross_cap, v => "cap " + pct1(v)) },
+    { label: "Effective bets", value: fmt(headline.effective_bets, v => v.toFixed(1)), tone: "warn", sub: (data.positions_count ? "of " + data.positions_count + " · " : "") + fmt(headline.hhi, v => "HHI " + v) },
   ];
   const headlineHTML = hl.map(h => `<div class="htile"><div class="hl">${esc(h.label)}</div><div class="hv" data-tone="${h.tone}">${esc(h.value)}</div><div class="hs">${esc(h.sub)}</div></div>`).join("");
 
@@ -173,20 +174,20 @@ function buildRisk(data) {
       <div class="card">
         <div class="card-head"><span class="card-title">Value at Risk &amp; Expected Shortfall</span><span class="card-method">1-day · 3 models</span></div>
         <div class="var-top">
-          <div class="var-big">${pct1(v99.pct || 0.036)}<small>99% · 1d</small></div>
+          <div class="var-big">${v99 ? pct1(v99.pct) : "—"}<small>99% · 1d</small></div>
           <div class="seg">
             <button data-on="true" data-var-mode="p99">99%</button>
             <button data-var-mode="p95">95%</button>
             <button data-var-mode="es">ES 97.5%</button>
           </div>
         </div>
-        <div class="var-note">1-day loss exceeded on roughly 1 session in 100 (99% confidence). Loss in equity terms: <b style="color:var(--aq-down)">${fmtCurrency(v99.usd || 12600)}</b>.</div>
+        <div class="var-note">1-day loss exceeded on roughly 1 session in 100 (99% confidence). Loss in equity terms: <b style="color:var(--aq-down)">${v99 ? fmtCurrency(v99.usd) : "—"}</b>.</div>
         <div class="tail">${tailHTML}</div>
         <div class="tail-x"><span>−3σ</span><span>loss ◂</span><span>0</span><span>▸ gain</span><span>+3σ</span></div>
         <div class="mcomp">
-          <span class="mn">Parametric <b>variance–covariance</b> · EWMA λ${methodParams.ewma_lambda || 0.94}</span><span class="mvv">${esc(v99.parametric || "3.6%")}</span>
-          <span class="mn">Historical simulation <b>${methodParams.hist_window_days || 500}-day</b></span><span class="mvv">${esc(v99.historical || "3.9%")}</span>
-          <span class="mn">Monte Carlo <b>${((methodParams.mc_paths || 10000) / 1000).toFixed(0)}k paths</b></span><span class="mvv">${esc(v99.monte_carlo || "3.7%")}</span>
+          <span class="mn">Parametric <b>variance–covariance</b> · EWMA λ${methodParams.ewma_lambda || "—"}</span><span class="mvv">${v99 ? esc(v99.parametric) : "—"}</span>
+          <span class="mn">Historical simulation <b>${methodParams.hist_window_days || "—"}-day</b></span><span class="mvv">${v99 ? esc(v99.historical) : "—"}</span>
+          <span class="mn">Monte Carlo <b>${methodParams.mc_paths ? (methodParams.mc_paths / 1000).toFixed(0) : "—"}k paths</b></span><span class="mvv">${v99 ? esc(v99.monte_carlo) : "—"}</span>
         </div>
       </div>
       <!-- Component VaR -->
@@ -205,17 +206,17 @@ function buildRisk(data) {
       <div class="card">
         <div class="card-head"><span class="card-title">Concentration &amp; diversification</span><span class="card-method">HHI · effective N</span></div>
         <div class="conc-grid">
-          <div class="conc-stat"><div class="cl">Effective bets</div><div class="cv" data-tone="warn">${(conc.effective_bets || 5.5).toFixed(1)}</div><div class="cs">of ${(data.component_var || []).length || 6} names · 1/HHI</div></div>
-          <div class="conc-stat"><div class="cl">Herfindahl HHI</div><div class="cv" data-tone="warn">${Math.round(conc.hhi || 1820)}</div><div class="cs">concentrated &gt;1,800</div></div>
-          <div class="conc-stat"><div class="cl">Avg correlation</div><div class="cv" data-tone="warn">${(conc.avg_correlation || 0.58).toFixed(2)}</div><div class="cs">20d</div></div>
+          <div class="conc-stat"><div class="cl">Effective bets</div><div class="cv" data-tone="warn">${fmt(conc.effective_bets, v => v.toFixed(1))}</div><div class="cs">of ${data.positions_count || "—"} names · 1/HHI</div></div>
+          <div class="conc-stat"><div class="cl">Herfindahl HHI</div><div class="cv" data-tone="warn">${fmt(conc.hhi, v => Math.round(v))}</div><div class="cs">concentrated &gt;1,800</div></div>
+          <div class="conc-stat"><div class="cl">Avg correlation</div><div class="cv" data-tone="warn">${fmt(conc.avg_correlation, v => v.toFixed(2))}</div><div class="cs">20d</div></div>
         </div>
-        <div class="card-note" style="margin-bottom:11px"><b>Sector weights</b> · diversification ratio ${(conc.diversification_ratio || 1.34).toFixed(2)} · top-3 names ${pct0(conc.top3_pct || 0.635)} of gross</div>
+        <div class="card-note" style="margin-bottom:11px"><b>Sector weights</b> · diversification ratio ${fmt(conc.diversification_ratio, v => v.toFixed(2))} · top-3 names ${fmt(conc.top3_pct, pct0)} of gross</div>
         ${sectors}
       </div>
       <!-- Factor exposures -->
       <div class="card">
         <div class="card-head"><span class="card-title">Factor exposures</span><span class="card-method">Barra-style · net tilt</span></div>
-        <div class="fbeta"><span class="l">Market beta (to SPY)</span><span class="v">${(factors.beta || 1.28).toFixed(2)}</span></div>
+        <div class="fbeta"><span class="l">Market beta (to SPY)</span><span class="v">${fmt(factors.beta, v => v.toFixed(2))}</span></div>
         <div class="card-note" style="margin-top:0;margin-bottom:13px">Standardized style tilts, −1 to +1.</div>
         ${styles}
       </div>

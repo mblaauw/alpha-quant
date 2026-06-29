@@ -1,0 +1,268 @@
+{
+  "symbol": "MSFT",
+  "as_of": "2026-06-29T17:00:00Z",
+  "snapshot_id": "snap-mock-001",
+  "categories": [
+    "price",
+    "technical",
+    "fundamental",
+    "insider",
+    "earnings",
+    "attention"
+  ],
+  "price": {
+    "last": 395.0,
+    "high": 400.92,
+    "low": 389.07,
+    "open": 393.81,
+    "volume": 21662186,
+    "change": 3.24,
+    "change_pct": 0.82,
+    "dollar_volume": 24941644344.0,
+    "latest_date": "2026-06-29"
+  },
+  "readouts": [
+    {
+      "definition": {
+        "readout_id": "trend.directional_bias",
+        "name": "Directional Bias",
+        "category": "trend"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 72
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "trend.regime",
+        "name": "Trend Regime",
+        "category": "trend"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 62
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "momentum.rsi_14",
+        "name": "RSI(14)",
+        "category": "momentum"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 68
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "momentum.macd_cross",
+        "name": "MACD Cross",
+        "category": "momentum"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "momentum.quality",
+        "name": "Momentum Quality",
+        "category": "momentum"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 82
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "volatility.atr_percent",
+        "name": "ATR %",
+        "category": "volatility"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 2.5
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "volatility.bollinger_width",
+        "name": "Bollinger Width",
+        "category": "volatility"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 0.14
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "volatility.regime",
+        "name": "Vol Regime",
+        "category": "volatility"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 62
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "participation.rvol",
+        "name": "Relative Volume",
+        "category": "participation"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 1.2
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "relative_strength.vs_benchmark",
+        "name": "vs Benchmark",
+        "category": "relative_strength"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 3.8
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "relative_strength.change_pct",
+        "name": "Change %",
+        "category": "relative_strength"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 0.82
+        }
+      ]
+    }
+  ],
+  "fundamentals": {
+    "metrics": [
+      {
+        "metric_id": "pe_ttm",
+        "name": "P/E (TTM)",
+        "category": "valuation",
+        "value": 32.1,
+        "period_end": "2026-03-31",
+        "unit": "x",
+        "tone": "neutral",
+        "quality_status": "good"
+      },
+      {
+        "metric_id": "debt_to_equity_ttm",
+        "name": "Debt/Equity",
+        "category": "credit",
+        "value": 0.6,
+        "period_end": "2026-03-31",
+        "unit": "x",
+        "tone": "neutral",
+        "quality_status": "good"
+      },
+      {
+        "metric_id": "gross_margin_ttm",
+        "name": "Gross Margin",
+        "category": "profitability",
+        "value": 70.0,
+        "period_end": "2026-03-31",
+        "unit": "%",
+        "tone": "positive",
+        "quality_status": "good"
+      },
+      {
+        "metric_id": "earnings_yield_ttm",
+        "name": "Earnings Yield",
+        "category": "valuation",
+        "value": 3.1,
+        "period_end": "2026-03-31",
+        "unit": "%",
+        "tone": "neutral",
+        "quality_status": "good"
+      }
+    ]
+  },
+  "insider_transactions": [
+    {
+      "effective_date": "2026-06-15",
+      "transaction_type": "buy",
+      "shares": 5000,
+      "price": 387.09999999999997,
+      "value": 1935500.0
+    },
+    {
+      "effective_date": "2026-06-10",
+      "transaction_type": "buy",
+      "shares": 2000,
+      "price": 391.05,
+      "value": 782100.0
+    }
+  ],
+  "earnings_events": [
+    {
+      "effective_date": "2026-04-25",
+      "symbol": "MSFT",
+      "surprise_pct": 4.2
+    },
+    {
+      "effective_date": "2026-01-28",
+      "symbol": "MSFT",
+      "surprise_pct": 3.1
+    }
+  ],
+  "attention_mentions": [
+    {
+      "effective_date": "2026-06-25",
+      "count": 149,
+      "source": "alpha_lake"
+    },
+    {
+      "effective_date": "2026-06-26",
+      "count": 112,
+      "source": "alpha_lake"
+    },
+    {
+      "effective_date": "2026-06-27",
+      "count": 221,
+      "source": "alpha_lake"
+    },
+    {
+      "effective_date": "2026-06-28",
+      "count": 316,
+      "source": "alpha_lake"
+    },
+    {
+      "effective_date": "2026-06-29",
+      "count": 136,
+      "source": "alpha_lake"
+    }
+  ]
+}

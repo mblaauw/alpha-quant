@@ -1,0 +1,14 @@
+{
+  "service": "alpha-lake",
+  "api_version": "1.0",
+  "minimum_alpha_quant_version": "0.3.0",
+  "capabilities": [
+    "pit_bars",
+    "technical_indicators",
+    "fundamental_metrics",
+    "insider_facts",
+    "earnings_events",
+    "attention_metrics",
+    "snapshot_reads"
+  ]
+}

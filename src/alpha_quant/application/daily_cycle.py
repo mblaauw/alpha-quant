@@ -200,7 +200,6 @@ class DailyCycleService:
                 as_of=now,
                 spy_bundle=spy_facts,
             )
-
             # -- Persist scorecards --
             run_id_str = str(run.decision_run_id)
             book_id_str = str(book_id)

@@ -100,6 +100,12 @@ function paintShell(ctx) {
     document.getElementById("book-label").textContent = "Book — " + (active ? active.label : "—");
   }
   document.getElementById("mode-badge").textContent = ctx.mode || "PAPER";
+  const mockBadge = document.getElementById("mock-badge");
+  if (ctx.mock_mode) {
+    mockBadge.classList.remove("hidden");
+  } else {
+    mockBadge.classList.add("hidden");
+  }
   document.getElementById("last-run-label").textContent = ctx.last_run ? "Last run " + fmtDateTime(ctx.last_run) : "No runs yet";
   const ops = document.getElementById("ops-status");
   ops.innerHTML = `<span class="d" style="background:${ctx.halted ? "var(--aq-down)" : "var(--aq-up)"}"></span>${ctx.halted ? "Halted" : "Ready"}`;

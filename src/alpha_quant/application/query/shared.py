@@ -10,6 +10,20 @@ DEFAULT_DATABASE_URL = (
     or "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant"
 )
 DEFAULT_BOOK_ID = UUID("00000000-0000-0000-0000-000000000001")
+MOCK_BOOK_ID = UUID("00000000-0000-0000-0000-000000000002")
+
+
+def _check_mock_mode():
+    """Check ops.app_config for mock_mode flag using a throwaway UoW."""
+    try:
+        from alpha_quant.application.factory import create_unit_of_work
+
+        uow = create_unit_of_work()
+        with uow:
+            val = uow.store.config_get("mock_mode")
+            return val == "true"
+    except Exception:
+        return False
 
 
 def with_uow(query_fn: Callable, database_url: str | None = None) -> Any:
@@ -21,7 +35,9 @@ def with_uow(query_fn: Callable, database_url: str | None = None) -> Any:
 
 
 def resolve_active_book_id() -> UUID:
-    """Return the earliest-registered book as the active default."""
+    """Return active book — mock or earliest-registered book."""
+    if _check_mock_mode():
+        return MOCK_BOOK_ID
     try:
         from alpha_quant.application.factory import create_unit_of_work
 

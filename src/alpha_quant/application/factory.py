@@ -110,11 +110,11 @@ def run_migrations(database_url: str | None = None) -> None:
 
 
 def seed_default_data(database_url: str | None = None) -> None:
-    """Insert seed records (strategy, portfolio_book) if absent."""
-    from uuid import uuid4
+    """Insert seed records (strategy, portfolio_book, strategy_version) if absent."""
+    from uuid import UUID as _UUID, uuid4
 
     from alpha_quant.adapters.postgres import create_engine, create_session
-    from alpha_quant.adapters.postgres.tables import PortfolioBook, Strategy
+    from alpha_quant.adapters.postgres.tables import PortfolioBook, Strategy, StrategyVersion
 
     url = database_url or DEFAULT_DATABASE_URL
     engine = create_engine(url)
@@ -134,13 +134,33 @@ def seed_default_data(database_url: str | None = None) -> None:
 
         existing_book = session.query(PortfolioBook).filter(PortfolioBook.name == "default").first()
         if existing_book is None:
-            from uuid import UUID as _UUID
-
             session.add(
                 PortfolioBook(
                     book_id=str(_UUID("00000000-0000-0000-0000-000000000001")),
                     name="default",
                     kind="paper",
+                    created_at=datetime.now(UTC),
+                )
+            )
+            session.commit()
+
+        strategy = session.query(Strategy).filter(Strategy.name == "default").first()
+        existing_sv = (
+            session.query(StrategyVersion)
+            .filter(
+                StrategyVersion.strategy_version_id
+                == str(_UUID("00000000-0000-0000-0000-000000000001"))
+            )
+            .first()
+        )
+        if strategy and existing_sv is None:
+            session.add(
+                StrategyVersion(
+                    strategy_version_id=str(_UUID("00000000-0000-0000-0000-000000000001")),
+                    strategy_id=strategy.strategy_id,
+                    version_label="v1",
+                    config_json="{}",
+                    config_hash="",
                     created_at=datetime.now(UTC),
                 )
             )

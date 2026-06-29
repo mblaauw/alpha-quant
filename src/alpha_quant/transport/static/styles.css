@@ -68,6 +68,7 @@ html, body { background: var(--aq-bg); color: var(--aq-ink); font-family: var(--
 
 .book-select { background:var(--aq-paper); color:var(--aq-ink); border:1px solid var(--aq-rule2); border-radius:3px; padding:8px 9px; font-family:var(--aq-mono); font-size:12px; font-weight:600; }
 .mode-badge { font-family:var(--aq-mono); font-size:10px; font-weight:700; letter-spacing:.08em; padding:5px 9px; border-radius:3px; background:var(--aq-bg3); color:var(--aq-ink2); }
+.mock-badge { font-family:var(--aq-mono); font-size:10px; font-weight:700; letter-spacing:.08em; padding:5px 9px; border-radius:3px; background:#e8a317; color:#1a1a1a; margin-left:6px; }
 .theme-btn { width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; background:var(--aq-paper); border:1px solid var(--aq-rule2); border-radius:3px; color:var(--aq-ink2); cursor:pointer; font-size:14px; }
 .run-btn { display:inline-flex; align-items:center; gap:7px; background:var(--aq-claret); color:#fff; border:1px solid var(--aq-claret); border-radius:3px; padding:8px 15px; font-size:13px; font-weight:600; cursor:pointer; }
 

@@ -1,0 +1,268 @@
+{
+  "symbol": "NVDA",
+  "as_of": "2026-06-29T17:00:00Z",
+  "snapshot_id": "snap-mock-001",
+  "categories": [
+    "price",
+    "technical",
+    "fundamental",
+    "insider",
+    "earnings",
+    "attention"
+  ],
+  "price": {
+    "last": 910.0,
+    "high": 923.65,
+    "low": 896.35,
+    "open": 907.27,
+    "volume": 61541275,
+    "change": 20.93,
+    "change_pct": 2.3,
+    "dollar_volume": 55133372188.0,
+    "latest_date": "2026-06-29"
+  },
+  "readouts": [
+    {
+      "definition": {
+        "readout_id": "trend.directional_bias",
+        "name": "Directional Bias",
+        "category": "trend"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 82
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "trend.regime",
+        "name": "Trend Regime",
+        "category": "trend"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 70
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "momentum.rsi_14",
+        "name": "RSI(14)",
+        "category": "momentum"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 72
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "momentum.macd_cross",
+        "name": "MACD Cross",
+        "category": "momentum"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "momentum.quality",
+        "name": "Momentum Quality",
+        "category": "momentum"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 90
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "volatility.atr_percent",
+        "name": "ATR %",
+        "category": "volatility"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 8.5
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "volatility.bollinger_width",
+        "name": "Bollinger Width",
+        "category": "volatility"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 0.22
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "volatility.regime",
+        "name": "Vol Regime",
+        "category": "volatility"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 70
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "participation.rvol",
+        "name": "Relative Volume",
+        "category": "participation"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 2.1
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "relative_strength.vs_benchmark",
+        "name": "vs Benchmark",
+        "category": "relative_strength"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 12.5
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "relative_strength.change_pct",
+        "name": "Change %",
+        "category": "relative_strength"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-06-29",
+          "value": 2.3
+        }
+      ]
+    }
+  ],
+  "fundamentals": {
+    "metrics": [
+      {
+        "metric_id": "pe_ttm",
+        "name": "P/E (TTM)",
+        "category": "valuation",
+        "value": 45.0,
+        "period_end": "2026-03-31",
+        "unit": "x",
+        "tone": "neutral",
+        "quality_status": "good"
+      },
+      {
+        "metric_id": "debt_to_equity_ttm",
+        "name": "Debt/Equity",
+        "category": "credit",
+        "value": 0.3,
+        "period_end": "2026-03-31",
+        "unit": "x",
+        "tone": "neutral",
+        "quality_status": "good"
+      },
+      {
+        "metric_id": "gross_margin_ttm",
+        "name": "Gross Margin",
+        "category": "profitability",
+        "value": 75.0,
+        "period_end": "2026-03-31",
+        "unit": "%",
+        "tone": "positive",
+        "quality_status": "good"
+      },
+      {
+        "metric_id": "earnings_yield_ttm",
+        "name": "Earnings Yield",
+        "category": "valuation",
+        "value": 2.2,
+        "period_end": "2026-03-31",
+        "unit": "%",
+        "tone": "neutral",
+        "quality_status": "good"
+      }
+    ]
+  },
+  "insider_transactions": [
+    {
+      "effective_date": "2026-06-15",
+      "transaction_type": "buy",
+      "shares": 5000,
+      "price": 891.8,
+      "value": 4459000.0
+    },
+    {
+      "effective_date": "2026-06-10",
+      "transaction_type": "buy",
+      "shares": 2000,
+      "price": 900.9,
+      "value": 1801800.0
+    }
+  ],
+  "earnings_events": [
+    {
+      "effective_date": "2026-04-25",
+      "symbol": "NVDA",
+      "surprise_pct": 4.2
+    },
+    {
+      "effective_date": "2026-01-28",
+      "symbol": "NVDA",
+      "surprise_pct": 3.1
+    }
+  ],
+  "attention_mentions": [
+    {
+      "effective_date": "2026-06-25",
+      "count": 133,
+      "source": "alpha_lake"
+    },
+    {
+      "effective_date": "2026-06-26",
+      "count": 146,
+      "source": "alpha_lake"
+    },
+    {
+      "effective_date": "2026-06-27",
+      "count": 184,
+      "source": "alpha_lake"
+    },
+    {
+      "effective_date": "2026-06-28",
+      "count": 242,
+      "source": "alpha_lake"
+    },
+    {
+      "effective_date": "2026-06-29",
+      "count": 123,
+      "source": "alpha_lake"
+    }
+  ]
+}

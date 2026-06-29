@@ -20,6 +20,7 @@ data/alerts.json
 fixtures/*/
 !fixtures/fx-*
 !fixtures/golden/
+!fixtures/v1/
 logs/
 seed-ship-*
 data.bak/

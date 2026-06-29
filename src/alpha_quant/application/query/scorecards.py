@@ -7,7 +7,7 @@ from uuid import UUID
 
 from sqlalchemy import text
 
-from alpha_quant.application.query.shared import with_uow
+from alpha_quant.application.query.shared import resolve_active_book_id, with_uow
 from alpha_quant.domain.scorecard import Scorecard
 
 
@@ -18,6 +18,16 @@ def list_scorecards(
     def _query(uow: Any) -> list[Scorecard]:
         if run_id:
             return uow.store.load_scorecards_for_run(run_id)
+        from alpha_quant.contracts.operational import RunStatus
+
+        bid = resolve_active_book_id()
+        runs = uow.store.list_decision_runs(bid, limit=100)
+        last = next(
+            (r for r in runs if r.status == RunStatus.COMPLETED),
+            None,
+        )
+        if last:
+            return uow.store.load_scorecards_for_run(str(last.decision_run_id))
         return []
 
     return with_uow(_query)

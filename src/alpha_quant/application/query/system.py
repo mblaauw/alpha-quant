@@ -3,6 +3,25 @@ from __future__ import annotations
 from alpha_quant.application.query.shared import with_uow
 
 
+_PG_ENGINE: object | None = None
+
+
+def _get_pg_engine():
+    global _PG_ENGINE
+    if _PG_ENGINE is None:
+        import os as _os
+
+        from alpha_quant.adapters.postgres.engine import create_engine
+
+        _PG_ENGINE = create_engine(
+            database_url=_os.environ.get(
+                "DATABASE_URL",
+                "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant",
+            )
+        )
+    return _PG_ENGINE
+
+
 def _check_lake_health() -> bool:
     try:
         from alpha_quant.application.config import load_config
@@ -25,25 +44,29 @@ def _resolve_book_id() -> str:
 
 def _check_postgres_health() -> bool:
     try:
-        import os as _os
-
-        from alpha_quant.adapters.postgres.engine import create_engine
         from alpha_quant.adapters.postgres.health import health_check
 
-        db_url = _os.environ.get(
-            "DATABASE_URL",
-            "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant",
-        )
-        engine = create_engine(database_url=db_url)
-        result = health_check(engine)
+        result = health_check(_get_pg_engine())
         return bool(result.get("db", result.get("database", False)))
     except Exception:
         return False
 
 
+MOCK_BOOK_ID = "00000000-0000-0000-0000-000000000002"
+
+
 class SystemService:
+    def _mock_mode(self) -> bool:
+        def _query(uow):
+            val = uow.store.config_get("mock_mode", "false")
+            return val == "true"
+
+        return with_uow(_query)
+
     def context(self) -> dict[str, object]:
-        book_id = _resolve_book_id()
+        mock_mode = self._mock_mode()
+        live_book_id = _resolve_book_id()
+        book_id = MOCK_BOOK_ID if mock_mode else live_book_id
         db_healthy = _check_postgres_health()
         lake_healthy = _check_lake_health()
 
@@ -73,11 +96,18 @@ class SystemService:
                 ],
                 "mode": "PAPER",
                 "snapshot": None,
+                "mock_mode": mock_mode,
                 "lake_healthy": lake_healthy,
                 "postgres_healthy": db_healthy,
             }
 
         return with_uow(_query)
+
+    def set_mock_mode(self, mock: bool) -> None:
+        def _query(uow):
+            uow.store.config_set("mock_mode", "true" if mock else "false")
+
+        with_uow(_query)
 
     def health(self) -> dict[str, object]:
         pg_h = _check_postgres_health()
