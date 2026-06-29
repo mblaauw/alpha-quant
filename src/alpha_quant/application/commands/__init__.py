@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Any
 from uuid import UUID, uuid4, uuid5
 
+import structlog
 from sqlalchemy import text
 
 from alpha_quant.application.factory import create_unit_of_work
@@ -266,12 +267,15 @@ def submit_order_handler(cmd: Command) -> tuple[CommandStatus, str | None, str |
 def approve_candidate_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | None]:
     import json
 
+    log = structlog.get_logger("alpha_quant.approve")
+
     uow = create_unit_of_work()
     with uow:
         payload: dict = json.loads(cmd.payload_json) if cmd.payload_json else {}
         symbol: str | None = payload.get("symbol")
         quantity_raw = payload.get("quantity")
         if not symbol or quantity_raw is None:
+            log.warning("missing_fields", payload=cmd.payload_json)
             return CommandStatus.FAILED, None, "Missing required fields: symbol, quantity"
         book_id = cmd.book_id or UUID("00000000-0000-0000-0000-000000000001")
         order_id = uow.store.create_order(
@@ -281,6 +285,7 @@ def approve_candidate_handler(cmd: Command) -> tuple[CommandStatus, str | None, 
             order_type="market",
             book_id=book_id,
         )
+        log.info("order_created", order_id=order_id, symbol=symbol, quantity=quantity_raw)
         _book_immediate_fill(
             uow,
             order_id,
@@ -290,6 +295,7 @@ def approve_candidate_handler(cmd: Command) -> tuple[CommandStatus, str | None, 
             float(quantity_raw),
             cmd.reason or "Follow advice",
         )
+        log.info("fill_booked", order_id=order_id, symbol=symbol)
         return CommandStatus.SUCCEEDED, order_id, None
 
 
