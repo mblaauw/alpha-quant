@@ -23,6 +23,7 @@ from alpha_quant.contracts.operational import (
     FillBookingResult,
     HaltCommand,
     HaltReason,
+    OrderSide,
     PolicyEvaluation,
     PortfolioBook,
     PortfolioMark,
@@ -198,6 +199,9 @@ class PostgresOperationalStore:
 
         fill_id = str(uuid4())
         now = datetime.now(UTC)
+
+        side_sign = -1 if command.side == OrderSide.BUY else 1
+        cash_amount = side_sign * command.price * command.quantity - command.fee
         self.session.execute(
             text(
                 """
@@ -236,7 +240,7 @@ class PostgresOperationalStore:
                 "eid": str(uuid4()),
                 "pbid": str(command.portfolio_book_id),
                 "fid": fill_id,
-                "amt": str(-command.price * command.quantity - command.fee),
+                "amt": str(cash_amount),
                 "cur": "USD",
                 "rea": command.reason,
                 "now": now,
@@ -297,6 +301,12 @@ class PostgresOperationalStore:
                 VALUES
                     (:mid, :pbid, :ed, :c, :eq,
                      :ge, :reg, :mao)
+                ON CONFLICT (portfolio_book_id, effective_date) DO UPDATE SET
+                    cash = :c2,
+                    equity = :eq2,
+                    gross_exposure = :ge2,
+                    regime = :reg2,
+                    mark_as_of = :mao2
                 """
             ),
             {
@@ -308,6 +318,11 @@ class PostgresOperationalStore:
                 "ge": str(mark.gross_exposure),
                 "reg": mark.regime,
                 "mao": mark.mark_as_of,
+                "c2": str(mark.cash),
+                "eq2": str(mark.equity),
+                "ge2": str(mark.gross_exposure),
+                "reg2": mark.regime,
+                "mao2": mark.mark_as_of,
             },
         )
 
@@ -460,21 +475,28 @@ class PostgresOperationalStore:
                         COALESCE(SUM(ABS(market_value)), 0) AS total_exposure
                     FROM projection.position_current
                     WHERE book_id = :bid2
+                ),
+                last_regime AS (
+                    SELECT regime FROM trade.portfolio_mark
+                    WHERE portfolio_book_id = :bid3
+                    ORDER BY mark_as_of DESC LIMIT 1
                 )
                 SELECT
-                    :bid3,
+                    :bid4,
                     c.total_cash,
                     c.total_cash + p.total_mv AS equity,
                     p.total_exposure,
-                    'unknown',
+                    COALESCE(lr.regime, 'unknown'),
                     :now
                 FROM cash_agg c, pos_agg p
+                LEFT JOIN last_regime lr ON TRUE
                 """
             ),
             {
                 "bid": str(book_id),
                 "bid2": str(book_id),
                 "bid3": str(book_id),
+                "bid4": str(book_id),
                 "now": datetime.now(UTC),
             },
         )
