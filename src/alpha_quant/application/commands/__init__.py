@@ -46,7 +46,7 @@ def _book_immediate_fill(
         text("""
             INSERT INTO core.security_reference (security_id, symbol)
             VALUES (:sid, :sym)
-            ON CONFLICT (security_id) DO NOTHING
+            ON CONFLICT (symbol) DO NOTHING
         """),
         {"sid": sec_id_str, "sym": symbol},
     )

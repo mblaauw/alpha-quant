@@ -229,7 +229,7 @@ class DailyCycleService:
                         text("""
                             INSERT INTO core.security_reference (security_id, symbol)
                             VALUES (:sid, :sym)
-                            ON CONFLICT (security_id) DO NOTHING
+                            ON CONFLICT (symbol) DO NOTHING
                         """),
                         {"sid": sec_id, "sym": sc.symbol},
                     )

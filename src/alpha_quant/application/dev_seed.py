@@ -91,12 +91,30 @@ def seed_dev_data(database_url: str | None = None) -> tuple[int, int]:
             sec_ids[sym] = sid
             _exec(
                 "INSERT INTO core.security_reference (security_id, symbol, display_name, sector) "
-                "VALUES (:sid, :sym, :name, :sector) ON CONFLICT (security_id) DO NOTHING",
+                "VALUES (:sid, :sym, :name, :sector) ON CONFLICT (symbol) DO NOTHING",
                 sid=sid,
                 sym=sym,
                 name=name,
                 sector=sector,
             )
+
+        # --- Strategy + Strategy Version (required FK for decision_run) ---
+        _exec(
+            "INSERT INTO core.strategy (strategy_id, name, created_at) "
+            "VALUES (:sid, 'default', :now) ON CONFLICT (strategy_id) DO NOTHING",
+            sid="00000000-0000-0000-0000-000000000001",
+            now=now,
+        )
+        _exec(
+            "INSERT INTO core.strategy_version "
+            "(strategy_version_id, strategy_id, "
+            "version_label, config_json, config_hash, created_at) "
+            "VALUES (:svid, :sid, 'v1', '{}', '', :now) "
+            "ON CONFLICT (strategy_version_id) DO NOTHING",
+            svid=svid,
+            sid="00000000-0000-0000-0000-000000000001",
+            now=now,
+        )
 
         # --- Execution Profiles (idempotent — skip if already seeded) ---
         existing_eps = {

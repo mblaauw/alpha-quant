@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from alpha_quant.adapters.postgres.engine import DEFAULT_DATABASE_URL
 from alpha_quant.application.query.shared import with_uow
 
 _PG_ENGINE: object | None = None
@@ -8,16 +9,9 @@ _PG_ENGINE: object | None = None
 def _get_pg_engine():
     global _PG_ENGINE
     if _PG_ENGINE is None:
-        import os as _os
-
         from alpha_quant.adapters.postgres.engine import create_engine
 
-        _PG_ENGINE = create_engine(
-            database_url=_os.environ.get(
-                "DATABASE_URL",
-                "postgresql+psycopg://alpha_quant:alpha_quant_dev@localhost:5433/alpha_quant",
-            )
-        )
+        _PG_ENGINE = create_engine(database_url=DEFAULT_DATABASE_URL)
     return _PG_ENGINE
 
 
