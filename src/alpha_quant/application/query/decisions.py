@@ -89,21 +89,26 @@ class DecisionService:
 
     def get_decision(self, decision_id: str) -> dict[str, object] | None:
         def _query(uow):
-            runs = uow.store.list_decision_runs(resolve_active_book_id(), limit=1)
-            if not runs:
+            runs = uow.store.list_decision_runs(resolve_active_book_id(), limit=200)
+            candidate = None
+            run = None
+            for r in runs:
+                candidates = uow.store.list_candidates(r.decision_run_id, limit=200)
+                c = next(
+                    (
+                        c
+                        for c in candidates
+                        if str(c.candidate_id) == decision_id or c.symbol == decision_id
+                    ),
+                    None,
+                )
+                if c:
+                    candidate = c
+                    run = r
+                    break
+            if not candidate or not run:
                 return None
-            candidates = uow.store.list_candidates(runs[0].decision_run_id, limit=200)
-            candidate = next(
-                (
-                    c
-                    for c in candidates
-                    if str(c.candidate_id) == decision_id or c.symbol == decision_id
-                ),
-                None,
-            )
-            if not candidate:
-                return None
-            evals = uow.store.list_policy_evals(runs[0].decision_run_id, limit=500)
+            evals = uow.store.list_policy_evals(run.decision_run_id, limit=500)
             filtered_evals = [
                 e for e in evals if str(e.candidate_id) == str(candidate.candidate_id)
             ]
@@ -120,10 +125,11 @@ class DecisionService:
             modules = [self._policy_to_module(p) for p in policies]
             action = "BLOCKED" if candidate.blocked else "ELIGIBLE"
             sev = "bad" if candidate.blocked else "ok"
+            score_str = f"{candidate.composite_score:.2f}" if candidate.composite_score else "N/A"
             narrative = {
                 "severity": sev,
                 "text": f"{action}: {candidate.symbol} — "
-                f"score {candidate.composite_score:.2f if candidate.composite_score else 'N/A'}, "
+                f"score {score_str}, "
                 f"reason: {candidate.block_reason or 'passes all gates'}.",
             }
             return {

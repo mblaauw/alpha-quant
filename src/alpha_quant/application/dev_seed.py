@@ -618,6 +618,11 @@ def seed_dev_data(database_url: str | None = None) -> tuple[int, int]:
             now=now,
         )
 
+        _exec(
+            "INSERT INTO ops.app_config (key, value) VALUES ('mock_mode', 'true') "
+            "ON CONFLICT (key) DO UPDATE SET value = 'true'",
+        )
+
         session.commit()
 
     # -- Run decision cycle to compute scorecards, risk, and advice from fixture data --
