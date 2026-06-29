@@ -83,16 +83,28 @@ def create_clock(config: AppConfig) -> Clock:
     return VirtualClock(date(2026, 1, 2))
 
 
+# -- Engine cache (prevent connection pool exhaustion from repeated create_unit_of_work calls) --
+
+_engine_cache: dict[str, object] = {}
+
+
+def _get_engine(url: str) -> object:
+    from sqlalchemy import create_engine as _ce
+
+    if url not in _engine_cache:
+        _engine_cache[url] = _ce(url, pool_size=5, max_overflow=10, pool_pre_ping=True)
+    return _engine_cache[url]
+
+
 # -- Factory functions for the PostgreSQL operational store --
 
 
 def create_unit_of_work(database_url: str | None = None) -> OperationalUnitOfWork:
     """Create an OperationalUnitOfWork backed by PostgreSQL."""
-    from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
     url = database_url or DEFAULT_DATABASE_URL
-    engine = create_engine(url, pool_size=5, max_overflow=10, pool_pre_ping=True)
+    engine = _get_engine(url)
     session_factory: sessionmaker[Session] = sessionmaker(bind=engine)
     return OperationalUnitOfWork(session_factory)
 
@@ -111,7 +123,8 @@ def run_migrations(database_url: str | None = None) -> None:
 
 def seed_default_data(database_url: str | None = None) -> None:
     """Insert seed records (strategy, portfolio_book, strategy_version) if absent."""
-    from uuid import UUID as _UUID, uuid4
+    from uuid import UUID as _UUID
+    from uuid import uuid4
 
     from alpha_quant.adapters.postgres import create_engine, create_session
     from alpha_quant.adapters.postgres.tables import PortfolioBook, Strategy, StrategyVersion
