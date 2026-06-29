@@ -1,3 +1,9 @@
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -8,13 +14,15 @@ services:
     environment:
       POSTGRES_DB: alpha_quant
       POSTGRES_USER: alpha_quant
-      POSTGRES_PASSWORD: alpha_quant_dev
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-alpha_quant_dev}"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U alpha_quant -d alpha_quant"]
       interval: 5s
       timeout: 3s
       retries: 5
+      start_period: 10s
     restart: unless-stopped
+    logging: *logging
 
   migrate:
     build:
@@ -22,11 +30,12 @@ services:
       dockerfile: Dockerfile
     command: ["db-migrate"]
     environment:
-      DATABASE_URL: postgresql+psycopg://alpha_quant:alpha_quant_dev@postgres:5432/alpha_quant
+      DATABASE_URL: "${DATABASE_URL:-postgresql+psycopg://alpha_quant:${POSTGRES_PASSWORD:-alpha_quant_dev}@postgres:5432/alpha_quant}"
     depends_on:
       postgres:
         condition: service_healthy
     restart: "no"
+    logging: *logging
 
   api:
     build:
@@ -36,14 +45,26 @@ services:
     ports:
       - "8501:8501"
     environment:
-      DATABASE_URL: postgresql+psycopg://alpha_quant:alpha_quant_dev@postgres:5432/alpha_quant
+      DATABASE_URL: "${DATABASE_URL:-postgresql+psycopg://alpha_quant:${POSTGRES_PASSWORD:-alpha_quant_dev}@postgres:5432/alpha_quant}"
       ALPHA_QUANT_LAKE__MODE: rest
       ALPHA_QUANT_LAKE__BASE_URL: "${ALPHA_QUANT_LAKE__BASE_URL:-http://host.docker.internal:8000}"
       ALPHA_LAKE_API_KEY: "${ALPHA_LAKE_API_KEY:-}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     depends_on:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+    logging: *logging
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: "512M"
 
   worker:
     build:
@@ -51,7 +72,7 @@ services:
       dockerfile: Dockerfile
     command: ["worker", "--poll-interval", "1"]
     environment:
-      DATABASE_URL: postgresql+psycopg://alpha_quant:alpha_quant_dev@postgres:5432/alpha_quant
+      DATABASE_URL: "${DATABASE_URL:-postgresql+psycopg://alpha_quant:${POSTGRES_PASSWORD:-alpha_quant_dev}@postgres:5432/alpha_quant}"
       ALPHA_QUANT_LAKE__MODE: rest
       ALPHA_QUANT_LAKE__BASE_URL: "${ALPHA_QUANT_LAKE__BASE_URL:-http://host.docker.internal:8000}"
       ALPHA_LAKE_API_KEY: "${ALPHA_LAKE_API_KEY:-}"
@@ -59,6 +80,12 @@ services:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+    logging: *logging
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: "256M"
 
 volumes:
   alpha_quant_pgdata:

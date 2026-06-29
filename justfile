@@ -1,6 +1,6 @@
 # ── Lifecycle ────────────────────────────────────────────────────────────────
 
-# Start the full stack (PostgreSQL, artifacts, migrate, API, worker)
+# Start the full stack (PostgreSQL, migrate, API, worker)
 up *flags:
     docker compose up -d {{ flags }}
 
@@ -16,6 +16,10 @@ logs *service:
 status:
     docker compose ps
 
+# Rebuild the application image (no cache)
+rebuild:
+    docker compose build --no-cache api
+
 # Build the application image
 build:
     docker compose build api
@@ -25,6 +29,10 @@ build:
 # Run pending Alembic migrations
 migrate:
     docker compose run --rm migrate
+
+# Check pending migrations without applying (dry-run)
+migrate-check:
+    docker compose run --rm --entrypoint alpha-quant api db-migrate-check
 
 # Open psql shell to the database
 db-shell:
@@ -42,32 +50,15 @@ db-backup file="backup.sql":
 db-restore file:
     docker compose exec -T postgres psql -U alpha_quant -d alpha_quant < {{ file }}
 
-# ── Artifacts ────────────────────────────────────────────────────────────────
-
-# List artifacts in the bucket
-artifacts-list:
-    docker compose run --rm --entrypoint mc rustfs/rustfs:latest \
-        --config-dir /tmp/mc alias set aq http://artifacts:9000 rustfsadmin rustfsadmin && \
-        docker compose run --rm --entrypoint mc rustfs/rustfs:latest \
-        --config-dir /tmp/mc ls aq/alpha-quant-artifacts
-
-# ── Testing ──────────────────────────────────────────────────────────────────
+# ── Testing / QA ─────────────────────────────────────────────────────────────
 
 # Run tests
-test:
-    docker compose run --rm --entrypoint pytest api
+test *args:
+    docker compose run --rm --entrypoint pytest api {{ args }}
 
-# Run dashboard API tests
-test-api:
-    docker compose run --rm --entrypoint pytest api tests/unit/test_dashboard_api.py
-
-# Run end-to-end tests
-test-e2e:
-    docker compose run --rm --entrypoint pytest api tests/integration/
-
-# Run all checks (lint, type, test)
+# Run all checks (lint, type) using host tooling
 check:
-    docker compose run --rm --entrypoint /bin/sh api -c "ruff check && ty check"
+    uv run ruff check src/ && uv run ty check src/
 
 # ── Destructive Reset (requires explicit confirmation) ───────────────────────
 
@@ -83,19 +74,7 @@ reset-db confirm="":
     docker volume rm alpha_quant_pgdata
     echo "PostgreSQL volume removed. Run 'just up' to recreate."
 
-# Remove artifact data volume
-reset-artifacts confirm="":
-    @if [ "{{ confirm }}" != "DROP_ALPHA_QUANT_ARTIFACTS" ]; then \
-        echo "ERROR: Provide confirm=DROP_ALPHA_QUANT_ARTIFACTS to proceed."; \
-        echo "This will IRREVERSIBLY DELETE all artifact data."; \
-        exit 1; \
-    fi
-    echo "WARNING: Removing artifacts volume — all data will be lost!"
-    docker compose stop api worker
-    docker volume rm alpha_quant_artifacts
-    echo "Artifacts volume removed. Run 'just up' to recreate."
-
-# Remove ALL data (PostgreSQL + artifacts)
+# Remove ALL data (PostgreSQL)
 reset-all confirm="":
     @if [ "{{ confirm }}" != "DROP_ALPHA_QUANT_ALL_STATE" ]; then \
         echo "ERROR: Provide confirm=DROP_ALPHA_QUANT_ALL_STATE to proceed."; \
@@ -104,5 +83,5 @@ reset-all confirm="":
     fi
     echo "WARNING: Removing ALL data volumes — every record will be lost!"
     docker compose down
-    docker volume rm alpha_quant_pgdata alpha_quant_artifacts
+    docker volume rm alpha_quant_pgdata
     echo "All volumes removed. Run 'just up' to recreate."

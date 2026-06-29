@@ -162,6 +162,23 @@ def db_migrate(
 
 
 @app.command(rich_help_panel="Database")
+def db_migrate_check(
+    database_url: str = _database_url_opt(),
+) -> None:
+    """Check pending migrations without applying them (dry-run)."""
+    from pathlib import Path
+
+    from alembic import command
+    from alembic.config import Config
+
+    url = database_url or _database_url_opt()
+    ini_path = Path(__file__).resolve().parents[3] / "alembic.ini"
+    cfg = Config(str(ini_path))
+    cfg.set_main_option("sqlalchemy.url", url)
+    command.check(cfg)
+
+
+@app.command(rich_help_panel="Database")
 def db_seed(
     database_url: str = _database_url_opt(),
 ) -> None:
