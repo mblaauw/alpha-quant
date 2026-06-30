@@ -266,9 +266,11 @@ class DailyCycleService:
                     except Exception:
                         logger.exception("advice_generation_failed", symbol=sc.symbol)
 
-                # Generate per-stage and overall explanations
+                # Mark previous explanations stale, then generate new ones
                 if self._explanation_service and sc_id:
                     try:
+                        self._store.mark_explanations_stale(scope="scorecard_stage")
+                        self._store.mark_explanations_stale(scope="scorecard_overall")
                         sc_with_id = sc_with_ids.model_copy(update={"scorecard_id": sc_id})
                         stage_artifacts = self._explanation_service.generate_stage_explanations(
                             sc_with_id

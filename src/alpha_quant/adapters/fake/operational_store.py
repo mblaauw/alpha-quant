@@ -367,6 +367,24 @@ class FakeOperationalStore:
         self._advice_artifacts[advice_id] = stored
         return advice_id
 
+    def mark_explanations_stale(self, scope: str = "", scope_id: str = "") -> int:
+        count = 0
+        for aid, artifact in self._advice_artifacts.items():
+            if scope and artifact.scope != scope:
+                continue
+            if scope_id and artifact.scope_id != scope_id:
+                continue
+            self._advice_artifacts[aid] = artifact.model_copy(update={"stale": True})
+            count += 1
+        return count
+
+    def load_advice_artifacts(self, scope: str = "", scope_id: str = "") -> list[AdviceArtifact]:
+        return [
+            a
+            for a in self._advice_artifacts.values()
+            if (not scope or a.scope == scope) and (not scope_id or a.scope_id == scope_id)
+        ]
+
     # --- Operator Overrides ---
 
     def save_operator_override(self, override: OperatorOverride) -> str:

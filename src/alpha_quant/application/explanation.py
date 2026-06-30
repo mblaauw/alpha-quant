@@ -32,11 +32,37 @@ class ExplanationService:
 
     Produces one AdviceArtifact per M-stage (M1-M8), one overall scorecard
     explanation, and one final deterministic output explanation.
+
+    All artifacts carry snapshot_id and input_fingerprint for
+    stale-result detection and lifecycle management.
     """
 
     def __init__(self, llm: LLM, prompt_version: str = PROMPT_VERSION) -> None:
         self._llm = llm
         self._prompt_version = prompt_version
+
+    @staticmethod
+    def compute_input_fingerprint(context: dict[str, Any]) -> str:
+        return hashlib.sha256(
+            json.dumps(context, sort_keys=True, default=str).encode()
+        ).hexdigest()[:16]
+
+    @staticmethod
+    def make_snapshot(scorecard: Scorecard) -> dict[str, str]:
+        return {
+            "snapshot_id": hashlib.sha256(
+                json.dumps(
+                    {
+                        "facts_hash": scorecard.facts_hash,
+                        "config_hash": scorecard.config_hash,
+                        "scorecard_id": scorecard.scorecard_id,
+                    },
+                    sort_keys=True,
+                ).encode()
+            ).hexdigest()[:16],
+            "facts_hash": scorecard.facts_hash,
+            "config_hash": scorecard.config_hash,
+        }
 
     def generate_stage_explanations(
         self,
@@ -46,6 +72,8 @@ class ExplanationService:
         now = datetime.now(UTC)
         artifacts: list[AdviceArtifact] = []
         seen_mids: set[str] = set()
+        snapshot = self.make_snapshot(scorecard)
+        snapshot_id = snapshot["snapshot_id"]
 
         for component in scorecard.components:
             module = module_from_component(component)
@@ -55,6 +83,7 @@ class ExplanationService:
             seen_mids.add(mid)
 
             stage_context = self._build_stage_context(component, module, scorecard)
+            fingerprint = self.compute_input_fingerprint(stage_context)
             prompt = scorecard_stage_prompt(stage_context)
             rec, status = self._call_llm_with_retry(prompt, scorecard.recommendation)
             input_json = json.dumps(stage_context, indent=2, default=str)
@@ -69,6 +98,8 @@ class ExplanationService:
                     scorecard_id=scorecard.scorecard_id,
                     scope=ExplanationScope.scorecard_stage,
                     scope_id=mid,
+                    snapshot_id=snapshot_id,
+                    input_fingerprint=fingerprint,
                     llm_provider=getattr(self._llm, "_provider", ""),
                     llm_model=getattr(self._llm, "_model", ""),
                     prompt_version=self._prompt_version,
@@ -90,6 +121,9 @@ class ExplanationService:
         """Generate an overall explanation for a complete scorecard."""
         now = datetime.now(UTC)
         context = self._build_scorecard_context(scorecard)
+        fingerprint = self.compute_input_fingerprint(context)
+        snapshot = self.make_snapshot(scorecard)
+        snapshot_id = snapshot["snapshot_id"]
         prompt = scorecard_overall_prompt(context)
         rec, status = self._call_llm_with_retry(prompt, scorecard.recommendation)
 
@@ -103,6 +137,8 @@ class ExplanationService:
         return AdviceArtifact(
             scorecard_id=scorecard.scorecard_id,
             scope=ExplanationScope.scorecard_overall,
+            snapshot_id=snapshot_id,
+            input_fingerprint=fingerprint,
             llm_provider=getattr(self._llm, "_provider", ""),
             llm_model=getattr(self._llm, "_model", ""),
             prompt_version=self._prompt_version,
@@ -123,6 +159,8 @@ class ExplanationService:
         now = datetime.now(UTC)
         artifacts: list[AdviceArtifact] = []
         limits = risk_report.get("limits", [])
+        as_of = str(risk_report.get("as_of", ""))
+        snapshot_id = hashlib.sha256(f"risk:{as_of}".encode()).hexdigest()[:16]
 
         for limit in limits:
             name = limit.get("name", "Unknown")
@@ -132,7 +170,9 @@ class ExplanationService:
                 "limit": limit.get("limit", ""),
                 "utilization": limit.get("utilization", 0.0),
                 "breach": limit.get("breach", False),
+                "as_of": as_of,
             }
+            fingerprint = self.compute_input_fingerprint(category_context)
             prompt = risk_category_prompt(category_context)
             fb_rec = Recommendation.watch if not limit.get("breach") else Recommendation.do_nothing
             rec, status = self._call_llm_with_retry(prompt, fb_rec)
@@ -148,6 +188,8 @@ class ExplanationService:
                     scorecard_id=scorecard_id,
                     scope=ExplanationScope.risk_category,
                     scope_id=name.lower().replace(" ", "_").replace("—", "_"),
+                    snapshot_id=snapshot_id,
+                    input_fingerprint=fingerprint,
                     llm_provider=getattr(self._llm, "_provider", ""),
                     llm_model=getattr(self._llm, "_model", ""),
                     prompt_version=self._prompt_version,
@@ -170,6 +212,9 @@ class ExplanationService:
         """Generate an overall explanation for a complete risk assessment."""
         now = datetime.now(UTC)
         context = self._build_risk_context(risk_report)
+        fingerprint = self.compute_input_fingerprint(context)
+        as_of = str(risk_report.get("as_of", ""))
+        snapshot_id = hashlib.sha256(f"risk:{as_of}".encode()).hexdigest()[:16]
         prompt = risk_overall_prompt(context)
 
         decisions = risk_report.get("decisions", [])
@@ -193,6 +238,8 @@ class ExplanationService:
         return AdviceArtifact(
             scorecard_id=scorecard_id,
             scope=ExplanationScope.risk_overall,
+            snapshot_id=snapshot_id,
+            input_fingerprint=fingerprint,
             llm_provider=getattr(self._llm, "_provider", ""),
             llm_model=getattr(self._llm, "_model", ""),
             prompt_version=self._prompt_version,
