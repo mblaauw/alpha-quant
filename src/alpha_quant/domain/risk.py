@@ -1,8 +1,9 @@
-"""Unified risk policy model — all trading thresholds and limits in one place."""
+"""Unified risk policy model — all trading thresholds, limits, and decisions."""
 
 from __future__ import annotations
 
 from datetime import datetime
+from enum import StrEnum
 
 from pydantic import Field
 
@@ -67,3 +68,20 @@ class RiskPolicy(FrozenModel):
     ewma_lambda: float = Field(default=0.94, ge=0.0, le=1.0)
     hist_window_days: int = Field(default=500, ge=10, le=2000)
     mc_paths: int = Field(default=10000, ge=100, le=1_000_000)
+
+
+class RiskAction(StrEnum):
+    HALT = "halt"
+    BLOCK = "block"
+    REDUCE = "reduce"
+    ALLOW = "allow"
+
+
+class RiskDecision(FrozenModel):
+    action: RiskAction
+    reason: str
+    limit_name: str = ""
+    current_value: str = ""
+    limit_value: str = ""
+    resized_quantity: int | None = None
+    policy_version: str = "default"

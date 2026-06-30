@@ -29,6 +29,7 @@ from alpha_quant.contracts.operational import (
     PortfolioMark,
     PortfolioState,
     PositionCurrent,
+    RiskEvent,
     RunKind,
     RunReservation,
     RunStatus,
@@ -978,6 +979,23 @@ class PostgresOperationalStore:
                 "vl": policy.version_label,
                 "pj": json.dumps(policy.model_dump(mode="json")),
                 "ch": policy.config_hash(),
+            },
+        )
+
+    def write_risk_event(self, event: RiskEvent) -> None:
+        self.session.execute(
+            text(
+                "INSERT INTO audit.risk_event "
+                "(risk_event_id, decision_run_id, event_type, severity, details_json, created_at) "
+                "VALUES (:eid, :rid, :etype, :sev, :details, :now)"
+            ),
+            {
+                "eid": str(event.risk_event_id),
+                "rid": str(event.decision_run_id),
+                "etype": event.event_type,
+                "sev": event.severity,
+                "details": event.details_json,
+                "now": event.created_at,
             },
         )
 

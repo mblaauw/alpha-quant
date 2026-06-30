@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4, uuid5
 
@@ -466,6 +467,26 @@ def candidate_modify_handler(cmd: Command) -> tuple[CommandStatus, str | None, s
 
     uow = create_unit_of_work()
     with uow:
+        # Check halt state
+        current_halt = uow.store.current_halt(book_id)
+        if current_halt is not None:
+            from alpha_quant.contracts.operational import RiskEvent
+
+            uow.store.write_risk_event(
+                RiskEvent(
+                    risk_event_id=uuid4(),
+                    decision_run_id=UUID(int=0),
+                    event_type="trade.blocked.halt_active",
+                    severity="crit",
+                    details_json=(
+                        '{"message": "Trade blocked — halt active: '
+                        f'{current_halt.reason}", "symbol": "{symbol_input}"}}'
+                    ),
+                    created_at=datetime.now(UTC),
+                )
+            )
+            return CommandStatus.FAILED, None, f"Halt active: {current_halt.reason}"
+
         # Look up symbol from scorecard if not provided in payload
         symbol = symbol_input
         if not symbol:
