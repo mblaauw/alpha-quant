@@ -91,7 +91,7 @@ class TestAdviceLLMService:
         assert artifact.llm_provider == ""
         assert artifact.input_hash != ""
         assert artifact.output_hash != ""
-        assert artifact.validation_status == "valid"
+        assert artifact.validation_status == "unverified"
         assert artifact.recommendation.recommendation == Recommendation.hold
         assert artifact.deterministic_differs is False
 
@@ -109,7 +109,7 @@ class TestAdviceLLMService:
         artifact = svc.generate_advice(sc)
         assert artifact.input_hash != ""
         assert artifact.output_hash != ""
-        assert artifact.validation_status == "valid"
+        assert artifact.validation_status == "unverified"
 
     def test_portfolio_summary_defaults(self) -> None:
         p = PortfolioSummary()

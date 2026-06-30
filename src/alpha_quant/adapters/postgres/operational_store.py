@@ -624,6 +624,7 @@ class PostgresOperationalStore:
                      input_hash, output_hash, validation_status,
                      recommendation, headline, summary,
                      rationale_json, risks_json,
+                     confidence_label, what_changed_json, override_guidance_json,
                      deterministic_differs, created_at)
                 VALUES
                     (:aid, :sid,
@@ -631,6 +632,7 @@ class PostgresOperationalStore:
                      :ih, :oh, :vs,
                      :rec, :hl, :sum,
                      :rj, :rkj,
+                     :cl, :wcj, :ogj,
                      :dd, :now)
             """),
             {
@@ -647,6 +649,9 @@ class PostgresOperationalStore:
                 "sum": rec.summary if rec else "",
                 "rj": json.dumps(rec.key_reasons if rec else []),
                 "rkj": json.dumps(rec.main_risks if rec else []),
+                "cl": rec.confidence_label if rec else "medium",
+                "wcj": json.dumps(rec.what_changed if rec else []),
+                "ogj": json.dumps(rec.override_guidance if rec else []),
                 "dd": advice.deterministic_differs,
                 "now": now,
             },

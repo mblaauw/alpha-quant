@@ -463,7 +463,7 @@ def seed_dev_data(database_url: str | None = None) -> tuple[int, int]:
                 "llm_model, prompt_version, input_hash, output_hash, validation_status, "
                 "recommendation, headline, summary, rationale_json, risks_json, "
                 "deterministic_differs, created_at) "
-                "VALUES (:aid, :scid, 'anthropic', 'claude-sonnet-4', 'v1', '', '', "
+                "VALUES (:aid, :scid, 'anthropic', 'claude-sonnet-4', '1.0', '', '', "
                 "'verified', :rec, :headline, :summary, :rationale, :risks, false, :now)",
                 aid=str(uuid4()),
                 scid=scid,

@@ -11,6 +11,7 @@ from uuid import NAMESPACE_DNS, UUID, uuid4, uuid5
 import structlog
 from sqlalchemy import text
 
+from alpha_quant.application.advice_llm import AdviceLLMService, PortfolioSummary
 from alpha_quant.application.scorecards import (
     PortfolioContext,
     PositionContext,
@@ -65,10 +66,12 @@ class DailyCycleService:
         alpha_lake: AlphaLakeReadPort,
         store: Any,
         clock: Clock,
+        llm: Any = None,
     ) -> None:
         self._alpha_lake = alpha_lake
         self._store = store
         self._clock = clock
+        self._advice_service = AdviceLLMService(llm) if llm else None
 
     def _resolve_trading_day(self, as_of: datetime) -> datetime:
         """Walk back from as_of to find a date with sufficient technical readouts."""
@@ -245,6 +248,22 @@ class DailyCycleService:
                     }
                 )
                 self._store.save_scorecard(sc_with_ids, run_id_str)
+
+                # Generate advice artifact for each scorecard
+                if self._advice_service and sc_with_ids.scorecard_id:
+                    try:
+                        portfolio_summary = PortfolioSummary(
+                            equity=float(state.equity),
+                            cash=float(state.cash),
+                            position_count=len(state.positions),
+                            regime=state.regime,
+                        )
+                        advice = self._advice_service.generate_advice(
+                            sc_with_ids, portfolio_summary
+                        )
+                        self._store.save_advice_artifact(advice)
+                    except Exception:
+                        logger.exception("advice_generation_failed", symbol=sc.symbol)
 
             # -- Persist portfolio mark --
             total_mv_end = sum(float(p.market_value or 0) for p in state.positions.values())

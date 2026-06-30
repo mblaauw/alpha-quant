@@ -498,6 +498,9 @@ class AdviceArtifactOrm(Base):
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     rationale_json: Mapped[str] = text_field()
     risks_json: Mapped[str] = text_field()
+    confidence_label: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    what_changed_json: Mapped[str] = text_field()
+    override_guidance_json: Mapped[str] = text_field()
     deterministic_differs: Mapped[bool] = bool_field()
     created_at: Mapped[datetime] = dt_field()
 

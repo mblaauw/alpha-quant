@@ -66,6 +66,8 @@ class AdviceLLMService:
                 "reduce",
                 "exit",
                 "watch",
+                "consider_entry",
+                "do_nothing",
             ],
         }
 
@@ -90,7 +92,7 @@ class AdviceLLMService:
             prompt_version=self._prompt_version,
             input_hash=input_hash,
             output_hash=output_hash,
-            validation_status="valid",
+            validation_status="unverified",
             recommendation=recommendation,
             deterministic_differs=deterministic_differs,
             created_at=now,
