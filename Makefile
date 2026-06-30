@@ -48,6 +48,8 @@ lint: check format type
 	@echo "All linting passed."
 
 bootstrap:
+	rm -f fixtures/v1/facts-bundle-*.json
+	rm -f fixtures/v1/golden_run.json
 	PYTHONHASHSEED=0 uv run python scripts/generate_fixtures.py
 	@echo "Fixtures generated in fixtures/v1/"
 

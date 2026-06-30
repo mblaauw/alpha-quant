@@ -1,6 +1,6 @@
 {
-  "symbol": "GOOGL",
-  "as_of": "2026-06-29T17:00:00Z",
+  "symbol": "MSFT",
+  "as_of": "2026-01-07T14:00:00+00:00",
   "snapshot_id": "snap-mock-001",
   "categories": [
     "price",
@@ -11,15 +11,15 @@
     "attention"
   ],
   "price": {
-    "last": 172.0,
-    "high": 174.58,
-    "low": 169.42,
-    "open": 171.48,
-    "volume": 16936819,
-    "change": 0.21,
-    "change_pct": 0.12,
-    "dollar_volume": 5024372558.0,
-    "latest_date": "2026-06-29"
+    "last": 422.02,
+    "high": 428.35,
+    "low": 415.69,
+    "open": 422.91,
+    "volume": 23100000,
+    "change": -2.98,
+    "change_pct": -0.7,
+    "dollar_volume": 9748662000.0,
+    "latest_date": "2026-01-07"
   },
   "readouts": [
     {
@@ -30,8 +30,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 55
+          "effective_date": "2026-01-07",
+          "value": 67
         }
       ]
     },
@@ -43,8 +43,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 48
+          "effective_date": "2026-01-07",
+          "value": 57
         }
       ]
     },
@@ -56,8 +56,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 58
+          "effective_date": "2026-01-07",
+          "value": 55.0
         }
       ]
     },
@@ -69,8 +69,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 0
+          "effective_date": "2026-01-07",
+          "value": 1
         }
       ]
     },
@@ -82,8 +82,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 65
+          "effective_date": "2026-01-07",
+          "value": 59
         }
       ]
     },
@@ -95,8 +95,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 1.9
+          "effective_date": "2026-01-07",
+          "value": 1.570117647058824
         }
       ]
     },
@@ -108,8 +108,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 0.1
+          "effective_date": "2026-01-07",
+          "value": 0.1035058823529412
         }
       ]
     },
@@ -121,8 +121,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 48
+          "effective_date": "2026-01-07",
+          "value": 67.0117647058824
         }
       ]
     },
@@ -134,8 +134,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 0.95
+          "effective_date": "2026-01-07",
+          "value": 1.0
         }
       ]
     },
@@ -147,8 +147,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 0.005
+          "effective_date": "2026-01-07",
+          "value": 1.1
         }
       ]
     },
@@ -160,8 +160,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 0.12
+          "effective_date": "2026-01-07",
+          "value": -0.7011764705882396
         }
       ]
     }
@@ -170,98 +170,41 @@
     "metrics": [
       {
         "metric_id": "pe_ttm",
-        "name": "P/E (TTM)",
+        "name": "PE TTM",
         "category": "valuation",
-        "value": 24.8,
-        "period_end": "2026-03-31",
-        "unit": "x",
-        "tone": "neutral",
-        "quality_status": "good"
+        "value": 35.0
       },
       {
         "metric_id": "debt_to_equity_ttm",
-        "name": "Debt/Equity",
-        "category": "credit",
-        "value": 0.4,
-        "period_end": "2026-03-31",
-        "unit": "x",
-        "tone": "neutral",
-        "quality_status": "good"
+        "name": "Debt to Equity",
+        "category": "financial_health",
+        "value": 0.5
       },
       {
         "metric_id": "gross_margin_ttm",
-        "name": "Gross Margin",
+        "name": "Gross Margin TTM",
         "category": "profitability",
-        "value": 0.58,
-        "period_end": "2026-03-31",
-        "unit": "%",
-        "tone": "positive",
-        "quality_status": "good"
+        "value": 0.43
       },
       {
         "metric_id": "earnings_yield_ttm",
-        "name": "Earnings Yield",
+        "name": "Earnings Yield TTM",
         "category": "valuation",
-        "value": 0.04,
-        "period_end": "2026-03-31",
-        "unit": "%",
-        "tone": "neutral",
-        "quality_status": "good"
+        "value": 0.029
       }
     ]
   },
-  "insider_transactions": [
-    {
-      "effective_date": "2026-06-01",
-      "transaction_type": "Buy",
-      "shares": 400,
-      "price": 163.0,
-      "value": 65200
-    },
-    {
-      "effective_date": "2026-06-01",
-      "transaction_type": "Sell",
-      "shares": 50,
-      "price": 166.0,
-      "value": 8300
-    }
-  ],
-  "earnings_events": [
-    {
-      "effective_date": "2026-06-27",
-      "symbol": "GOOGL",
-      "surprise_pct": 4.2
-    },
-    {
-      "effective_date": "2026-01-28",
-      "symbol": "GOOGL",
-      "surprise_pct": 4.2
-    }
-  ],
+  "insider_transactions": [],
+  "earnings_events": [],
   "attention_mentions": [
     {
-      "effective_date": "2026-06-25",
-      "count": 144,
+      "effective_date": "2026-01-02",
+      "count": 85,
       "source": "alpha_lake"
     },
     {
-      "effective_date": "2026-06-26",
-      "count": 244,
-      "source": "alpha_lake"
-    },
-    {
-      "effective_date": "2026-06-27",
-      "count": 76,
-      "source": "alpha_lake"
-    },
-    {
-      "effective_date": "2026-06-28",
-      "count": 387,
-      "source": "alpha_lake"
-    },
-    {
-      "effective_date": "2026-06-29",
-      "count": 480,
+      "effective_date": "2026-01-06",
+      "count": 92,
       "source": "alpha_lake"
     }
   ]

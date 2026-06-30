@@ -1,0 +1,40 @@
+{
+  "symbol": "POOR_DATA",
+  "as_of": "2025-12-15T14:00:00+00:00",
+  "snapshot_id": "snap-mock-001",
+  "categories": [
+    "price"
+  ],
+  "price": {
+    "last": 50.0,
+    "high": 51.0,
+    "low": 49.0,
+    "open": 49.5,
+    "volume": 500000,
+    "change": 0.0,
+    "change_pct": 0.0,
+    "dollar_volume": 25000000.0,
+    "latest_date": "2025-12-15"
+  },
+  "readouts": [
+    {
+      "definition": {
+        "readout_id": "price.last",
+        "name": "Last Price",
+        "category": "price"
+      },
+      "observations": [
+        {
+          "effective_date": "2025-12-15",
+          "value": 50.0
+        }
+      ]
+    }
+  ],
+  "fundamentals": {
+    "metrics": []
+  },
+  "insider_transactions": [],
+  "earnings_events": [],
+  "attention_mentions": []
+}

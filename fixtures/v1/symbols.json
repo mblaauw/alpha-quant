@@ -2,33 +2,33 @@
   "symbols": [
     {
       "symbol": "AAPL",
-      "added_at": "2026-01-01T00:00:00Z",
-      "active": true
+      "security_id": "AAPL",
+      "name": "AAPL"
     },
     {
       "symbol": "MSFT",
-      "added_at": "2026-01-01T00:00:00Z",
-      "active": true
+      "security_id": "MSFT",
+      "name": "MSFT"
     },
     {
       "symbol": "GOOGL",
-      "added_at": "2026-01-01T00:00:00Z",
-      "active": true
+      "security_id": "GOOGL",
+      "name": "GOOGL"
     },
     {
       "symbol": "NVDA",
-      "added_at": "2026-01-01T00:00:00Z",
-      "active": true
+      "security_id": "NVDA",
+      "name": "NVDA"
     },
     {
       "symbol": "AMZN",
-      "added_at": "2026-01-01T00:00:00Z",
-      "active": true
+      "security_id": "AMZN",
+      "name": "AMZN"
     },
     {
       "symbol": "SPY",
-      "added_at": "2026-01-01T00:00:00Z",
-      "active": true
+      "security_id": "SPY",
+      "name": "SPY"
     }
   ]
 }

@@ -1,0 +1,218 @@
+{
+  "symbol": "AMZN",
+  "as_of": "2026-01-08T14:00:00+00:00",
+  "snapshot_id": "snap-mock-001",
+  "categories": [
+    "price",
+    "technical",
+    "fundamental",
+    "insider",
+    "earnings",
+    "attention"
+  ],
+  "price": {
+    "last": 227.84,
+    "high": 231.26,
+    "low": 224.42,
+    "open": 225.99,
+    "volume": 33250000,
+    "change": 5.99,
+    "change_pct": 2.7,
+    "dollar_volume": 7575680000.0,
+    "latest_date": "2026-01-08"
+  },
+  "readouts": [
+    {
+      "definition": {
+        "readout_id": "trend.directional_bias",
+        "name": "Directional Bias",
+        "category": "trend"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-01-08",
+          "value": 65
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "trend.regime",
+        "name": "Trend Regime",
+        "category": "trend"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-01-08",
+          "value": 55
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "momentum.rsi_14",
+        "name": "RSI(14)",
+        "category": "momentum"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-01-08",
+          "value": 72.0
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "momentum.macd_cross",
+        "name": "MACD Cross",
+        "category": "momentum"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-01-08",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "momentum.quality",
+        "name": "Momentum Quality",
+        "category": "momentum"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-01-08",
+          "value": 65
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "volatility.atr_percent",
+        "name": "ATR %",
+        "category": "volatility"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-01-08",
+          "value": 1.7700022537750737
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "volatility.bollinger_width",
+        "name": "Bollinger Width",
+        "category": "volatility"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-01-08",
+          "value": 0.1135001126887537
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "volatility.regime",
+        "name": "Vol Regime",
+        "category": "volatility"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-01-08",
+          "value": 32.99977462249264
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "participation.rvol",
+        "name": "Relative Volume",
+        "category": "participation"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-01-08",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "relative_strength.vs_benchmark",
+        "name": "vs Benchmark",
+        "category": "relative_strength"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-01-08",
+          "value": 0.5
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "relative_strength.change_pct",
+        "name": "Change %",
+        "category": "relative_strength"
+      },
+      "observations": [
+        {
+          "effective_date": "2026-01-08",
+          "value": 2.7000225377507365
+        }
+      ]
+    }
+  ],
+  "fundamentals": {
+    "metrics": [
+      {
+        "metric_id": "pe_ttm",
+        "name": "PE TTM",
+        "category": "valuation",
+        "value": 45.0
+      },
+      {
+        "metric_id": "debt_to_equity_ttm",
+        "name": "Debt to Equity",
+        "category": "financial_health",
+        "value": 1.2
+      },
+      {
+        "metric_id": "gross_margin_ttm",
+        "name": "Gross Margin TTM",
+        "category": "profitability",
+        "value": 0.35
+      },
+      {
+        "metric_id": "earnings_yield_ttm",
+        "name": "Earnings Yield TTM",
+        "category": "valuation",
+        "value": 0.022
+      }
+    ]
+  },
+  "insider_transactions": [
+    {
+      "effective_date": "2026-01-05",
+      "transaction_type": "Sell",
+      "shares": 10000.0,
+      "price": 225.0
+    }
+  ],
+  "earnings_events": [],
+  "attention_mentions": [
+    {
+      "effective_date": "2026-01-02",
+      "count": 110,
+      "source": "alpha_lake"
+    },
+    {
+      "effective_date": "2026-01-06",
+      "count": 105,
+      "source": "alpha_lake"
+    }
+  ]
+}

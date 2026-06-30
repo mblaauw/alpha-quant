@@ -61,8 +61,10 @@ class AlphaLakeHttpFixtureClient(AlphaLakeReadPort):
         readout_ids: list[str] | None = None,
         metric_ids: list[str] | None = None,
     ) -> FactsBundle:
-        key = f"facts-bundle-{symbol}"
-        data = self._load_json(key)
+        data = self._load_bundle_by_date(symbol, as_of)
+        if not data:
+            key = f"facts-bundle-{symbol}"
+            data = self._load_json(key)
         if not data:
             data = self._load_json("facts-bundle")
         if not data:
@@ -75,6 +77,18 @@ class AlphaLakeHttpFixtureClient(AlphaLakeReadPort):
                 )
             )
         return parse_facts_bundle(data)
+
+    def _load_bundle_by_date(self, symbol: str, as_of: datetime) -> dict[str, Any] | None:
+        """Try loading a facts-bundle from a date-specific subdirectory."""
+        date_str = as_of.date().isoformat()
+        path = self._root / date_str / f"facts-bundle-{symbol}.json"
+        if path.exists():
+            return json.loads(path.read_text())
+        # Try stale directory
+        stale_path = self._root / "stale" / f"facts-bundle-{symbol}.json"
+        if stale_path.exists():
+            return json.loads(stale_path.read_text())
+        return None
 
     @override
     def list_symbols(self, active_only: bool = True) -> list[SymbolRegistryItem]:
