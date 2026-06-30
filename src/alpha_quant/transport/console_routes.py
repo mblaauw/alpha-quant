@@ -529,12 +529,18 @@ def _compute_guardrails(
     if suggested_qty == 0:
         guards.append({"code": "zero_qty", "severity": "block", "message": "Quantity is zero."})
     if not guards:
+        if equity > 0:
+            msg = (
+                f"Budget ok: risk {risk_at_stop / equity * 100:.2f}%, "
+                f"notional {notional / equity * 100:.1f}%."
+            )
+        else:
+            msg = "Equity data unavailable — checks skipped."
         guards.append(
             {
                 "code": "ok",
                 "severity": "ok",
-                "message": f"Budget ok: risk {risk_at_stop / equity * 100:.2f}%, "
-                f"notional {notional / equity * 100:.1f}%.",
+                "message": msg,
             }
         )
     return guards
