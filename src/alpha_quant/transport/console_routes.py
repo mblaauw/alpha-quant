@@ -271,17 +271,22 @@ async def list_scorecards(
 # M1-M8 mapping imported from domain/categories.py
 
 
-def _derive_rank(total_score: float) -> str:
-    """Derive a rank label from the total score."""
+def _derive_rank(total_score: float) -> str | None:
+    """Derive a rank label from the total score.
+
+    Returns a tier label based on score brackets.
+    Does not compare against peer scorecards — use get_scorecard's
+    position within the run for true ranking.
+    """
     if total_score >= 90:
-        return "#1 of 9"
+        return "top tier"
     if total_score >= 80:
-        return "#2 of 9"
+        return "strong"
     if total_score >= 70:
-        return "#3 of 9"
+        return "good"
     if total_score >= 60:
-        return "#4 of 9"
-    return "—"
+        return "average"
+    return None
 
 
 def _synthetic_narrative(sc: Any, modules: list[dict[str, object]]) -> dict[str, object]:
