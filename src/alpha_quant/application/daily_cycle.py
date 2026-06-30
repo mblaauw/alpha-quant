@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 from uuid import NAMESPACE_DNS, UUID, uuid4, uuid5
@@ -26,6 +26,7 @@ from alpha_quant.contracts.operational import (
 from alpha_quant.domain.events import DomainEvent
 from alpha_quant.domain.models import Decision, Fill, Position
 from alpha_quant.ports.alpha_lake import AlphaLakeReadPort
+from alpha_quant.ports.clock import Clock
 
 logger = structlog.get_logger()
 
@@ -63,9 +64,11 @@ class DailyCycleService:
         self,
         alpha_lake: AlphaLakeReadPort,
         store: Any,
+        clock: Clock,
     ) -> None:
         self._alpha_lake = alpha_lake
         self._store = store
+        self._clock = clock
 
     def _resolve_trading_day(self, as_of: datetime) -> datetime:
         """Walk back from as_of to find a date with sufficient technical readouts."""
@@ -92,7 +95,7 @@ class DailyCycleService:
         discovery_symbols: list[str] | None = None,
         strategy_version_id: UUID | None = None,
     ) -> DailyCycleResult:
-        now = self._resolve_trading_day(as_of or datetime.now(UTC))
+        now = self._resolve_trading_day(as_of or self._clock.now())
         today = now.date()
 
         strategy_version_id = strategy_version_id or UUID("00000000-0000-0000-0000-000000000001")

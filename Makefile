@@ -36,6 +36,14 @@ qa:
 		bash "$$script" || echo "  ⚠️  $$script failed (non-zero exit)"; \
 	done
 
+golden:
+	uv run pytest tests/test_golden_replay.py -q
+
+bless-golden:
+	rm -f fixtures/golden/run.hash
+	uv run pytest tests/test_golden_replay.py -q 2>&1 || true
+	@echo "Golden hash updated in fixtures/golden/run.hash"
+
 lint: check format type
 	@echo "All linting passed."
 

@@ -32,6 +32,45 @@ from alpha_quant.domain.advice import AdviceArtifact, OperatorOverride
 from alpha_quant.domain.scorecard import Scorecard, ScorecardComponent
 
 
+class _FakeSession:
+    """Minimal SQLAlchemy-like session that handles security_reference lookups."""
+
+    def __init__(self, security_refs: dict[str, str]) -> None:
+        self._security_refs = security_refs
+
+    def execute(
+        self,
+        statement: Any,
+        params: dict[str, Any] | None = None,
+    ) -> _FakeResult:
+        sql = str(statement)
+        params = params or {}
+        if "SELECT security_id FROM core.security_reference" in sql:
+            symbol = params.get("sym", "")
+            security_id = self._security_refs.get(symbol)
+            return _FakeResult(security_id)
+        if "INSERT INTO core.security_reference" in sql:
+            sid = str(params.get("sid", ""))
+            sym = str(params.get("sym", ""))
+            if sym and sym not in self._security_refs:
+                self._security_refs[sym] = sid
+        return _FakeResult(None)
+
+
+class _FakeResult:
+    def __init__(self, security_id: str | None) -> None:
+        self._security_id = security_id
+
+    def fetchone(self) -> _FakeResult | None:
+        if self._security_id is not None:
+            return self
+        return None
+
+    @property
+    def _mapping(self) -> dict[str, str]:
+        return {"security_id": self._security_id} if self._security_id else {}
+
+
 class FakeOperationalStore:
     def __init__(self) -> None:
         self._runs: dict[UUID, DecisionRun] = {}
@@ -58,6 +97,11 @@ class FakeOperationalStore:
         self._position_risks: dict[tuple[UUID, str], dict[str, Any]] = {}
         self._commands: dict[UUID, Command] = {}
         self._config: dict[str, str] = {}
+        self._security_refs: dict[str, str] = {}
+
+    @property
+    def session(self) -> _FakeSession:
+        return _FakeSession(self._security_refs)
 
     # --- Run lifecycle ---
 
