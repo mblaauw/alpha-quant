@@ -17,6 +17,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy import (
     Enum as SAEnum,
@@ -563,6 +564,20 @@ class AdviceArtifactOrm(Base):
     confidence_label: Mapped[str | None] = mapped_column(String(20), nullable=True)
     what_changed_json: Mapped[str] = text_field()
     override_guidance_json: Mapped[str] = text_field()
+    scope: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default="scorecard_overall"
+    )
+    scope_id: Mapped[str] = mapped_column(String(64), nullable=False, server_default="")
+    snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    input_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    stale: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    interpretation: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    key_evidence_json: Mapped[str] = text_field()
+    key_caveats_json: Mapped[str] = text_field()
+    data_quality_notes: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    decision_context: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    educational_context: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    what_could_change_json: Mapped[str] = text_field()
     deterministic_differs: Mapped[bool] = bool_field()
     created_at: Mapped[datetime] = dt_field()
 

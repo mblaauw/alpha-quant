@@ -641,6 +641,9 @@ class PostgresOperationalStore:
                      recommendation, headline, summary,
                      rationale_json, risks_json,
                      confidence_label, what_changed_json, override_guidance_json,
+                     interpretation, key_evidence_json, key_caveats_json,
+                     data_quality_notes, decision_context,
+                     educational_context, what_could_change_json,
                      deterministic_differs, stale, created_at)
                 VALUES
                     (:aid, :sid,
@@ -650,6 +653,9 @@ class PostgresOperationalStore:
                      :rec, :hl, :sum,
                      :rj, :rkj,
                      :cl, :wcj, :ogj,
+                     :int, :kej, :kcj,
+                     :dqn, :dc,
+                     :ec, :wccj,
                      :dd, :st, :now)
             """),
             {
@@ -673,6 +679,13 @@ class PostgresOperationalStore:
                 "cl": rec.confidence_label if rec else "medium",
                 "wcj": json.dumps(rec.what_changed if rec else []),
                 "ogj": json.dumps(rec.override_guidance if rec else []),
+                "int": rec.interpretation if rec else "",
+                "kej": json.dumps(rec.key_evidence if rec else []),
+                "kcj": json.dumps(rec.key_caveats if rec else []),
+                "dqn": rec.data_quality_notes if rec else "",
+                "dc": rec.decision_context if rec else "",
+                "ec": rec.educational_context if rec else "",
+                "wccj": json.dumps(rec.what_could_change if rec else []),
                 "dd": advice.deterministic_differs,
                 "st": advice.stale,
                 "now": now,
@@ -702,7 +715,7 @@ class PostgresOperationalStore:
         return count
 
     def load_advice_artifacts(self, scope: str = "", scope_id: str = "") -> list[AdviceArtifact]:
-        from alpha_quant.domain.advice import AdviceRecommendation as AR
+        from alpha_quant.domain.advice import AdviceRecommendation
 
         where = []
         params: dict[str, object] = {}
@@ -720,8 +733,12 @@ class PostgresOperationalStore:
                        snapshot_id, input_fingerprint,
                        validation_status, stale,
                        recommendation, headline, summary,
-                       interpretation, key_reasons, main_risks,
+                       rationale_json AS key_reasons,
+                       risks_json AS main_risks,
                        confidence_label, what_changed_json, override_guidance_json,
+                       interpretation, key_evidence_json, key_caveats_json,
+                       data_quality_notes, decision_context,
+                       educational_context, what_could_change_json,
                        created_at
                 FROM run.advice_artifact
                 WHERE {where_clause}
@@ -729,6 +746,12 @@ class PostgresOperationalStore:
             """),
             params,
         ).fetchall()
+
+        def _load_json(val: str | None, default: str = "[]") -> list:
+            try:
+                return json.loads(val) if val else json.loads(default)
+            except (json.JSONDecodeError, TypeError):  # fmt: skip
+                return json.loads(default)
 
         return [
             AdviceArtifact(
@@ -740,19 +763,24 @@ class PostgresOperationalStore:
                 input_fingerprint=str(r._mapping.get("input_fingerprint") or ""),
                 validation_status=str(r._mapping.get("validation_status", "")),
                 stale=bool(r._mapping.get("stale", False)),
-                recommendation=AR(
+                recommendation=AdviceRecommendation(
                     recommendation=r._mapping.get(
                         "recommendation", Recommendation.do_nothing.value
                     ),
                     confidence_label=str(r._mapping.get("confidence_label", "medium")),
                     headline=str(r._mapping.get("headline", "")),
                     summary=str(r._mapping.get("summary", "")),
-                    key_reasons=json.loads(r._mapping.get("key_reasons", "[]") or "[]"),
-                    main_risks=json.loads(r._mapping.get("main_risks", "[]") or "[]"),
-                    what_changed=json.loads(r._mapping.get("what_changed_json", "[]") or "[]"),
-                    override_guidance=json.loads(
-                        r._mapping.get("override_guidance_json", "[]") or "[]"
-                    ),
+                    interpretation=str(r._mapping.get("interpretation", "")),
+                    educational_context=str(r._mapping.get("educational_context", "")),
+                    key_reasons=_load_json(r._mapping.get("key_reasons")),
+                    key_evidence=_load_json(r._mapping.get("key_evidence_json")),
+                    key_caveats=_load_json(r._mapping.get("key_caveats_json")),
+                    main_risks=_load_json(r._mapping.get("main_risks")),
+                    data_quality_notes=str(r._mapping.get("data_quality_notes", "")),
+                    decision_context=str(r._mapping.get("decision_context", "")),
+                    what_changed=_load_json(r._mapping.get("what_changed_json")),
+                    what_could_change=_load_json(r._mapping.get("what_could_change_json")),
+                    override_guidance=_load_json(r._mapping.get("override_guidance_json")),
                 ),
                 created_at=r._mapping.get("created_at"),
             )
