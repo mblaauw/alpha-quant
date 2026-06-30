@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by ADR-0044 (OperationalStore).
 
 ## Date
 
