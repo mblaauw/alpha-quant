@@ -129,11 +129,13 @@ function _qtyGuardrails(qty, sizing, equity) {
   if (notional > sizing.buying_power) {
     guards.push({ severity: "block", icon: "⛔", message: `Notional ${fmtCurrency(notional)} exceeds buying power ${fmtCurrency(sizing.buying_power)} by ${fmtCurrency(notional - sizing.buying_power)}.` });
   }
-  if (riskAtStop > equity * 0.01) {
-    guards.push({ severity: "warn", icon: "⚠", message: `Risk at stop ${fmtCurrency(riskAtStop)} is above the 1% per-trade cap (${fmtCurrency(equity * 0.01)}).` });
+  const ptCap = sizing.per_trade_risk_cap || 0.01;
+  const concCap = sizing.concentration_cap || 0.20;
+  if (riskAtStop > equity * ptCap) {
+    guards.push({ severity: "warn", icon: "⚠", message: `Risk at stop ${fmtCurrency(riskAtStop)} is above the ${pct1(ptCap)} per-trade cap (${fmtCurrency(equity * ptCap)}).` });
   }
-  if (notional > equity * 0.20) {
-    guards.push({ severity: "warn", icon: "⚠", message: `Notional ${pct1(notional / equity)} of equity — above 20% single-name guide.` });
+  if (notional > equity * concCap) {
+    guards.push({ severity: "warn", icon: "⚠", message: `Notional ${pct1(notional / equity)} of equity — above ${pct1(concCap)} single-name guide.` });
   }
   if (qty === 0) {
     guards.push({ severity: "block", icon: "⛔", message: "Quantity is zero — nothing to submit." });
@@ -423,7 +425,9 @@ function wireTicket() {
     const equity = _ticketSizing.equity || 350000;
     const riskAtStop = qty * _ticketSizing.stop_distance;
     const notional = qty * _ticketSizing.last_price;
-    const blocked = notional > _ticketSizing.buying_power || riskAtStop > equity * 0.01 || qty === 0;
+    const ptc = _ticketSizing.per_trade_risk_cap || 0.01;
+    const coc = _ticketSizing.concentration_cap || 0.20;
+    const blocked = notional > _ticketSizing.buying_power || riskAtStop > equity * ptc || notional > equity * coc || qty === 0;
     if (blocked) return;
     const isMod = _activeTicket.qtyOverride != null || _activeTicket.riskPct !== 0.5 || _activeTicket.method !== "atr_2_0";
     const bookId = store.bookId;
