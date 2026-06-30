@@ -18,6 +18,7 @@ from alpha_quant.application.risk.liquidity import compute_all as compute_liquid
 from alpha_quant.application.risk.posture import derive_posture
 from alpha_quant.application.risk.scenarios import compute_all as compute_scenarios
 from alpha_quant.application.risk.var import compute_all as compute_var
+from alpha_quant.domain.risk import RiskPolicy
 
 
 def _round(value: float, digits: int = 4) -> float:
@@ -71,9 +72,14 @@ class RiskEngine:
     def __init__(self, lake: Any | None = None) -> None:
         self._lake = lake
 
-    def run(self, book_id: str | None = None) -> dict[str, Any]:
+    def run(
+        self,
+        book_id: str | None = None,
+        policy: RiskPolicy | None = None,
+    ) -> dict[str, Any]:
         """Compute all risk measures for the given book."""
         inputs = load_inputs(book_id, self._lake)
+        policy = policy or RiskPolicy.default()
 
         if not inputs.positions:
             return self._empty_response(inputs)
@@ -115,7 +121,12 @@ class RiskEngine:
         headline_es = var_result["levels"]["es975"]["pct"]
 
         # Component VaR
-        comp_var = component_var(inputs.weights, cov_matrix, headline_var)
+        comp_var = component_var(
+            inputs.weights,
+            cov_matrix,
+            headline_var,
+            flag_multiplier=policy.component_flag_multiplier,
+        )
         for i, c in enumerate(comp_var):
             c["symbol"] = inputs.symbols[i] if i < len(inputs.symbols) else f"pos_{i}"
 
@@ -131,6 +142,7 @@ class RiskEngine:
             pos_returns,
             [c.get("vol", 0.0) for c in comp_var],
             cov_matrix[0][0] ** 0.5 if cov_matrix else 0.0,
+            sector_cap=policy.sector_cap,
         )
 
         # Factors
@@ -159,6 +171,7 @@ class RiskEngine:
             concentration.get("sectors", []),
             single_weights,
             inputs.symbols,
+            limits=policy,
         )
 
         events = generate_events(limits, inputs.halt_active)
@@ -189,9 +202,9 @@ class RiskEngine:
                 "beta": _round(factors.get("beta", 0.0), 2),
                 "drawdown": drawdown,
                 "max_drawdown": max_drawdown,
-                "drawdown_limit": -0.10,
+                "drawdown_limit": RiskPolicy.default().drawdown_limit,
                 "gross_exposure": _round(gross_exposure),
-                "gross_cap": 0.90,
+                "gross_cap": RiskPolicy.default().gross_exposure_cap,
                 "effective_bets": _round(concentration.get("effective_bets", 0.0), 1),
                 "hhi": round(concentration.get("hhi", 0)),
             },
@@ -229,9 +242,9 @@ class RiskEngine:
                 "beta": 0.0,
                 "drawdown": 0.0,
                 "max_drawdown": 0.0,
-                "drawdown_limit": -0.10,
+                "drawdown_limit": RiskPolicy.default().drawdown_limit,
                 "gross_exposure": 0.0,
-                "gross_cap": 0.90,
+                "gross_cap": RiskPolicy.default().gross_exposure_cap,
                 "effective_bets": 0.0,
                 "hhi": 0,
             },

@@ -18,6 +18,7 @@ from alpha_quant.contracts.operational import (
     RunKind,
     RunReservation,
 )
+from alpha_quant.domain.risk import RiskPolicy
 
 CommandHandler = Callable[[Command], tuple[CommandStatus, str | None, str | None]]
 
@@ -481,16 +482,17 @@ def candidate_modify_handler(cmd: Command) -> tuple[CommandStatus, str | None, s
         total_mv = sum(float(p.market_value or 0) for p in positions)
         equity = cash + total_mv if (cash + total_mv) > 0 else 350_000.0
 
-        risk_pct = risk_pct if risk_pct else 0.005
+        policy = RiskPolicy.default()
+        risk_pct = risk_pct if risk_pct else policy.default_risk_pct
         last_price = stop_price if stop_price else 100.0
         atr = last_price * 0.033
 
         if method == "atr_2_5":
-            stop_dist = 2.5 * atr
+            stop_dist = policy.atr_stop_aggressive_mult * atr
         elif method == "fixed_8":
-            stop_dist = last_price * 0.08
+            stop_dist = last_price * policy.fixed_stop_pct
         else:
-            stop_dist = 2.0 * atr
+            stop_dist = policy.atr_stop_default_mult * atr
             method = method or "atr_2_0"
 
         risk_budget = equity * risk_pct
@@ -499,7 +501,7 @@ def candidate_modify_handler(cmd: Command) -> tuple[CommandStatus, str | None, s
 
         notional = final_qty * last_price
         risk_at_stop = final_qty * stop_dist
-        buying_power = equity * 0.18
+        buying_power = equity * policy.buying_power_pct
 
         if notional > buying_power:
             return (
@@ -509,11 +511,14 @@ def candidate_modify_handler(cmd: Command) -> tuple[CommandStatus, str | None, s
             )
         if final_qty == 0:
             return CommandStatus.FAILED, None, "zero_qty: quantity would be zero"
-        if risk_at_stop > equity * 0.01:
+        if risk_at_stop > equity * policy.per_trade_risk_cap:
             return (
                 CommandStatus.FAILED,
                 None,
-                f"per_trade_risk_exceeded: ${risk_at_stop:,.0f} > 1% of equity",
+                (
+                    f"per_trade_risk_exceeded: ${risk_at_stop:,.0f}"
+                    f" > {policy.per_trade_risk_cap * 100:.0f}% of equity"
+                ),
             )
 
         order_id = uow.store.create_order(

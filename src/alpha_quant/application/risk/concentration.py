@@ -49,7 +49,9 @@ def diversification_ratio(vols: list[float], portfolio_vol: float) -> float:
     return sum(vols) / portfolio_vol
 
 
-def sector_weights(weights: list[float], sectors: list[str]) -> list[dict[str, Any]]:
+def sector_weights(
+    weights: list[float], sectors: list[str], cap: float = 0.70
+) -> list[dict[str, Any]]:
     """Group weights by sector, compare to cap."""
     sector_map: dict[str, float] = {}
     for w, s in zip(weights, sectors, strict=False):
@@ -59,8 +61,8 @@ def sector_weights(weights: list[float], sectors: list[str]) -> list[dict[str, A
         {
             "name": name,
             "pct": round(pct, 4),
-            "cap": 0.70,
-            "breach": pct > 0.70,
+            "cap": cap,
+            "breach": pct > cap,
         }
         for name, pct in sorted_sectors
     ]
@@ -72,6 +74,7 @@ def compute_all(
     returns_matrix: list[list[float]] | None = None,
     vols: list[float] | None = None,
     portfolio_vol: float | None = None,
+    sector_cap: float = 0.70,
 ) -> dict[str, Any]:
     """Compute all concentration metrics."""
     hhi_val = hhi(weights)
@@ -80,7 +83,7 @@ def compute_all(
     top3 = top_n_concentration(weights)
     avg_corr = avg_pairwise_correlation(returns_matrix) if returns_matrix else 0.0
     dr = diversification_ratio(vols, portfolio_vol) if vols and portfolio_vol else 1.0
-    secs = sector_weights(weights, sectors)
+    secs = sector_weights(weights, sectors, cap=sector_cap)
 
     return {
         "effective_bets": round(en, 1),
