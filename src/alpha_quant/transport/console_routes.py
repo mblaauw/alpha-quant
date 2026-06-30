@@ -333,8 +333,8 @@ async def get_scorecard(scorecard_id: str):
     exps = get_explanations(scorecard_id)
     exp_status = "unavailable"
     if exps:
-        stale = all(e.get("stale", False) for e in exps)
-        exp_status = "stale" if stale else "current"
+        any_stale = any(e.get("stale", False) for e in exps)
+        exp_status = "stale" if any_stale else "current"
 
     return {
         "scorecard_id": sc.scorecard_id,
