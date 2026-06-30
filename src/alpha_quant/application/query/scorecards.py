@@ -45,23 +45,17 @@ def _compute_sizing(
     last_price: float,
     atr_value: float | None,
 ) -> dict[str, object]:
-    """Compute one-row sizing preview (mirrors POST /sizing-preview logic)."""
+    """Compute one-row sizing preview."""
+    from alpha_quant.application.risk.methods import compute_sizing
+
     atr = atr_value if atr_value else last_price * 0.033
     risk_pct = 0.005
     mult = 2.0
     stop_dist = mult * atr
     stop_price = last_price - stop_dist
-    risk_budget = equity * risk_pct
-    suggested_qty = max(1, int(risk_budget // stop_dist)) if stop_dist > 0 else 1
-    notional = suggested_qty * last_price
-    risk_at_stop = suggested_qty * stop_dist
-    return {
-        "suggested_qty": suggested_qty,
-        "notional": round(notional, 2),
-        "risk_at_stop": round(risk_at_stop, 2),
-        "stop_price": round(stop_price, 2),
-        "stop_distance": round(stop_dist, 2),
-    }
+    sizing = compute_sizing(equity, last_price, stop_dist, risk_pct)
+    sizing["stop_price"] = round(stop_price, 2)
+    return sizing
 
 
 def get_today_advice(
