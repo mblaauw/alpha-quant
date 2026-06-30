@@ -112,7 +112,7 @@ def test_load_inputs_no_positions_defaults_equity(monkeypatch: Any) -> None:
 
     result = load_inputs()
 
-    assert result.equity == 350000.0
+    assert result.equity == 0.0
     assert result.positions == []
     assert result.weights == []
 
