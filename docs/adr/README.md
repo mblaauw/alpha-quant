@@ -62,6 +62,16 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0054](./0054-evolved-desk-advice-tab.md) | Desk Redesigned with Advice-First Tab | Accepted | 2026-06-27 |
 | [0055](./0055-risk-desk-placeholder-contract.md) | Risk Desk Uses a Stable Placeholder Contract Before the Real Risk Engine | Superseded by 0056 | 2026-06-28 |
 | [0056](./0056-real-risk-engine.md) | Real Risk Engine Replaces Placeholder Calculations | Accepted | 2026-06-28 |
+| [0057](./0057-scorecard-engine-as-decision-core.md) | Scorecard Engine Replaces Policy Modules as Decision Core | Accepted | 2026-06-30 |
+| [0058](./0058-removal-of-cli-run-commands.md) | Removal of CLI run/status/journal/ask/report/halt/backup Commands | Accepted | 2026-06-30 |
+| [0059](./0059-domainevent-regression-to-dict.md) | DomainEvent Regression to Plain dict | Accepted | 2026-06-30 |
+| [0060](./0060-risk-engine-synthetic-returns-v1.md) | Risk Engine Uses Synthetic Returns as v1 Methodology | Accepted | 2026-06-30 |
+| [0061](./0061-duckdb-retained-for-legacy-import.md) | DuckDB Retained for Legacy Import Only | Accepted | 2026-06-30 |
+| [0062](./0062-console-mutation-routes-reconciled.md) | Console Mutation Routes Reconciled with Command Bus | Accepted | 2026-06-30 |
+| [0063](./0063-unified-risk-policy-model.md) | Unified Risk Policy Model Replaces Three Disconnected Systems | Accepted | 2026-06-30 |
+| [0064](./0064-scoring-policy-versioning.md) | Scoring Policy Versioning via RiskPolicy.component_weights_json | Accepted | 2026-06-30 |
+| [0065](./0065-llm-integration-and-guardrails.md) | LLM Integration and Guardrails for Deterministic Advice | Accepted | 2026-06-30 |
+| [0066](./0066-fake-operational-store-containerless-testing.md) | FakeOperationalStore Enables Containerless Testing | Accepted | 2026-06-30 |
 
 ## Status Meanings
 
