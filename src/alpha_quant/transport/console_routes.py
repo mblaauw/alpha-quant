@@ -214,11 +214,22 @@ async def get_freshness(svc: FreshnessService = Depends(_freshness_service)):
 async def get_today_advice(
     book_id: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
+    freshness: FreshnessService = Depends(_freshness_service),
 ):
     from alpha_quant.application.query.scorecards import get_today_advice as _get_today
 
     bid = UUID(book_id) if book_id else None
-    return {"items": _get_today(book_id=bid, limit=limit)}
+    items = _get_today(book_id=bid, limit=limit)
+    symbols = [str(d.get("symbol", "")) for d in items if d.get("symbol")]
+    freshness_map = {f["symbol"]: f for f in freshness.for_symbols(symbols)}
+    for item in items:
+        sym = item.get("symbol", "")
+        f = freshness_map.get(sym)
+        item["freshness"] = f
+        if f and f.get("stale"):
+            item["recommendation"] = "blocked"
+            item["reason"] = f"Stale market data — {f['age_minutes']}m old"
+    return {"items": items}
 
 
 @router.get("/scorecards")

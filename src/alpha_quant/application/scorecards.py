@@ -7,6 +7,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from statistics import mean, stdev
+from typing import Any
 
 import structlog
 
@@ -488,15 +489,26 @@ def _score_fundamentals(bundle: FactsBundle) -> ScorecardComponent:
         reasons.append("Deeply negative earnings yield")
         failed = True
 
-    score = 20.0 if failed else 70.0
+    has_any_data = any(
+        _fundamental_value(bundle, k) is not None
+        for k in ("pe_ttm", "debt_to_equity_ttm", "gross_margin_ttm", "earnings_yield_ttm")
+    )
+    if not has_any_data:
+        score = 35.0
+        state = ComponentState.warn
+        reason = "No fundamental data — defaulting to cautious score"
+    else:
+        score = 20.0 if failed else 70.0
+        state = ComponentState.fail if failed else ComponentState.pass_
+        reason = "; ".join(reasons) if reasons else "Fundamentals within range"
     return ScorecardComponent(
         name="fundamentals",
         category="fundamental",
         score=score,
-        state=ComponentState.fail if failed else ComponentState.pass_,
+        state=state,
         weight=_COMPONENT_WEIGHTS["fundamentals"],
-        passed=not failed,
-        reason="; ".join(reasons) if reasons else "No fundamental data",
+        passed=not failed and has_any_data,
+        reason=reason,
     )
 
 
@@ -504,10 +516,14 @@ def _score_event_risk(bundle: FactsBundle, as_of: date) -> ScorecardComponent:
     blackout_days = 14
     window_end = as_of + timedelta(days=blackout_days)
 
-    for event in bundle.sections.earnings_events:
-        event_date = _parse_date(event.effective_date)
-        if event_date is None:
-            continue
+    parsed_events: list[tuple[date, Any]] = []
+    for e in bundle.sections.earnings_events:
+        d = _parse_date(e.effective_date)
+        if d is not None:
+            parsed_events.append((d, e))
+    parsed_events.sort(key=lambda pair: abs((pair[0] - as_of).days))
+
+    for event_date, _event in parsed_events:
         if as_of <= event_date <= window_end:
             days_until = (event_date - as_of).days
             return ScorecardComponent(
@@ -827,23 +843,55 @@ def _apply_gates(
     portfolio: PortfolioContext,
     as_of: date,
     symbol: str = "",
-) -> list[str]:
-    warnings: list[str] = []
+) -> dict[str, ScorecardComponent]:
+    """Apply market regime and data quality gates to component scores.
+
+    Returns updated components dict with regime-adjusted scores.
+    """
 
     if portfolio.regime == "RISK_OFF":
-        warnings.append("Market regime: RISK_OFF — reducing all scores")
+        logger.warning(
+            "gate_triggered", symbol=symbol, warning="RISK_OFF — reducing all scores by 20%"
+        )
+        for name, comp in components.items():
+            new_score = comp.score * 0.8
+            components[name] = comp.model_copy(
+                update={
+                    "score": round(max(new_score, 5.0), 1),
+                    "reason": (comp.reason + "; " if comp.reason else "") + "RISK_OFF regime",
+                }
+            )
 
     dq = components.get("data_quality")
     if dq and dq.state == ComponentState.fail:
-        warnings.append("Data quality insufficient")
+        logger.warning(
+            "gate_triggered",
+            symbol=symbol,
+            warning="Data quality insufficient — reducing all scores by 30%",
+        )
+        for name, comp in components.items():
+            new_score = comp.score * 0.7
+            components[name] = comp.model_copy(
+                update={
+                    "score": round(max(new_score, 5.0), 1),
+                    "reason": (comp.reason + "; " if comp.reason else "") + "poor data quality",
+                }
+            )
 
     if portfolio.regime == "CAUTION":
-        warnings.append("Market regime: CAUTION — adopting defensive posture")
+        logger.warning(
+            "gate_triggered", symbol=symbol, warning="CAUTION — reducing all scores by 10%"
+        )
+        for name, comp in components.items():
+            new_score = comp.score * 0.9
+            components[name] = comp.model_copy(
+                update={
+                    "score": round(max(new_score, 5.0), 1),
+                    "reason": (comp.reason + "; " if comp.reason else "") + "CAUTION regime",
+                }
+            )
 
-    for w in warnings:
-        logger.warning("gate_triggered", symbol=symbol, warning=w)
-
-    return warnings
+    return components
 
 
 def _compute_total_score(
@@ -981,7 +1029,21 @@ def generate_scorecards(
     as_of: datetime | None = None,
     spy_bundle: FactsBundle | None = None,
     strategy_version_id: str = "",
+    policy: Any = None,
 ) -> list[Scorecard]:
+    from alpha_quant.domain.risk import RiskPolicy
+
+    weights = dict(_COMPONENT_WEIGHTS)
+    if policy is not None and isinstance(policy, RiskPolicy) and policy.component_weights_json:
+        import json as _json
+
+        try:
+            overrides = _json.loads(policy.component_weights_json)
+            for key, val in overrides.items():
+                if key in weights and isinstance(val, (int, float)):
+                    weights[key] = float(val)
+        except (_json.JSONDecodeError, TypeError):  # fmt: skip
+            pass
     now = as_of or datetime.now(UTC)
     today = now.date()
     scorecards: list[Scorecard] = []
@@ -1014,7 +1076,11 @@ def generate_scorecards(
         components["data_quality"] = _score_data_quality(bundle)
 
         components = _enrich_components(components, bundle)
-        _apply_gates(components, portfolio, today, symbol=symbol)
+        components = _apply_gates(components, portfolio, today, symbol=symbol)
+        components = {
+            k: comp.model_copy(update={"weight": weights.get(k, comp.weight)})
+            for k, comp in components.items()
+        }
         total_score = _compute_total_score(list(components.values()), portfolio.regime)
 
         dq = components.get("data_quality")
