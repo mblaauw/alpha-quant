@@ -89,6 +89,7 @@ def compute_all(
     returns_matrix: list[list[float]],
     benchmark_returns: list[float],
     extra_metrics: dict[str, list[float]] | None = None,
+    weights: list[float] | None = None,
 ) -> dict[str, Any]:
     """Compute beta and style tilts.
 
@@ -98,13 +99,12 @@ def compute_all(
         return {"beta": 0.0, "styles": []}
 
     n = len(returns_matrix)
-    weights = [1.0 / n] * n
+    w = weights if weights and len(weights) == n else [1.0 / n] * n
 
-    # Portfolio beta: weighted average of individual betas
     betas: list[float] = []
     for r in returns_matrix:
         betas.append(market_beta(r, benchmark_returns))
-    portfolio_beta = sum(w * b for w, b in zip(weights, betas, strict=False))
+    portfolio_beta = sum(w[i] * betas[i] for i in range(n))
 
     metrics = extra_metrics or {}
     styles = style_tilts(metrics)

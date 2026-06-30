@@ -161,6 +161,59 @@ def monte_carlo_var(
     return max(sorted_losses[index], 0.0)
 
 
+def monte_carlo_es(
+    weights: list[float],
+    cov_matrix: list[list[float]],
+    paths: int = 10000,
+    seed: int = 42,
+    confidence: float = 0.975,
+) -> float:
+    """Compute Monte Carlo Expected Shortfall (tail average beyond VaR).
+
+    Averages the worst (1-confidence) fraction of simulated portfolio losses.
+    Returns positive value (average loss in tail).
+    """
+    n = len(weights)
+    if n == 0:
+        return 0.0
+
+    chol: list[list[float]] = [[0.0] * n for _ in range(n)]
+    for i in range(n):
+        for j in range(i + 1):
+            s = sum(chol[i][k] * chol[j][k] for k in range(j))
+            if i == j:
+                val = cov_matrix[i][i] - s
+                chol[i][j] = math.sqrt(max(val, 0.0))
+            else:
+                chol[i][j] = (cov_matrix[i][j] - s) / chol[j][j] if chol[j][j] > 0 else 0.0
+
+    rng_state = seed
+    portfolio_losses: list[float] = []
+    for _ in range(paths):
+        normals: list[float] = []
+        for _ in range((n + 1) // 2 + 1):
+            rng_state = (rng_state * 1103515245 + 12345) & 0x7FFFFFFF
+            u1 = rng_state / 2147483648.0
+            rng_state = (rng_state * 1103515245 + 12345) & 0x7FFFFFFF
+            u2 = rng_state / 2147483648.0
+            normals.append(
+                math.sqrt(-2.0 * math.log(max(u1, 1e-10))) * math.cos(2.0 * math.pi * u2)
+            )
+            normals.append(
+                math.sqrt(-2.0 * math.log(max(u1, 1e-10))) * math.sin(2.0 * math.pi * u2)
+            )
+        normals = normals[:n]
+
+        correlated = [sum(chol[i][j] * normals[j] for j in range(n)) for i in range(n)]
+        portfolio_loss = -sum(weights[i] * correlated[i] for i in range(n))
+        portfolio_losses.append(portfolio_loss)
+
+    sorted_losses = sorted(portfolio_losses)
+    n_tail = max(1, int((1 - confidence) * len(sorted_losses)))
+    tail = sorted_losses[:n_tail]
+    return abs(sum(tail) / len(tail)) if tail else 0.0
+
+
 def compute_all(
     weights: list[float],
     cov_matrix: list[list[float]],
@@ -193,11 +246,12 @@ def compute_all(
         }
 
     es_hist = expected_shortfall(portfolio_returns, 0.975)
-    es_mc = monte_carlo_var(weights, cov_matrix, confidence=0.975)
+    es_mc = monte_carlo_es(weights, cov_matrix, confidence=0.975)
+    es_para = para.get("es975", {}).get("parametric", 0.0)
     levels["es975"] = {
         "pct": round(es_pct, 4),
         "usd": round(equity * es_pct, 2),
-        "parametric": f"{es_pct * 100:.1f}%",
+        "parametric": f"{es_para * 100:.1f}%",
         "historical": f"{es_hist * 100:.1f}%",
         "monte_carlo": f"{es_mc * 100:.1f}%",
     }
