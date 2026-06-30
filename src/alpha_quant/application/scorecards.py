@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from statistics import mean, stdev
@@ -62,6 +64,26 @@ _COMPONENT_WEIGHTS: dict[str, float] = {
     "cash_impact": 0.04,
     "data_quality": 0.02,
 }
+
+
+REGIME_MULTIPLIERS: dict[str, float] = {
+    "RISK_ON": 1.0,
+    "CAUTION": 0.6,
+    "RISK_OFF": 0.2,
+}
+
+
+def _config_hash() -> str:
+    return hashlib.sha256(
+        json.dumps(
+            {
+                "weights": _COMPONENT_WEIGHTS,
+                "thresholds": _RECOMMENDATION_THRESHOLDS,
+                "regime_mult": REGIME_MULTIPLIERS,
+            },
+            sort_keys=True,
+        ).encode()
+    ).hexdigest()[:16]
 
 
 # Mapping from scorecard engine readout IDs to actual Alpha-Lake v2 readout IDs.
@@ -804,7 +826,7 @@ def _compute_total_score(
 ) -> float:
     total_weight = 0.0
     weighted_sum = 0.0
-    regime_multiplier = {"RISK_ON": 1.0, "CAUTION": 0.6, "RISK_OFF": 0.2}.get(regime, 1.0)
+    regime_multiplier = REGIME_MULTIPLIERS.get(regime, 1.0)
 
     for c in components:
         if c.weight <= 0:
@@ -843,10 +865,12 @@ def generate_scorecards(
     portfolio: PortfolioContext,
     as_of: datetime | None = None,
     spy_bundle: FactsBundle | None = None,
+    strategy_version_id: str = "",
 ) -> list[Scorecard]:
     now = as_of or datetime.now(UTC)
     today = now.date()
     scorecards: list[Scorecard] = []
+    cfg_hash = _config_hash()
 
     all_symbols = set(bundles.keys())
     if spy_bundle and spy_bundle.metadata.symbol in all_symbols:
@@ -891,6 +915,8 @@ def generate_scorecards(
             data_quality=data_quality,
             components=list(components.values()),
             facts_hash=_compute_hash(bundle),
+            config_hash=cfg_hash,
+            strategy_version=strategy_version_id,
         )
         scorecards.append(scorecard)
 
@@ -899,8 +925,6 @@ def generate_scorecards(
 
 
 def _compute_hash(bundle: FactsBundle) -> str:
-    import hashlib
-
     parts: list[str] = []
     parts.append(bundle.metadata.symbol)
     parts.append(str(bundle.metadata.as_of))
@@ -910,5 +934,11 @@ def _compute_hash(bundle: FactsBundle) -> str:
             parts.append(f"{o.effective_date}={o.value}")
     for f in bundle.sections.fundamentals:
         parts.append(f"{f.metric_id}={f.value}")
+    for t in bundle.sections.insider_transactions:
+        parts.append(f"insider:{t.effective_date}={t.transaction_type}={t.shares}")
+    for e in bundle.sections.earnings_events:
+        parts.append(f"earnings:{e.effective_date}={e.symbol}")
+    for m in bundle.sections.attention_mentions:
+        parts.append(f"mention:{m.effective_date}={m.count}")
     raw = "|".join(parts)
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
