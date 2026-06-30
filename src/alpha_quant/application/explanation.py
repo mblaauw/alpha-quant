@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -28,6 +29,14 @@ from alpha_quant.ports.llm import LLM
 
 logger = structlog.get_logger()
 _MAX_RETRIES = 2
+
+
+@dataclass
+class PortfolioSummary:
+    equity: float = 0.0
+    cash: float = 0.0
+    position_count: int = 0
+    regime: str = "RISK_ON"
 
 
 class ExplanationService:
@@ -127,10 +136,11 @@ class ExplanationService:
     def generate_scorecard_explanation(
         self,
         scorecard: Scorecard,
+        portfolio: PortfolioSummary | None = None,
     ) -> AdviceArtifact:
         """Generate an overall explanation for a complete scorecard."""
         now = datetime.now(UTC)
-        context = self._build_scorecard_context(scorecard)
+        context = self._build_scorecard_context(scorecard, portfolio)
         fingerprint = self.compute_input_fingerprint(context)
         snapshot = self.make_snapshot(scorecard)
         snapshot_id = snapshot["snapshot_id"]
@@ -348,8 +358,11 @@ class ExplanationService:
             "symbol": scorecard.symbol,
         }
 
-    def _build_scorecard_context(self, scorecard: Scorecard) -> dict[str, Any]:
+    def _build_scorecard_context(
+        self, scorecard: Scorecard, portfolio: PortfolioSummary | None = None
+    ) -> dict[str, Any]:
         stages = []
+        portfolio = portfolio or PortfolioSummary()
         seen_mids: set[str] = set()
         for component in scorecard.components:
             module = module_from_component(component)
@@ -378,6 +391,10 @@ class ExplanationService:
             "facts_hash": scorecard.facts_hash,
             "config_hash": scorecard.config_hash,
             "strategy_version": scorecard.strategy_version,
+            "portfolio_equity": portfolio.equity,
+            "portfolio_cash": portfolio.cash,
+            "portfolio_position_count": portfolio.position_count,
+            "portfolio_regime": portfolio.regime,
         }
 
     def _call_llm_with_retry(
