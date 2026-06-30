@@ -8,11 +8,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from alpha_quant.application.prompts import ALLOWED_ACTIONS, PROMPT_VERSION
 from alpha_quant.domain.advice import AdviceArtifact, AdviceRecommendation
 from alpha_quant.domain.scorecard import Recommendation, Scorecard
 from alpha_quant.ports.llm import LLM
 
-_PROMPT_VERSION = "1.0"
 _MAX_RETRIES = 2
 
 
@@ -31,7 +31,7 @@ class AdviceLLMService:
     LLM output: schema-validated JSON that maps to AdviceRecommendation.
     """
 
-    def __init__(self, llm: LLM, prompt_version: str = _PROMPT_VERSION) -> None:
+    def __init__(self, llm: LLM, prompt_version: str = PROMPT_VERSION) -> None:
         self._llm = llm
         self._prompt_version = prompt_version
 
@@ -76,7 +76,9 @@ class AdviceLLMService:
 
         prompt = _build_prompt(input_json)
 
-        recommendation = self._call_llm_with_retry(prompt, scorecard.recommendation)
+        recommendation, validation_status = self._call_llm_with_retry(
+            prompt, scorecard.recommendation
+        )
         output_json = json.dumps(
             recommendation.model_dump() if hasattr(recommendation, "model_dump") else {},
             default=str,
@@ -92,7 +94,7 @@ class AdviceLLMService:
             prompt_version=self._prompt_version,
             input_hash=input_hash,
             output_hash=output_hash,
-            validation_status="unverified",
+            validation_status=validation_status,
             recommendation=recommendation,
             deterministic_differs=deterministic_differs,
             created_at=now,
@@ -122,17 +124,28 @@ class AdviceLLMService:
         self,
         prompt: str,
         fallback_rec: Recommendation,
-    ) -> AdviceRecommendation:
+    ) -> tuple[AdviceRecommendation, str]:
         for attempt in range(_MAX_RETRIES + 1):
             try:
                 response = self._llm.explain(prompt)
                 parsed = self._parse_llm_response(response)
                 if parsed is not None:
-                    return parsed
+                    status = self._validate_recommendation(parsed)
+                    return parsed, status
             except Exception:
                 if attempt == _MAX_RETRIES:
-                    return self._fallback_recommendation(fallback_rec)
-        return self._fallback_recommendation(fallback_rec)
+                    fb = self._fallback_recommendation(fallback_rec)
+                    return fb, "failed"
+        fb = self._fallback_recommendation(fallback_rec)
+        return fb, "failed"
+
+    @staticmethod
+    def _validate_recommendation(rec: AdviceRecommendation) -> str:
+        if rec.recommendation.value not in ALLOWED_ACTIONS:
+            return "failed"
+        if rec.confidence_label not in ("low", "medium", "high"):
+            return "failed"
+        return "verified"
 
     def _parse_llm_response(self, raw: str) -> AdviceRecommendation | None:
         cleaned = raw.strip()
@@ -156,9 +169,16 @@ class AdviceLLMService:
                 confidence_label=data.get("confidence_label", "medium"),
                 headline=data.get("headline", ""),
                 summary=data.get("summary", ""),
+                interpretation=data.get("interpretation", ""),
+                educational_context=data.get("educational_context", ""),
                 key_reasons=data.get("key_reasons", []),
+                key_evidence=data.get("key_evidence", []),
+                key_caveats=data.get("key_caveats", []),
                 main_risks=data.get("main_risks", []),
+                data_quality_notes=data.get("data_quality_notes", ""),
+                decision_context=data.get("decision_context", ""),
                 what_changed=data.get("what_changed_since_previous_run", []),
+                what_could_change=data.get("what_could_change", []),
                 override_guidance=data.get("override_guidance", []),
             )
         except (ValueError, TypeError):  # fmt: skip

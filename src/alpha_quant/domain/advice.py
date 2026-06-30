@@ -11,6 +11,30 @@ from alpha_quant.domain._base import FrozenModel
 from alpha_quant.domain.scorecard import Recommendation
 
 
+class ExplanationInputBundle(FrozenModel):
+    scope: str = ""
+    scope_id: str = ""
+    snapshot_id: str = ""
+    input_fingerprint: str = ""
+    entity_id: str = ""
+    symbol: str = ""
+    as_of: datetime | None = None
+    policy_version: str = ""
+    model_version: str = ""
+    deterministic_result: str = ""
+    score: float = 0.0
+    recommendation: str = ""
+    data_quality: str = "pass"
+    stage_name: str = ""
+    stage_type: str = ""
+    stage_question: str = ""
+    stage_state: str = "pass"
+    stage_reason: str = ""
+    stage_metrics: list[dict[str, str]] = Field(default_factory=list)
+    key_evidence: list[str] = Field(default_factory=list)
+    caveats: list[str] = Field(default_factory=list)
+
+
 class ExplanationScope(StrEnum):
     scorecard_stage = "scorecard_stage"
     scorecard_overall = "scorecard_overall"
