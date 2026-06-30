@@ -29,6 +29,8 @@ from alpha_quant.contracts.operational import (
 )
 from tests.conftest import require_postgres_engine
 
+pytestmark = pytest.mark.requires_pg
+
 
 @pytest.fixture(scope="module")
 def engine():

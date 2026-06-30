@@ -43,6 +43,7 @@ def read_session(engine):
     s.close()
 
 
+@pytest.mark.requires_pg
 class TestUnitOfWork:
     def test_enter_exit_commits(self, engine, read_session):
         from sqlalchemy.orm import sessionmaker
