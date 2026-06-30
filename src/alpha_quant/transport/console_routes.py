@@ -181,7 +181,18 @@ async def get_risk(
     book_id: str | None = Query(None),
     svc: RiskService = svc_depends(RiskService),
 ):
-    return svc.summary(book_id=book_id)
+    result = svc.summary(book_id=book_id)
+    result["explanation_status"] = "unavailable"
+    return result
+
+
+@router.get("/risk/explanations")
+async def get_risk_explanations():
+    from alpha_quant.application.query.scorecards import get_explanations
+
+    items = get_explanations("", scope="risk_overall")
+    overall = items + get_explanations("", scope="risk_category")
+    return {"items": overall}
 
 
 @router.get("/runs")
@@ -303,7 +314,12 @@ def _synthetic_narrative(sc: Any, modules: list[dict[str, object]]) -> dict[str,
 async def get_scorecard(scorecard_id: str):
     from fastapi import HTTPException
 
-    from alpha_quant.application.query.scorecards import get_scorecard as _get
+    from alpha_quant.application.query.scorecards import (
+        get_explanations,
+    )
+    from alpha_quant.application.query.scorecards import (
+        get_scorecard as _get,
+    )
 
     sc = _get(scorecard_id)
     if sc is None:
@@ -312,6 +328,14 @@ async def get_scorecard(scorecard_id: str):
     narrative = _synthetic_narrative(sc, modules)
     total = sc.total_score or 0
     rank_str = _derive_rank(total)
+
+    # Determine explanation status
+    exps = get_explanations(scorecard_id)
+    exp_status = "unavailable"
+    if exps:
+        stale = all(e.get("stale", False) for e in exps)
+        exp_status = "stale" if stale else "current"
+
     return {
         "scorecard_id": sc.scorecard_id,
         "symbol": sc.symbol,
@@ -338,11 +362,36 @@ async def get_scorecard(scorecard_id: str):
         ],
         "modules": modules,
         "narrative": narrative,
+        "explanation_status": exp_status,
         "execution": [],
         "portfolio_fit": [],
         "invalidations": [],
         "changed_since": [],
     }
+
+
+@router.get("/scorecards/{scorecard_id}/explanations")
+async def get_scorecard_explanations(scorecard_id: str):
+    from alpha_quant.application.query.scorecards import get_explanations
+
+    items = get_explanations(scorecard_id)
+    if not items:
+        from fastapi import HTTPException
+
+        raise HTTPException(404, "No explanations found for this scorecard")
+    return {"items": items}
+
+
+@router.get("/scorecards/{scorecard_id}/explanations/{scope}")
+async def get_scorecard_explanations_by_scope(scorecard_id: str, scope: str):
+    from alpha_quant.application.query.scorecards import get_explanations
+
+    items = get_explanations(scorecard_id, scope=scope)
+    if not items:
+        from fastapi import HTTPException
+
+        raise HTTPException(404, f"No explanations found for scope {scope}")
+    return {"items": items}
 
 
 @router.get("/symbols/{symbol}/scorecard")
