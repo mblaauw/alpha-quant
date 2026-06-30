@@ -250,7 +250,16 @@ window.addEventListener("bookchange", renderAdvice);
 function buildPage(data, portfolio) {
   const items = data.items || [];
   if (!items.length) return emptyState("No advice for today. Run a decision cycle first.") + `<div style="text-align:center;margin-top:16px"><button class="btn btn-primary" onclick="document.getElementById('run-btn').click()">Run decision cycle</button></div>`;
-  const cards = items.map(i => buildCard(i)).join("");
+
+  // Group by recommendation per ADR-0054
+  const actionRecs = ["add", "consider_entry", "reduce", "exit", "blocked"];
+  const overviewRecs = ["hold", "watch"];
+  const actions = items.filter(i => actionRecs.includes(i.recommendation));
+  const overview = items.filter(i => overviewRecs.includes(i.recommendation));
+  const noAction = items.filter(i => i.recommendation === "do_nothing");
+
+  const section = (title, sub, recs, collapsed) => recs.length ? `<div class="sec-head" style="margin-top:16px"><div class="sec-title">${title}</div><span class="sec-sub">${sub}</span></div>
+    <div class="adv-section${collapsed ? ' adv-collapsed' : ''}">${recs.map(i => buildCard(i)).join("")}</div>` : "";
 
   const p = portfolio || {};
   const posCount = p.positions_count || items.length;
@@ -264,8 +273,9 @@ function buildPage(data, portfolio) {
     <div class="metric"><span class="metric-label">Buying power</span><span class="metric-value">${fmtCurrency(p.cash || 64226)}</span><span class="metric-sub">cash available</span></div>
     <div class="metric"><span class="metric-label">Today's risk used</span><span class="metric-value">0.0%</span><span class="metric-sub">of 2.0% daily cap</span></div>
   </div>
-  <div class="sec-head"><div class="sec-title">Today's advice — portfolio actions</div><span class="sec-sub">${items.length} actionable · latest run</span></div>
-  ${cards}`;
+  ${section("Portfolio actions", "needs attention", actions)}
+  ${section("Portfolio overview", "on hold or watching", overview)}
+  ${section("No action needed", "do nothing recommendations", noAction, true)}`;
 }
 
 function wire(items) {

@@ -94,6 +94,9 @@ html, body { background: var(--aq-bg); color: var(--aq-ink); font-family: var(--
 .sec-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:13px; flex-wrap:wrap; }
 .sec-title { font-family:var(--aq-serif); font-size:18px; font-weight:600; color:var(--aq-ink); }
 .sec-title .sub { font-family:var(--aq-mono); font-size:12px; font-weight:400; color:var(--aq-ink3); }
+.adv-section { margin-bottom:8px; }
+.adv-collapsed { max-height:0; overflow:hidden; opacity:0; transition:max-height 0.3s ease, opacity 0.3s ease; }
+.adv-section:not(.adv-collapsed) + .sec-head { margin-top:8px; }
 .sec-note { font-family:var(--aq-mono); font-size:10px; color:var(--aq-ink3); }
 .sec-note b { color:var(--aq-down); font-weight:700; }
 

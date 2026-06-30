@@ -7,12 +7,14 @@ export function showModal(title, body, actions) {
   document.getElementById("modal-body").innerHTML = body;
   const el = document.getElementById("modal-actions");
   el.innerHTML = "";
-  actions.forEach((a) => {
+  actions.forEach((a, i) => {
     const b = document.createElement("button");
     b.className = a.class || "btn";
     b.textContent = a.label;
     b.onclick = a.onclick;
     el.appendChild(b);
+    // Focus the first action button when modal opens
+    if (i === 0) setTimeout(() => b.focus(), 100);
   });
   document.getElementById("modal").showModal();
 }
