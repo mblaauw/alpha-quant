@@ -24,6 +24,7 @@ from alpha_quant.contracts.operational import (
     PortfolioMark,
     PortfolioState,
     PositionCurrent,
+    RiskEvent,
     RunReservation,
     RunStatus,
     Strategy,
@@ -100,6 +101,7 @@ class FakeOperationalStore:
         self._config: dict[str, str] = {}
         self._security_refs: dict[str, str] = {}
         self._risk_policies: dict[str, RiskPolicy] = {}
+        self._risk_events: list[RiskEvent] = []
 
     @property
     def session(self) -> _FakeSession:
@@ -607,3 +609,6 @@ class FakeOperationalStore:
 
     def save_risk_policy_version(self, policy: RiskPolicy) -> None:
         self._risk_policies[policy.version_label] = policy
+
+    def write_risk_event(self, event: RiskEvent) -> None:
+        self._risk_events.append(event)

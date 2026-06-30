@@ -8,6 +8,7 @@ from __future__ import annotations
 import math
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 from alpha_quant.application.risk.component import component_var
 from alpha_quant.application.risk.concentration import compute_all as compute_concentration
@@ -18,7 +19,8 @@ from alpha_quant.application.risk.liquidity import compute_all as compute_liquid
 from alpha_quant.application.risk.posture import derive_posture
 from alpha_quant.application.risk.scenarios import compute_all as compute_scenarios
 from alpha_quant.application.risk.var import compute_all as compute_var
-from alpha_quant.domain.risk import RiskPolicy
+from alpha_quant.contracts.operational import HaltCommand, HaltReason, RiskEvent
+from alpha_quant.domain.risk import RiskAction, RiskDecision, RiskPolicy
 
 
 def _round(value: float, digits: int = 4) -> float:
@@ -61,6 +63,135 @@ def _estimate_adv_map(positions: list[Any]) -> dict[str, float]:
         notional = p.shares * p.current_price
         adv_map[p.symbol] = max(notional / 0.02, 1_000_000.0)
     return adv_map
+
+
+def decide(
+    events: list[dict[str, Any]],
+    halted: bool = False,
+    requested_qty: int | None = None,
+) -> list[RiskDecision]:
+    """Translate risk events into decisions.
+
+    crit breach → HALT (or BLOCK if already halted)
+    warn breach → REDUCE (with resized qty scaled inversely to utilization)
+    no breach → ALLOW
+    """
+    decisions: list[RiskDecision] = []
+    has_crit = False
+
+    for event in events:
+        severity = event.get("severity", "info")
+        title = event.get("title", "")
+        detail = event.get("detail", "")
+        util = event.get("utilization", 0.0)
+
+        if severity == "crit" and not has_crit:
+            has_crit = True
+            if not halted:
+                decisions.append(
+                    RiskDecision(
+                        action=RiskAction.HALT,
+                        reason=f"{title}: {detail}",
+                        limit_name=title,
+                        current_value=detail,
+                        limit_value=detail,
+                    )
+                )
+            else:
+                decisions.append(
+                    RiskDecision(
+                        action=RiskAction.BLOCK,
+                        reason=f"{title}: {detail} (already halted)",
+                        limit_name=title,
+                    )
+                )
+
+        elif severity == "warn" and not has_crit:
+            reduction = 1.0 - min(util, 1.0)
+            resized = int(requested_qty * (1.0 - reduction * 0.5)) if requested_qty else None
+            decisions.append(
+                RiskDecision(
+                    action=RiskAction.REDUCE,
+                    reason=f"{title}: {detail}",
+                    limit_name=title,
+                    resized_quantity=max(1, resized) if resized else None,
+                )
+            )
+
+    if not decisions:
+        decisions.append(
+            RiskDecision(
+                action=RiskAction.ALLOW,
+                reason="All limits within policy",
+            )
+        )
+
+    return decisions
+
+
+def process_risk_decisions(
+    decisions: list[RiskDecision],
+    store: Any,
+    book_id: str | None = None,
+    run_id: str | None = None,
+) -> None:
+    """Execute risk decisions: write risk_events and set halts.
+
+    For each decision:
+      HALT → write risk_event + set_halt
+      BLOCK → write risk_event (blocked by existing halt)
+      REDUCE → write risk_event (warning)
+      ALLOW → no-op
+    """
+    from uuid import uuid4
+
+    now = datetime.now(UTC)
+    decision_run_id = UUID(run_id) if run_id else UUID(int=0)
+    bid = UUID(book_id) if book_id else UUID(int=0)
+
+    for d in decisions:
+        if d.action == RiskAction.HALT:
+            store.write_risk_event(
+                RiskEvent(
+                    risk_event_id=uuid4(),
+                    decision_run_id=decision_run_id,
+                    event_type=f"limit.{d.limit_name.lower().replace(' ', '_')}.breach",
+                    severity="crit",
+                    details_json=f'{{"message": "{d.reason}", "action": "halt"}}',
+                    created_at=now,
+                )
+            )
+            store.set_halt(
+                HaltCommand(
+                    portfolio_book_id=bid,
+                    reason=HaltReason.MANUAL,
+                    details=d.reason,
+                )
+            )
+
+        elif d.action == RiskAction.BLOCK:
+            store.write_risk_event(
+                RiskEvent(
+                    risk_event_id=uuid4(),
+                    decision_run_id=decision_run_id,
+                    event_type=f"limit.{d.limit_name.lower().replace(' ', '_')}.breach",
+                    severity="crit",
+                    details_json=f'{{"message": "{d.reason}", "action": "block"}}',
+                    created_at=now,
+                )
+            )
+
+        elif d.action == RiskAction.REDUCE:
+            store.write_risk_event(
+                RiskEvent(
+                    risk_event_id=uuid4(),
+                    decision_run_id=decision_run_id,
+                    event_type=f"limit.{d.limit_name.lower().replace(' ', '_')}.warning",
+                    severity="warn",
+                    details_json=f'{{"message": "{d.reason}", "action": "reduce"}}',
+                    created_at=now,
+                )
+            )
 
 
 class RiskEngine:
@@ -174,7 +305,10 @@ class RiskEngine:
             limits=policy,
         )
 
-        events = generate_events(limits, inputs.halt_active)
+        events = generate_events(limits, inputs.halt_active, warn_threshold=policy.warn_threshold)
+
+        # Risk decisions
+        decisions = decide(events, inputs.halt_active)
 
         # Posture
         posture = derive_posture(events, inputs.halt_active, inputs.halt_details)
@@ -216,6 +350,7 @@ class RiskEngine:
             "liquidity": liquidity,
             "limits": limits,
             "events": events,
+            "decisions": [d.model_dump(mode="json") for d in decisions],
             "positions_count": len(inputs.positions),
             "near_stop": [],
         }
@@ -295,6 +430,9 @@ class RiskEngine:
                     "at": datetime.now(UTC).strftime("%H:%M"),
                     "detail": "Open a position to see risk dashboard data.",
                 }
+            ],
+            "decisions": [
+                RiskDecision(action=RiskAction.ALLOW, reason="No positions").model_dump(mode="json")
             ],
             "positions_count": 0,
             "near_stop": [],
