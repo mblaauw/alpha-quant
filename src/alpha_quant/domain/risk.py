@@ -71,6 +71,10 @@ class RiskPolicy(FrozenModel):
     hist_window_days: int = Field(default=500, ge=10, le=2000)
     mc_paths: int = Field(default=10000, ge=100, le=1_000_000)
 
+    component_weights_json: str = Field(
+        default="", description="JSON override for scorecard component weights"
+    )
+
 
 class RiskCalculation(FrozenModel):
     """Result of a single risk method computation.

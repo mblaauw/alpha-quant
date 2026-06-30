@@ -428,3 +428,58 @@ class TestGenerateScorecards:
         result1 = generate_scorecards({"AAPL": bundle}, portfolio, strategy_version_id="sv-1")
         result2 = generate_scorecards({"AAPL": bundle}, portfolio, strategy_version_id="sv-1")
         assert result1[0].config_hash == result2[0].config_hash
+
+
+class TestScorecardProperties:
+    """Property-based invariants for scorecard engine."""
+
+    def test_scores_in_range(self) -> None:
+        """All component scores must be ∈ [0, 100]."""
+        bundle = _make_bundle("AAPL", readouts=[_r("close", 110), _r("sma_50", 100)])
+        portfolio = PortfolioContext(equity=100000, cash=50000, regime="RISK_ON")
+        result = generate_scorecards({"AAPL": bundle}, portfolio, strategy_version_id="sv-1")[0]
+        for comp in result.components:
+            assert 0.0 <= comp.score <= 100.0, f"{comp.name} score {comp.score} ∉ [0, 100]"
+
+    def test_scores_in_range_risk_off(self) -> None:
+        """All component scores still ∈ [0, 100] under RISK_OFF."""
+        bundle = _make_bundle("AAPL", readouts=[_r("close", 110), _r("sma_50", 100)])
+        portfolio = PortfolioContext(equity=100000, cash=50000, regime="RISK_OFF")
+        result = generate_scorecards({"AAPL": bundle}, portfolio, strategy_version_id="sv-1")[0]
+        for comp in result.components:
+            assert 0.0 <= comp.score <= 100.0, f"{comp.name} score {comp.score} ∉ [0, 100]"
+
+    def test_risk_off_lowers_scores(self) -> None:
+        """RISK_OFF scores must be ≤ same-input RISK_ON scores."""
+        bundle = _make_bundle("AAPL", readouts=[_r("close", 110), _r("sma_50", 100)])
+        on_result = generate_scorecards(
+            {"AAPL": bundle},
+            PortfolioContext(equity=100000, cash=50000, regime="RISK_ON"),
+            strategy_version_id="sv-1",
+        )[0]
+        off_result = generate_scorecards(
+            {"AAPL": bundle},
+            PortfolioContext(equity=100000, cash=50000, regime="RISK_OFF"),
+            strategy_version_id="sv-1",
+        )[0]
+        on_scores = {c.name: c.score for c in on_result.components}
+        off_scores = {c.name: c.score for c in off_result.components}
+        for name in on_scores:
+            assert off_scores[name] <= on_scores[name], (
+                f"{name} RISK_OFF ({off_scores[name]}) > RISK_ON ({on_scores[name]})"
+            )
+
+    def test_total_score_non_negative(self) -> None:
+        """Total score must be ≥ 0."""
+        bundle = _make_bundle("AAPL", readouts=[_r("close", 110), _r("sma_50", 100)])
+        portfolio = PortfolioContext(equity=100000, cash=50000)
+        result = generate_scorecards({"AAPL": bundle}, portfolio, strategy_version_id="sv-1")[0]
+        assert result.total_score >= 0
+
+    def test_config_hash_deterministic(self) -> None:
+        """Same inputs produce same config_hash."""
+        bundle = _make_bundle("AAPL", readouts=[_r("close", 110), _r("sma_50", 100)])
+        portfolio = PortfolioContext(equity=100000, cash=50000)
+        r1 = generate_scorecards({"AAPL": bundle}, portfolio, strategy_version_id="sv-1")[0]
+        r2 = generate_scorecards({"AAPL": bundle}, portfolio, strategy_version_id="sv-1")[0]
+        assert r1.config_hash == r2.config_hash

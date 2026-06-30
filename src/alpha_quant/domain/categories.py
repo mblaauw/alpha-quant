@@ -41,9 +41,9 @@ M_CATEGORY: dict[str, tuple[str, str, str]] = {
     # M8 — Rank & selection
     "Rank": ("M8", "score", "Is this the best remaining use of risk budget?"),
     "Ranking": ("M8", "score", "Is this the best remaining use of risk budget?"),
-    # Fallback mappings for scorecard engine categories not directly in M1-M8
-    "portfolio": ("", "score", ""),
-    "data": ("", "score", ""),
+    # Portfolio and data quality mapped to M1 (universe/investability gate) and M8 (selection)
+    "portfolio": ("M8", "score", "How does this fit in the portfolio?"),
+    "data": ("M1", "hard", "Is the data fresh enough to trade?"),
 }
 
 M_NAMES: dict[str, str] = {
