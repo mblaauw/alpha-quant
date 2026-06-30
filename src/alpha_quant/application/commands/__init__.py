@@ -478,9 +478,11 @@ def candidate_modify_handler(cmd: Command) -> tuple[CommandStatus, str | None, s
                     decision_run_id=UUID(int=0),
                     event_type="trade.blocked.halt_active",
                     severity="crit",
-                    details_json=(
-                        '{"message": "Trade blocked — halt active: '
-                        f'{current_halt.reason}", "symbol": "{symbol_input}"}}'
+                    details_json=json.dumps(
+                        {
+                            "message": f"Trade blocked — halt active: {current_halt.reason}",
+                            "symbol": symbol_input,
+                        }
                     ),
                     created_at=datetime.now(UTC),
                 )
