@@ -5,6 +5,7 @@ WS10 of the real risk engine epic (#612).
 
 from __future__ import annotations
 
+import json
 import math
 from datetime import UTC, datetime
 from typing import Any
@@ -163,9 +164,8 @@ def process_risk_decisions(
                     decision_run_id=decision_run_id,
                     event_type=f"limit.{d.limit_name.lower().replace(' ', '_')}.breach",
                     severity="crit",
-                    details_json=(
-                        f'{{"message": "{d.reason}", "action": "halt",'
-                        f' "policy_version": "{d.policy_version}"}}'
+                    details_json=json.dumps(
+                        {"message": d.reason, "action": "halt", "policy_version": d.policy_version}
                     ),
                     created_at=now,
                 )
@@ -185,9 +185,8 @@ def process_risk_decisions(
                     decision_run_id=decision_run_id,
                     event_type=f"limit.{d.limit_name.lower().replace(' ', '_')}.breach",
                     severity="crit",
-                    details_json=(
-                        f'{{"message": "{d.reason}", "action": "block",'
-                        f' "policy_version": "{d.policy_version}"}}'
+                    details_json=json.dumps(
+                        {"message": d.reason, "action": "block", "policy_version": d.policy_version}
                     ),
                     created_at=now,
                 )
@@ -200,9 +199,12 @@ def process_risk_decisions(
                     decision_run_id=decision_run_id,
                     event_type=f"limit.{d.limit_name.lower().replace(' ', '_')}.warning",
                     severity="warn",
-                    details_json=(
-                        f'{{"message": "{d.reason}", "action": "reduce",'
-                        f' "policy_version": "{d.policy_version}"}}'
+                    details_json=json.dumps(
+                        {
+                            "message": d.reason,
+                            "action": "reduce",
+                            "policy_version": d.policy_version,
+                        }
                     ),
                     created_at=now,
                 )

@@ -370,10 +370,23 @@ class PostgresOperationalStore:
         )
 
     def clear_halt(self, book_id: UUID) -> None:
+        row = self.session.execute(
+            text("SELECT reason, details, halted_at FROM ops.current_halt WHERE book_id = :bid"),
+            {"bid": str(book_id)},
+        ).fetchone()
         self.session.execute(
             text("UPDATE ops.current_halt SET halted = FALSE WHERE book_id = :bid"),
             {"bid": str(book_id)},
         )
+        if row:
+            self.session.execute(
+                text("""
+                    UPDATE audit.halt_transition
+                    SET resumed_at = NOW()
+                    WHERE portfolio_book_id = :bid AND resumed_at IS NULL
+                """),
+                {"bid": str(book_id)},
+            )
 
     def current_halt(self, book_id: UUID) -> CurrentHalt | None:
         row = self.session.execute(
