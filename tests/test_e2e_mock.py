@@ -99,8 +99,10 @@ class TestE2EMock:
         advice_count = len(store._advice_artifacts)
 
         assert advice_count > 0, "No advice artifacts produced"
-        assert advice_count == len(scorecards), (
-            f"Advice count {advice_count} != scorecard count {len(scorecards)}"
+        # Each scorecard produces 1 overall advice + 1 overall explanation + N stage explanations
+        assert advice_count >= len(scorecards) * 3, (
+            f"Expected at least {len(scorecards) * 3} advice artifacts (1 overall + 1 explanation + stages)"
+            f" per scorecard, got {advice_count}"
         )
 
         for artifact in store._advice_artifacts.values():
@@ -109,6 +111,16 @@ class TestE2EMock:
             )
             assert artifact.recommendation is not None
             assert artifact.recommendation.headline, "Advice missing headline"
+
+        # Verify stage explanations exist
+        stage_artifacts = [
+            a for a in store._advice_artifacts.values() if a.scope == "scorecard_stage"
+        ]
+        assert len(stage_artifacts) > 0, "No stage explanation artifacts produced"
+        for sa in stage_artifacts:
+            assert sa.scope_id in ("M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8"), (
+                f"Invalid stage scope_id: {sa.scope_id}"
+            )
             assert artifact.recommendation.summary, "Advice missing summary"
             assert artifact.deterministic_differs is not None
 

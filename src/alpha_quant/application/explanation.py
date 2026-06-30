@@ -1,0 +1,238 @@
+"""ExplanationService — generates per-stage and overall LLM explanations for scorecards."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from datetime import UTC, datetime
+from typing import Any
+
+from alpha_quant.application.prompts import (
+    ALLOWED_ACTIONS,
+    PROMPT_VERSION,
+    scorecard_overall_prompt,
+    scorecard_stage_prompt,
+)
+from alpha_quant.domain.advice import (
+    AdviceArtifact,
+    AdviceRecommendation,
+    ExplanationScope,
+)
+from alpha_quant.domain.categories import module_from_component
+from alpha_quant.domain.scorecard import Recommendation, Scorecard, ScorecardComponent
+from alpha_quant.ports.llm import LLM
+
+_MAX_RETRIES = 2
+
+
+class ExplanationService:
+    """Generates structured LLM explanations for scorecard stages and overall results.
+
+    Produces one AdviceArtifact per M-stage (M1-M8), one overall scorecard
+    explanation, and one final deterministic output explanation.
+    """
+
+    def __init__(self, llm: LLM, prompt_version: str = PROMPT_VERSION) -> None:
+        self._llm = llm
+        self._prompt_version = prompt_version
+
+    def generate_stage_explanations(
+        self,
+        scorecard: Scorecard,
+    ) -> list[AdviceArtifact]:
+        """Generate one explanation per M-stage (M1-M8)."""
+        now = datetime.now(UTC)
+        artifacts: list[AdviceArtifact] = []
+        seen_mids: set[str] = set()
+
+        for component in scorecard.components:
+            module = module_from_component(component)
+            mid = module.get("id", "")
+            if not mid or mid in seen_mids:
+                continue
+            seen_mids.add(mid)
+
+            stage_context = self._build_stage_context(component, module, scorecard)
+            prompt = scorecard_stage_prompt(stage_context)
+            rec, status = self._call_llm_with_retry(prompt, scorecard.recommendation)
+            input_json = json.dumps(stage_context, indent=2, default=str)
+            input_hash = hashlib.sha256(input_json.encode()).hexdigest()[:16]
+            output_json = json.dumps(
+                rec.model_dump() if hasattr(rec, "model_dump") else {}, default=str
+            )
+            output_hash = hashlib.sha256(output_json.encode()).hexdigest()[:16]
+
+            artifacts.append(
+                AdviceArtifact(
+                    scorecard_id=scorecard.scorecard_id,
+                    scope=ExplanationScope.scorecard_stage,
+                    scope_id=mid,
+                    llm_provider=getattr(self._llm, "_provider", ""),
+                    llm_model=getattr(self._llm, "_model", ""),
+                    prompt_version=self._prompt_version,
+                    input_hash=input_hash,
+                    output_hash=output_hash,
+                    validation_status=status,
+                    recommendation=rec,
+                    deterministic_differs=False,
+                    created_at=now,
+                )
+            )
+
+        return artifacts
+
+    def generate_scorecard_explanation(
+        self,
+        scorecard: Scorecard,
+    ) -> AdviceArtifact:
+        """Generate an overall explanation for a complete scorecard."""
+        now = datetime.now(UTC)
+        context = self._build_scorecard_context(scorecard)
+        prompt = scorecard_overall_prompt(context)
+        rec, status = self._call_llm_with_retry(prompt, scorecard.recommendation)
+
+        input_json = json.dumps(context, indent=2, default=str)
+        input_hash = hashlib.sha256(input_json.encode()).hexdigest()[:16]
+        output_json = json.dumps(
+            rec.model_dump() if hasattr(rec, "model_dump") else {}, default=str
+        )
+        output_hash = hashlib.sha256(output_json.encode()).hexdigest()[:16]
+
+        return AdviceArtifact(
+            scorecard_id=scorecard.scorecard_id,
+            scope=ExplanationScope.scorecard_overall,
+            llm_provider=getattr(self._llm, "_provider", ""),
+            llm_model=getattr(self._llm, "_model", ""),
+            prompt_version=self._prompt_version,
+            input_hash=input_hash,
+            output_hash=output_hash,
+            validation_status=status,
+            recommendation=rec,
+            deterministic_differs=False,
+            created_at=now,
+        )
+
+    def _build_stage_context(
+        self,
+        component: ScorecardComponent,
+        module: dict[str, Any],
+        scorecard: Scorecard,
+    ) -> dict[str, Any]:
+        return {
+            "id": module.get("id", ""),
+            "name": module.get("name", component.name),
+            "type": module.get("type", "score"),
+            "question": module.get("question", ""),
+            "score": component.score,
+            "state": component.state.value,
+            "reason": component.reason,
+            "metrics": module.get("metrics", []),
+            "total_score": scorecard.total_score,
+            "recommendation": scorecard.recommendation.value,
+            "symbol": scorecard.symbol,
+        }
+
+    def _build_scorecard_context(self, scorecard: Scorecard) -> dict[str, Any]:
+        stages = []
+        seen_mids: set[str] = set()
+        for component in scorecard.components:
+            module = module_from_component(component)
+            mid = module.get("id", "")
+            if not mid or mid in seen_mids:
+                continue
+            seen_mids.add(mid)
+            stages.append(
+                {
+                    "id": mid,
+                    "name": module.get("name", component.name),
+                    "type": module.get("type", ""),
+                    "score": component.score,
+                    "state": component.state.value,
+                    "passed": component.passed,
+                }
+            )
+
+        return {
+            "symbol": scorecard.symbol,
+            "total_score": scorecard.total_score,
+            "recommendation": scorecard.recommendation.value,
+            "confidence": scorecard.confidence,
+            "data_quality": scorecard.data_quality.value,
+            "stages": stages,
+            "facts_hash": scorecard.facts_hash,
+            "config_hash": scorecard.config_hash,
+            "strategy_version": scorecard.strategy_version,
+        }
+
+    def _call_llm_with_retry(
+        self,
+        prompt: str,
+        fallback_rec: Recommendation,
+    ) -> tuple[AdviceRecommendation, str]:
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                response = self._llm.explain(prompt)
+                parsed = self._parse_llm_response(response)
+                if parsed is not None:
+                    status = self._validate_recommendation(parsed)
+                    return parsed, status
+            except Exception:
+                if attempt == _MAX_RETRIES:
+                    fb = self._fallback_recommendation(fallback_rec)
+                    return fb, "failed"
+        fb = self._fallback_recommendation(fallback_rec)
+        return fb, "failed"
+
+    @staticmethod
+    def _validate_recommendation(rec: AdviceRecommendation) -> str:
+        if rec.recommendation.value not in ALLOWED_ACTIONS:
+            return "failed"
+        if rec.confidence_label not in ("low", "medium", "high"):
+            return "failed"
+        return "verified"
+
+    def _parse_llm_response(self, raw: str) -> AdviceRecommendation | None:
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("```")[1]
+            if cleaned.startswith("json"):
+                cleaned = cleaned[4:]
+        cleaned = cleaned.strip()
+
+        try:
+            data = json.loads(cleaned)
+        except json.JSONDecodeError:
+            return None
+
+        if not isinstance(data, dict):
+            return None
+
+        try:
+            return AdviceRecommendation(
+                recommendation=data.get("recommended_action", Recommendation.do_nothing.value),
+                confidence_label=data.get("confidence_label", "medium"),
+                headline=data.get("headline", ""),
+                summary=data.get("summary", ""),
+                interpretation=data.get("interpretation", ""),
+                educational_context=data.get("educational_context", ""),
+                key_reasons=data.get("key_reasons", []),
+                key_evidence=data.get("key_evidence", []),
+                key_caveats=data.get("key_caveats", []),
+                main_risks=data.get("main_risks", []),
+                data_quality_notes=data.get("data_quality_notes", ""),
+                decision_context=data.get("decision_context", ""),
+                what_changed=data.get("what_changed_since_previous_run", []),
+                what_could_change=data.get("what_could_change", []),
+                override_guidance=data.get("override_guidance", []),
+            )
+        except (ValueError, TypeError):  # fmt: skip
+            return None
+
+    @staticmethod
+    def _fallback_recommendation(rec: Recommendation) -> AdviceRecommendation:
+        return AdviceRecommendation(
+            recommendation=rec,
+            confidence_label="low",
+            headline=f"Deterministic recommendation: {rec.value}",
+            summary="LLM explanation unavailable; showing deterministic result.",
+        )
