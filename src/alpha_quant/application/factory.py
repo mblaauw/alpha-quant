@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from sqlalchemy import Engine
     from sqlalchemy.orm import Session, sessionmaker
 
+    from alpha_quant.adapters.fake.unit_of_work import FakeUnitOfWork
     from alpha_quant.application.query.freshness import FreshnessService
 
 from alpha_quant.application.config import AppConfig, FreshnessConfig
@@ -95,8 +96,17 @@ def _get_engine(url: str) -> Engine:
 # -- Factory functions for the PostgreSQL operational store --
 
 
-def create_unit_of_work(database_url: str | None = None) -> OperationalUnitOfWork:
-    """Create an OperationalUnitOfWork backed by PostgreSQL."""
+def create_unit_of_work(
+    database_url: str | None = None,
+    store_mode: str = "postgres",
+) -> OperationalUnitOfWork | FakeUnitOfWork:
+    """Create a unit of work backed by PostgreSQL ('postgres') or in-memory ('fake')."""
+    if store_mode == "fake":
+        from alpha_quant.adapters.fake.operational_store import FakeOperationalStore
+        from alpha_quant.adapters.fake.unit_of_work import FakeUnitOfWork
+
+        return FakeUnitOfWork(FakeOperationalStore())
+
     from sqlalchemy.orm import sessionmaker
 
     url = database_url or DEFAULT_DATABASE_URL
