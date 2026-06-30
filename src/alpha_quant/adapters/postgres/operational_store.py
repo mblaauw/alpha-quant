@@ -16,6 +16,7 @@ from alpha_quant.contracts.operational import (
     Command,
     CommandEnvelope,
     CommandStatus,
+    CorporateActionBooking,
     CurrentHalt,
     DecisionBatch,
     DecisionRun,
@@ -1015,6 +1016,33 @@ class PostgresOperationalStore:
                 "details": event.details_json,
                 "now": event.created_at,
             },
+        )
+
+    def write_corporate_action_booking(self, booking: CorporateActionBooking) -> None:
+        self.session.execute(
+            text(
+                "INSERT INTO trade.corporate_action_booking "
+                "(booking_id, portfolio_book_id, security_id, action_type, effective_date, ratio, amount) "
+                "VALUES (:bid, :pbid, :sid, :at, :ed, :ratio, :amt)"
+            ),
+            {
+                "bid": str(booking.booking_id),
+                "pbid": str(booking.portfolio_book_id),
+                "sid": str(booking.security_id),
+                "at": booking.action_type,
+                "ed": booking.effective_date,
+                "ratio": booking.ratio,
+                "amt": booking.amount,
+            },
+        )
+
+    def write_run_lock_audit(self, run_key: str, action: str) -> None:
+        self.session.execute(
+            text(
+                "INSERT INTO ops.run_lock_audit (lock_id, run_key, action, created_at) "
+                "VALUES (:lid, :rk, :act, NOW())"
+            ),
+            {"lid": str(uuid4()), "rk": run_key, "act": action},
         )
 
     # --- Commands ---
