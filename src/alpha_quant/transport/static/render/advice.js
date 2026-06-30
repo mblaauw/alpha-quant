@@ -210,7 +210,7 @@ function buildTicket(ticket, sizing) {
     <div class="tk-metrics">
       <div class="tk-metric"><div class="ml">Notional</div><div class="mv">${fmtCurrency(notional)}</div><div class="ms">${pct1(notional / equity)} of equity</div></div>
       <div class="tk-metric"><div class="ml">Stop price</div><div class="mv">${price(sizing.stop_price)}</div><div class="ms">−${price(sizing.stop_distance)} (${pct1(sizing.stop_distance / sizing.last_price)})</div></div>
-      <div class="tk-metric"><div class="ml">Risk at stop</div><div class="mv" data-tone="${riskAtStop > equity * 0.01 ? "warn" : ""}">${fmtCurrency(riskAtStop)}</div><div class="ms">${pct1(riskAtStop / equity)} of equity · 1R</div></div>
+      <div class="tk-metric"><div class="ml">Risk at stop</div><div class="mv" data-tone="${equity && riskAtStop > equity * (sizing.per_trade_risk_cap || 0.01) ? "warn" : ""}">${fmtCurrency(riskAtStop)}</div><div class="ms">${equity ? pct1(riskAtStop / equity) : "—"} of equity · 1R</div></div>
       <div class="tk-metric"><div class="ml">Target 2R</div><div class="mv" data-tone="up">${price(targetPrice)}</div><div class="ms">+${fmtCurrency(targetGain)} if hit</div></div>
       <div class="tk-metric"><div class="ml">Buying power after</div><div class="mv" data-tone="${bpAfter < 0 ? "down" : ""}">${fmtCurrency(bpAfter)}</div><div class="ms">from ${fmtCurrency(sizing.buying_power)}</div></div>
       <div class="tk-metric"><div class="ml">Avg cost basis</div><div class="mv">${price(sizing.last_price)}</div><div class="ms">last Lake mark</div></div>
@@ -270,7 +270,7 @@ function buildPage(data, portfolio) {
   return `<div class="metric-strip">
     <div class="metric"><span class="metric-label">Open positions</span><span class="metric-value">${posCount}</span></div>
     <div class="metric"><span class="metric-label">Gross exposure</span><span class="metric-value">${fmtCurrency(ge)}</span><span class="metric-sub">${gePct}% of equity</span></div>
-    <div class="metric"><span class="metric-label">Buying power</span><span class="metric-value">${fmtCurrency(p.cash || 64226)}</span><span class="metric-sub">cash available</span></div>
+    <div class="metric"><span class="metric-label">Buying power</span><span class="metric-value">${p.cash ? fmtCurrency(p.cash) : "—"}</span><span class="metric-sub">cash available</span></div>
     <div class="metric"><span class="metric-label">Today's risk used</span><span class="metric-value">0.0%</span><span class="metric-sub">of 2.0% daily cap</span></div>
   </div>
   ${section("Portfolio actions", "needs attention", actions)}
