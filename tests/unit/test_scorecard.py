@@ -165,7 +165,7 @@ class TestAdviceArtifact:
             prompt_version="1.0",
             input_hash="abc123",
             output_hash="def456",
-            validation_status="valid",
+            validation_status="unverified",
             recommendation=AdviceRecommendation(
                 recommendation=Recommendation.add,
                 confidence_label="medium",
