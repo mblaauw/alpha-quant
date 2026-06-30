@@ -168,3 +168,45 @@ def get_position_advice(
         ]
 
     return with_uow(_query)
+
+
+def get_explanations(
+    scorecard_id: str,
+    scope: str | None = None,
+) -> list[dict[str, Any]]:
+    def _query(uow: Any) -> list[dict[str, Any]]:
+        artifacts = uow.store.load_advice_artifacts(
+            scope=scope or "",
+            scope_id="",
+        )
+        return [
+            {
+                "advice_id": a.advice_id,
+                "scope": a.scope,
+                "scope_id": a.scope_id,
+                "snapshot_id": a.snapshot_id,
+                "input_fingerprint": a.input_fingerprint,
+                "validation_status": a.validation_status,
+                "stale": a.stale,
+                "headline": a.recommendation.headline if a.recommendation else "",
+                "summary": a.recommendation.summary if a.recommendation else "",
+                "interpretation": a.recommendation.interpretation if a.recommendation else "",
+                "key_reasons": a.recommendation.key_reasons if a.recommendation else [],
+                "key_evidence": a.recommendation.key_evidence if a.recommendation else [],
+                "key_caveats": a.recommendation.key_caveats if a.recommendation else [],
+                "main_risks": a.recommendation.main_risks if a.recommendation else [],
+                "data_quality_notes": a.recommendation.data_quality_notes
+                if a.recommendation
+                else "",
+                "decision_context": a.recommendation.decision_context if a.recommendation else "",
+                "educational_context": a.recommendation.educational_context
+                if a.recommendation
+                else "",
+                "what_could_change": a.recommendation.what_could_change if a.recommendation else [],
+                "created_at": str(a.created_at) if a.created_at else None,
+            }
+            for a in artifacts
+            if a.scorecard_id == scorecard_id and (not scope or a.scope == scope)
+        ]
+
+    return with_uow(_query)
