@@ -169,6 +169,20 @@ def _score_technical_trend(bundle: FactsBundle) -> ScorecardComponent:
         weight=_COMPONENT_WEIGHTS["technical_trend"],
         passed=score >= 20,
         reason="; ".join(reasons) if reasons else "Neutral trend",
+        details_json=json.dumps(
+            {
+                "metrics": [
+                    {
+                        "k": "Trend Regime",
+                        "v": f"{trend_regime:.1f}" if trend_regime is not None else "—",
+                    },
+                    {
+                        "k": "Directional Bias",
+                        "v": f"{dir_bias:.1f}" if dir_bias is not None else "—",
+                    },
+                ]
+            }
+        ),
     )
 
 
@@ -227,6 +241,18 @@ def _score_momentum(bundle: FactsBundle) -> ScorecardComponent:
         weight=_COMPONENT_WEIGHTS["momentum"],
         passed=score >= 20,
         reason="; ".join(reasons) if reasons else "Neutral momentum",
+        details_json=json.dumps(
+            {
+                "metrics": [
+                    {"k": "RSI 14", "v": f"{rsi_14:.1f}" if rsi_14 is not None else "—"},
+                    {"k": "MACD Cross", "v": f"{macd_val:.2f}" if macd_val is not None else "—"},
+                    {
+                        "k": "Momentum Quality",
+                        "v": f"{quality:.1f}" if quality is not None else "—",
+                    },
+                ]
+            }
+        ),
     )
 
 
@@ -857,6 +883,95 @@ def _recommendation_from_score(
     return Recommendation.do_nothing
 
 
+# -- metrics enrichment --
+
+
+def _readout(bundle: FactsBundle, key: str) -> float | None:
+    return _readout_value(bundle, key)
+
+
+def _component_metrics(name: str, bundle: FactsBundle) -> list[dict[str, str]]:
+    """Return metrics list for a given component name based on bundle data."""
+    r = lambda k: _readout(bundle, k)  # noqa: E731
+    m = lambda k, v: {"k": k, "v": f"{v:.2f}" if v is not None else "—"}  # noqa: E731
+
+    registry: dict[str, list[dict[str, str]]] = {
+        "technical_trend": [
+            m("Trend Regime", r("trend.regime")),
+            m("Directional Bias", r("directional_bias")),
+        ],
+        "momentum": [
+            m("RSI 14", r("rsi_14")),
+            m("MACD Cross", r("macd_cross")),
+            m("Momentum Quality", r("quality")),
+        ],
+        "volatility": [
+            m("ATR %", r("atr_pct_14")),
+            m("Bollinger Width", r("bollinger_width")),
+            m("Vol Regime", r("volatility.regime")),
+        ],
+        "participation": [
+            m("Spread", r("spread_pct")),
+            m("Volume Z-Score", r("volume_zscore")),
+        ],
+        "relative_strength": [
+            m("RS vs SPY 20d", r("rs_vs_spy_20d")),
+            m("RS vs SPY 63d", r("rs_vs_spy_63d")),
+        ],
+        "fundamentals": [
+            {
+                "k": "PE",
+                "v": f"{_fundamental_value(bundle, 'pe_ratio'):.2f}"
+                if _fundamental_value(bundle, "pe_ratio") is not None
+                else "—",
+            },
+            {
+                "k": "PB",
+                "v": f"{_fundamental_value(bundle, 'pb_ratio'):.2f}"
+                if _fundamental_value(bundle, "pb_ratio") is not None
+                else "—",
+            },
+        ],
+        "event_risk": [
+            m("Earnings Days", r("earnings_days_away")),
+            m("Dividend Days", r("dividend_days_away")),
+        ],
+        "insider_activity": [
+            m("Insider Sentiment", r("insider.sentiment")),
+            m("Insider Net %", r("insider.net_pct")),
+        ],
+        "attention_crowding": [
+            m("Attention Score", r("attention.score")),
+            m("Mention Velocity", r("attention.velocity")),
+        ],
+        "portfolio_fit": [
+            {"k": "Portfolio Weight", "v": "—"},
+        ],
+        "position_risk": [
+            {"k": "Position Risk", "v": "—"},
+        ],
+        "cash_impact": [
+            {"k": "Cash Impact", "v": "—"},
+        ],
+        "data_quality": [
+            m("Readout Freshness", r("freshness.readout")),
+            m("Fundamental Freshness", r("freshness.fundamental")),
+        ],
+    }
+    return registry.get(name, [])
+
+
+def _enrich_components(
+    components: dict[str, ScorecardComponent], bundle: FactsBundle
+) -> dict[str, ScorecardComponent]:
+    """Add details_json metrics to each component based on bundle data."""
+    enriched: dict[str, ScorecardComponent] = {}
+    for name, comp in components.items():
+        metrics = _component_metrics(name, bundle)
+        enriched[name] = comp.model_copy(update={"details_json": json.dumps({"metrics": metrics})})
+    return enriched
+
+
 # -- main engine --
 
 
@@ -898,6 +1013,7 @@ def generate_scorecards(
         components["cash_impact"] = _score_cash_impact(symbol, portfolio)
         components["data_quality"] = _score_data_quality(bundle)
 
+        components = _enrich_components(components, bundle)
         _apply_gates(components, portfolio, today, symbol=symbol)
         total_score = _compute_total_score(list(components.values()), portfolio.regime)
 

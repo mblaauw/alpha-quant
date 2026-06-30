@@ -6,45 +6,7 @@ from alpha_quant.application.query.shared import (
     resolve_active_book_id,
     with_uow,
 )
-
-_M_CATEGORY = {
-    "Universe": ("M1", "hard"),
-    "Universe & Investability": ("M1", "hard"),
-    "Regime": ("M2", "soft"),
-    "Market Regime": ("M2", "soft"),
-    "Technical": ("M3", "score"),
-    "Technical Trend": ("M3", "score"),
-    "Fundamental": ("M4", "soft"),
-    "Fundamental Resilience": ("M4", "soft"),
-    "Insider": ("M5", "evidence"),
-    "Insider Behaviour": ("M5", "evidence"),
-    "Attention": ("M6", "soft"),
-    "Crowding": ("M6", "soft"),
-    "Event Risk": ("M7", "hard"),
-    "Known Event": ("M7", "hard"),
-    "Rank": ("M8", "score"),
-    "Ranking": ("M8", "score"),
-}
-_M_NAMES = {
-    "M1": "Universe & investability",
-    "M2": "Market regime & posture",
-    "M3": "Technical state & leadership",
-    "M4": "Fundamental resilience",
-    "M5": "Insider behaviour",
-    "M6": "Crowding & attention",
-    "M7": "Known event & gap risk",
-    "M8": "Rank & selection",
-}
-_M_QUESTIONS = {
-    "M1": "Can this security be traded?",
-    "M2": "Should long risk be deployed?",
-    "M3": "Is it a leader with a valid setup now?",
-    "M4": "Is there a fundamental reason to avoid it?",
-    "M5": "Is insider activity supportive?",
-    "M6": "Is attention making the entry unsafe?",
-    "M7": "Is event risk too large for normal risk controls?",
-    "M8": "Is this the best remaining use of risk budget?",
-}
+from alpha_quant.domain.categories import M_CATEGORY, M_NAMES, M_QUESTIONS
 
 
 class DecisionService:
@@ -156,15 +118,15 @@ class DecisionService:
     @staticmethod
     def _policy_to_module(p: dict[str, object]) -> dict[str, object]:
         name = str(p.get("policy_name", ""))
-        mid, mtype = _M_CATEGORY.get(name, ("", "score"))
+        mid, mtype, _ = M_CATEGORY.get(name, ("", "score", ""))
         passed = p.get("passed", True) is True
         state_tone = "ok" if passed else "bad"
         score_val = p.get("score")
         return {
             "id": mid,
-            "name": _M_NAMES.get(mid, name),
+            "name": M_NAMES.get(mid, name),
             "type": mtype,
-            "question": _M_QUESTIONS.get(mid, ""),
+            "question": M_QUESTIONS.get(mid, ""),
             "state": "PASS" if passed else "FAIL",
             "state_tone": state_tone,
             "score": round(float(score_val), 2) if score_val is not None else None,  # ty: ignore
