@@ -422,7 +422,7 @@ async def sizing_preview(req: SizingPreviewRequest):
         cash = float(portfolio.cash) if portfolio and portfolio.cash else 0.0
         positions = uow.store.list_positions(bid)
         total_mv = sum(float(p.market_value or 0) for p in positions)
-        equity = cash + total_mv if (cash + total_mv) > 0 else 350_000.0
+        equity = cash + total_mv if (cash + total_mv) > 0 else 0.0
         risk_pct = req.risk_pct if req.risk_pct else policy.default_risk_pct
 
         pos = next((p for p in positions if p.symbol == req.symbol), None)

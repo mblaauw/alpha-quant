@@ -60,7 +60,7 @@ def load_inputs(
 
         cash = float(portfolio.cash) if portfolio and portfolio.cash else 0.0
         total_mv = sum(float(p.market_value or 0) for p in positions_raw)
-        equity = cash + total_mv if (cash + total_mv) > 0 else 350_000.0
+        equity = cash + total_mv if (cash + total_mv) > 0 else 0.0
 
         # Build sector map from security_reference
         from sqlalchemy import text

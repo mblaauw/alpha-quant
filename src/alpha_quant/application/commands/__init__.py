@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -98,7 +99,7 @@ def _book_immediate_fill(
             "eid": str(uuid4()),
             "rid": None,
             "et": f"position.{symbol}.filled.{side}",
-            "pj": f'{{"symbol":"{symbol}","side":"{side}","quantity":{quantity}}}',  # noqa: E501
+            "pj": json.dumps({"symbol": symbol, "side": side, "quantity": quantity}),
             "now": now,
         },
     )
@@ -264,7 +265,7 @@ def reject_candidate_handler(cmd: Command) -> tuple[CommandStatus, str | None, s
                 "eid": str(uuid4()),
                 "rid": None,
                 "et": f"candidate.rejected{sym_part}",
-                "pj": f'{{"decision_id":"{decision_id}","symbol":"{symbol or ""}"}}',  # noqa: E501
+                "pj": json.dumps({"decision_id": decision_id, "symbol": symbol}),
                 "now": now,
             },
         )
@@ -340,7 +341,7 @@ def set_stop_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | Non
                 "eid": str(uuid4()),
                 "rid": None,
                 "et": f"position.{position_id}.stop_updated",
-                "pj": f'{{"symbol":"{position_id}","stop_price":{stop_price_raw}}}',
+                "pj": json.dumps({"symbol": position_id, "stop_price": stop_price_raw}),
                 "now": now,
             },
         )
@@ -503,7 +504,7 @@ def candidate_modify_handler(cmd: Command) -> tuple[CommandStatus, str | None, s
         positions = uow.store.list_positions(book_id)
         cash = float(portfolio.cash) if portfolio and portfolio.cash else 0.0
         total_mv = sum(float(p.market_value or 0) for p in positions)
-        equity = cash + total_mv if (cash + total_mv) > 0 else 350_000.0
+        equity = cash + total_mv if (cash + total_mv) > 0 else 0.0
 
         policy = RiskPolicy.default()
         risk_pct = risk_pct if risk_pct else policy.default_risk_pct
