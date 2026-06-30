@@ -280,6 +280,7 @@ class PaperFill(Base):
         CheckConstraint("quantity > 0", name="ck_paper_fill_quantity_positive"),
         CheckConstraint("price > 0", name="ck_paper_fill_price_positive"),
         Index("ix_paper_fill_security_id", "security_id"),
+        Index("ix_paper_fill_order_id", "order_id"),
         {"schema": "trade"},
     )
 
@@ -436,6 +437,7 @@ class Command(Base):
     __tablename__ = "command"
     __table_args__ = (
         UniqueConstraint("actor_id", "type", "idempotency_key", name="uq_command_idempotency"),
+        Index("ix_command_status", "status"),
         {"schema": "ops"},
     )
 
@@ -618,6 +620,7 @@ class PositionRiskCurrent(Base):
     time_stop_date: Mapped[datetime | None] = date_opt()
     auto_trail_enabled: Mapped[bool] = bool_field()
     last_adjusted_at: Mapped[datetime | None] = dt_opt()
+    last_adjustment_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class RiskPolicyVersion(Base):
