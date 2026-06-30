@@ -219,7 +219,7 @@ class TestE2EMock:
 
     def test_canned_llm_parses_as_valid_advice(self, llm: CannedLLM) -> None:
         """CannedLLM response parses as valid AdviceRecommendation."""
-        from alpha_quant.application.advice_llm import AdviceLLMService
+        from alpha_quant.application.explanation import ExplanationService
         from alpha_quant.domain.scorecard import (
             Scorecard,
             Recommendation,
@@ -227,7 +227,7 @@ class TestE2EMock:
             ScorecardComponent,
         )
 
-        service = AdviceLLMService(llm)
+        service = ExplanationService(llm)
         sc = Scorecard(
             symbol="AAPL",
             total_score=75.0,
@@ -248,7 +248,7 @@ class TestE2EMock:
             config_hash="abc123",
             strategy_version="1.0",
         )
-        artifact = service.generate_advice(sc)
+        artifact = service.generate_scorecard_explanation(sc)
 
         assert artifact.validation_status == "verified"
         rec = artifact.recommendation

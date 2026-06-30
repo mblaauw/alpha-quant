@@ -11,8 +11,7 @@ from uuid import NAMESPACE_DNS, UUID, uuid4, uuid5
 import structlog
 from sqlalchemy import text
 
-from alpha_quant.application.advice_llm import AdviceLLMService, PortfolioSummary
-from alpha_quant.application.explanation import ExplanationService
+from alpha_quant.application.explanation import ExplanationService, PortfolioSummary
 from alpha_quant.application.scorecards import (
     PortfolioContext,
     PositionContext,
@@ -72,7 +71,6 @@ class DailyCycleService:
         self._alpha_lake = alpha_lake
         self._store = store
         self._clock = clock
-        self._advice_service = AdviceLLMService(llm) if llm else None
         self._explanation_service = ExplanationService(llm) if llm else None
 
     def _resolve_trading_day(self, as_of: datetime) -> datetime:
@@ -251,17 +249,14 @@ class DailyCycleService:
                 )
                 sc_id = self._store.save_scorecard(sc_with_ids, run_id_str)
 
-                # Mark previous explanations stale for this scorecard, then generate new ones
-                if sc_id and (self._advice_service or self._explanation_service):
+                # Generate per-stage and overall explanations
+                if self._explanation_service and sc_id:
                     try:
                         self._store.mark_explanations_stale(
                             scope="scorecard_stage", scorecard_id=sc_id
                         )
                         self._store.mark_explanations_stale(
                             scope="scorecard_overall", scorecard_id=sc_id
-                        )
-                        self._store.mark_explanations_stale(
-                            scope="final_output", scorecard_id=sc_id
                         )
 
                         sc_with_id = sc_with_ids.model_copy(update={"scorecard_id": sc_id})
@@ -272,34 +267,17 @@ class DailyCycleService:
                             regime=state.regime,
                         )
 
-                        # Generate overall advice artifact
-                        if self._advice_service:
-                            try:
-                                advice = self._advice_service.generate_advice(
-                                    sc_with_id, portfolio_summary
-                                )
-                                self._store.save_advice_artifact(advice)
-                            except Exception:
-                                logger.exception("advice_generation_failed", symbol=sc.symbol)
-
-                        # Generate per-stage and overall explanations
-                        if self._explanation_service:
-                            try:
-                                stage_artifacts = (
-                                    self._explanation_service.generate_stage_explanations(
-                                        sc_with_id
-                                    )
-                                )
-                                for sa in stage_artifacts:
-                                    self._store.save_advice_artifact(sa)
-                                overall = self._explanation_service.generate_scorecard_explanation(
-                                    sc_with_id
-                                )
-                                self._store.save_advice_artifact(overall)
-                            except Exception:
-                                logger.exception("explanation_generation_failed", symbol=sc.symbol)
+                        stage_artifacts = self._explanation_service.generate_stage_explanations(
+                            sc_with_id
+                        )
+                        for sa in stage_artifacts:
+                            self._store.save_advice_artifact(sa)
+                        overall = self._explanation_service.generate_scorecard_explanation(
+                            sc_with_id, portfolio_summary
+                        )
+                        self._store.save_advice_artifact(overall)
                     except Exception:
-                        logger.exception("explanation_mark_stale_failed", symbol=sc.symbol)
+                        logger.exception("explanation_generation_failed", symbol=sc.symbol)
 
             # -- Persist portfolio mark --
             total_mv_end = sum(float(p.market_value or 0) for p in state.positions.values())
