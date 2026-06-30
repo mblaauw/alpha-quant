@@ -1,6 +1,6 @@
 {
-  "symbol": "MSFT",
-  "as_of": "2026-06-29T17:00:00Z",
+  "symbol": "AMZN",
+  "as_of": "2026-01-07T14:00:00+00:00",
   "snapshot_id": "snap-mock-001",
   "categories": [
     "price",
@@ -11,15 +11,15 @@
     "attention"
   ],
   "price": {
-    "last": 395.0,
-    "high": 400.92,
-    "low": 389.07,
-    "open": 393.81,
-    "volume": 21662186,
-    "change": 3.24,
-    "change_pct": 0.82,
-    "dollar_volume": 24941644344.0,
-    "latest_date": "2026-06-29"
+    "last": 221.85,
+    "high": 225.18,
+    "low": 218.52,
+    "open": 222.78,
+    "volume": 36750000,
+    "change": -3.15,
+    "change_pct": -1.4,
+    "dollar_volume": 8152987500.0,
+    "latest_date": "2026-01-07"
   },
   "readouts": [
     {
@@ -30,8 +30,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 72
+          "effective_date": "2026-01-07",
+          "value": 65
         }
       ]
     },
@@ -43,8 +43,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 62
+          "effective_date": "2026-01-07",
+          "value": 55
         }
       ]
     },
@@ -56,8 +56,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 68
+          "effective_date": "2026-01-07",
+          "value": 55.0
         }
       ]
     },
@@ -69,7 +69,7 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
+          "effective_date": "2026-01-07",
           "value": 1
         }
       ]
@@ -82,8 +82,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 82
+          "effective_date": "2026-01-07",
+          "value": 58
         }
       ]
     },
@@ -95,8 +95,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 2.5
+          "effective_date": "2026-01-07",
+          "value": 1.6400000000000001
         }
       ]
     },
@@ -108,8 +108,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 0.14
+          "effective_date": "2026-01-07",
+          "value": 0.10700000000000001
         }
       ]
     },
@@ -121,8 +121,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 62
+          "effective_date": "2026-01-07",
+          "value": 74.00000000000003
         }
       ]
     },
@@ -134,8 +134,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 1.2
+          "effective_date": "2026-01-07",
+          "value": 1.0
         }
       ]
     },
@@ -147,8 +147,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 0.038
+          "effective_date": "2026-01-07",
+          "value": 0.5
         }
       ]
     },
@@ -160,8 +160,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 0.82
+          "effective_date": "2026-01-07",
+          "value": -1.4000000000000024
         }
       ]
     }
@@ -170,98 +170,48 @@
     "metrics": [
       {
         "metric_id": "pe_ttm",
-        "name": "P/E (TTM)",
+        "name": "PE TTM",
         "category": "valuation",
-        "value": 32.1,
-        "period_end": "2026-03-31",
-        "unit": "x",
-        "tone": "neutral",
-        "quality_status": "good"
+        "value": 45.0
       },
       {
         "metric_id": "debt_to_equity_ttm",
-        "name": "Debt/Equity",
-        "category": "credit",
-        "value": 0.6,
-        "period_end": "2026-03-31",
-        "unit": "x",
-        "tone": "neutral",
-        "quality_status": "good"
+        "name": "Debt to Equity",
+        "category": "financial_health",
+        "value": 1.2
       },
       {
         "metric_id": "gross_margin_ttm",
-        "name": "Gross Margin",
+        "name": "Gross Margin TTM",
         "category": "profitability",
-        "value": 0.7,
-        "period_end": "2026-03-31",
-        "unit": "%",
-        "tone": "positive",
-        "quality_status": "good"
+        "value": 0.35
       },
       {
         "metric_id": "earnings_yield_ttm",
-        "name": "Earnings Yield",
+        "name": "Earnings Yield TTM",
         "category": "valuation",
-        "value": 0.031,
-        "period_end": "2026-03-31",
-        "unit": "%",
-        "tone": "neutral",
-        "quality_status": "good"
+        "value": 0.022
       }
     ]
   },
   "insider_transactions": [
     {
-      "effective_date": "2026-06-01",
-      "transaction_type": "Buy",
-      "shares": 300,
-      "price": 390.0,
-      "value": 117000
-    },
-    {
-      "effective_date": "2026-06-01",
-      "transaction_type": "Buy",
-      "shares": 150,
-      "price": 395.0,
-      "value": 59250
+      "effective_date": "2026-01-05",
+      "transaction_type": "Sell",
+      "shares": 10000.0,
+      "price": 225.0
     }
   ],
-  "earnings_events": [
-    {
-      "effective_date": "2026-07-15",
-      "symbol": "MSFT",
-      "surprise_pct": 4.2
-    },
-    {
-      "effective_date": "2026-04-28",
-      "symbol": "MSFT",
-      "surprise_pct": 4.2
-    }
-  ],
+  "earnings_events": [],
   "attention_mentions": [
     {
-      "effective_date": "2026-06-25",
-      "count": 149,
+      "effective_date": "2026-01-02",
+      "count": 110,
       "source": "alpha_lake"
     },
     {
-      "effective_date": "2026-06-26",
-      "count": 112,
-      "source": "alpha_lake"
-    },
-    {
-      "effective_date": "2026-06-27",
-      "count": 221,
-      "source": "alpha_lake"
-    },
-    {
-      "effective_date": "2026-06-28",
-      "count": 316,
-      "source": "alpha_lake"
-    },
-    {
-      "effective_date": "2026-06-29",
-      "count": 290,
+      "effective_date": "2026-01-06",
+      "count": 105,
       "source": "alpha_lake"
     }
   ]

@@ -1,6 +1,6 @@
 {
-  "symbol": "SPY",
-  "as_of": "2026-06-29T17:00:00Z",
+  "symbol": "NVDA",
+  "as_of": "2026-01-02T14:00:00+00:00",
   "snapshot_id": "snap-mock-001",
   "categories": [
     "price",
@@ -11,15 +11,15 @@
     "attention"
   ],
   "price": {
-    "last": 548.0,
-    "high": 556.22,
-    "low": 539.78,
-    "open": 546.36,
-    "volume": 77218850,
-    "change": 0.27,
-    "change_pct": 0.05,
-    "dollar_volume": 20209497697.0,
-    "latest_date": "2026-06-29"
+    "last": 130.0,
+    "high": 131.95,
+    "low": 128.05,
+    "open": 130.0,
+    "volume": 45000000,
+    "change": 0.0,
+    "change_pct": 0.0,
+    "dollar_volume": 5850000000.0,
+    "latest_date": "2026-01-02"
   },
   "readouts": [
     {
@@ -30,8 +30,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 52
+          "effective_date": "2026-01-02",
+          "value": 68
         }
       ]
     },
@@ -43,8 +43,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 50
+          "effective_date": "2026-01-02",
+          "value": 58
         }
       ]
     },
@@ -56,8 +56,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 56
+          "effective_date": "2026-01-02",
+          "value": 55.0
         }
       ]
     },
@@ -69,7 +69,7 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
+          "effective_date": "2026-01-02",
           "value": 0
         }
       ]
@@ -82,7 +82,7 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
+          "effective_date": "2026-01-02",
           "value": 60
         }
       ]
@@ -95,8 +95,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 2.0
+          "effective_date": "2026-01-02",
+          "value": 1.5
         }
       ]
     },
@@ -108,8 +108,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 0.09
+          "effective_date": "2026-01-02",
+          "value": 0.1
         }
       ]
     },
@@ -121,8 +121,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 50
+          "effective_date": "2026-01-02",
+          "value": 60.0
         }
       ]
     },
@@ -134,7 +134,7 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
+          "effective_date": "2026-01-02",
           "value": 1.0
         }
       ]
@@ -147,8 +147,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 0.0
+          "effective_date": "2026-01-02",
+          "value": 1.4
         }
       ]
     },
@@ -160,8 +160,8 @@
       },
       "observations": [
         {
-          "effective_date": "2026-06-29",
-          "value": 0.05
+          "effective_date": "2026-01-02",
+          "value": 0.0
         }
       ]
     }
@@ -170,72 +170,46 @@
     "metrics": [
       {
         "metric_id": "pe_ttm",
-        "name": "P/E (TTM)",
+        "name": "PE TTM",
         "category": "valuation",
-        "value": 22.0,
-        "period_end": "2026-03-31",
-        "unit": "x",
-        "tone": "neutral",
-        "quality_status": "good"
+        "value": 55.0
       },
       {
         "metric_id": "debt_to_equity_ttm",
-        "name": "Debt/Equity",
-        "category": "credit",
-        "value": 0.0,
-        "period_end": "2026-03-31",
-        "unit": "x",
-        "tone": "neutral",
-        "quality_status": "good"
+        "name": "Debt to Equity",
+        "category": "financial_health",
+        "value": 0.8
       },
       {
         "metric_id": "gross_margin_ttm",
-        "name": "Gross Margin",
+        "name": "Gross Margin TTM",
         "category": "profitability",
-        "value": 0.0,
-        "period_end": "2026-03-31",
-        "unit": "%",
-        "tone": "positive",
-        "quality_status": "good"
+        "value": 0.62
       },
       {
         "metric_id": "earnings_yield_ttm",
-        "name": "Earnings Yield",
+        "name": "Earnings Yield TTM",
         "category": "valuation",
-        "value": 4.5,
-        "period_end": "2026-03-31",
-        "unit": "%",
-        "tone": "neutral",
-        "quality_status": "good"
+        "value": 0.018
       }
     ]
   },
   "insider_transactions": [],
-  "earnings_events": [],
+  "earnings_events": [
+    {
+      "effective_date": "2026-01-12",
+      "symbol": "NVDA"
+    }
+  ],
   "attention_mentions": [
     {
-      "effective_date": "2026-06-25",
-      "count": 91,
+      "effective_date": "2026-01-02",
+      "count": 200,
       "source": "alpha_lake"
     },
     {
-      "effective_date": "2026-06-26",
-      "count": 187,
-      "source": "alpha_lake"
-    },
-    {
-      "effective_date": "2026-06-27",
-      "count": 94,
-      "source": "alpha_lake"
-    },
-    {
-      "effective_date": "2026-06-28",
-      "count": 283,
-      "source": "alpha_lake"
-    },
-    {
-      "effective_date": "2026-06-29",
-      "count": 296,
+      "effective_date": "2026-01-06",
+      "count": 350,
       "source": "alpha_lake"
     }
   ]

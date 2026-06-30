@@ -1,0 +1,54 @@
+{
+  "symbol": "STALE",
+  "as_of": "2025-12-15T14:00:00+00:00",
+  "snapshot_id": "snap-mock-001",
+  "categories": [
+    "price",
+    "technical"
+  ],
+  "price": {
+    "last": 100.0,
+    "high": 101.0,
+    "low": 99.0,
+    "open": 99.5,
+    "volume": 1000000,
+    "change": 0.0,
+    "change_pct": 0.0,
+    "dollar_volume": 100000000.0,
+    "latest_date": "2025-12-15"
+  },
+  "readouts": [
+    {
+      "definition": {
+        "readout_id": "trend.regime",
+        "name": "Trend Regime",
+        "category": "trend"
+      },
+      "observations": [
+        {
+          "effective_date": "2025-12-15",
+          "value": 30
+        }
+      ]
+    },
+    {
+      "definition": {
+        "readout_id": "momentum.rsi_14",
+        "name": "RSI(14)",
+        "category": "momentum"
+      },
+      "observations": [
+        {
+          "effective_date": "2025-12-15",
+          "value": 45
+        }
+      ]
+    }
+  ],
+  "fundamentals": {
+    "metrics": []
+  },
+  "insider_transactions": [],
+  "earnings_events": [],
+  "attention_mentions": []
+}
