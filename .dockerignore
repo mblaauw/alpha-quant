@@ -3,6 +3,7 @@
 data
 docs
 tests
+fixtures
 **/__pycache__
 .pytest_cache
 .ruff_cache

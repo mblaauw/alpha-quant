@@ -23,7 +23,7 @@ COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/src /app/src
 COPY --from=builder /app/alembic.ini /app/alembic.ini
 COPY --from=builder /app/config.toml /app/config.toml
-COPY fixtures/ fixtures/
+# fixtures/ excluded from production image (only needed for fixture/dev mode)
 RUN chown -R app:app /app
 ENV PATH="/app/.venv/bin:$PATH"
 USER app
