@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from collections.abc import Callable
+from datetime import date, datetime
 from enum import StrEnum
+from typing import Any
 
 from pydantic import Field
 
@@ -68,6 +70,24 @@ class RiskPolicy(FrozenModel):
     ewma_lambda: float = Field(default=0.94, ge=0.0, le=1.0)
     hist_window_days: int = Field(default=500, ge=10, le=2000)
     mc_paths: int = Field(default=10000, ge=100, le=1_000_000)
+
+
+class RiskCalculation(FrozenModel):
+    """Result of a single risk method computation.
+
+    All prices are absolute (not percentages).
+    """
+
+    stop_price: float | None = None
+    trail_price: float | None = None
+    trail_activation_pct: float | None = None
+    time_stop_date: date | None = None
+    reason: str = ""
+    method_type: str = ""
+    params_snapshot: dict[str, Any] = {}
+
+
+MethodFn = Callable[..., RiskCalculation]
 
 
 class RiskAction(StrEnum):
