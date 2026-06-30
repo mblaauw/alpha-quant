@@ -122,6 +122,7 @@ class PostgresOperationalStore:
                 UPDATE run.decision_run
                 SET status = :s, completed_at = :now, failure_reason = :fr
                 WHERE decision_run_id = :rid
+                AND status IN ('RUNNING', 'HALTED')
                 """
             ),
             {
@@ -1364,7 +1365,9 @@ class PostgresOperationalStore:
 
         status = OrderStatus.CANCELLED.value
         self.session.execute(
-            text("UPDATE trade.paper_order SET status = :s WHERE order_id = :oid"),
+            text(
+                "UPDATE trade.paper_order SET status = :s WHERE order_id = :oid AND status IN ('pending', 'open', 'submitted')"
+            ),
             {"s": status, "oid": str(order_id)},
         )
         self.session.execute(
@@ -1377,7 +1380,7 @@ class PostgresOperationalStore:
                 "eid": str(uuid4()),
                 "rid": None,
                 "et": "order.cancelled",
-                "pj": f'{{"order_id": "{order_id}", "reason": "{reason or ""}"}}',
+                "pj": json.dumps({"order_id": str(order_id), "reason": reason or ""}),
                 "now": datetime.now(UTC),
             },
         )

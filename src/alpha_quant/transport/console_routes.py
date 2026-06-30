@@ -10,7 +10,7 @@ import asyncio
 import json
 import os
 from typing import Any, cast
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.responses import StreamingResponse
@@ -86,7 +86,7 @@ async def set_mode(
 
     envelope = CommandEnvelope(
         type="system.set_mock_mode",
-        idempotency_key=f"set-mock-mode-{uuid4().hex[:8]}",
+        idempotency_key=f"set-mock-mode-{x_actor_id}-{req.mock}",
         actor_id=x_actor_id,
         actor_display_name=x_actor_name,
         payload_json=json.dumps({"mock": req.mock}),
