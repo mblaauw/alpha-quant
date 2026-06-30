@@ -541,6 +541,15 @@ def candidate_modify_handler(cmd: Command) -> tuple[CommandStatus, str | None, s
                     f" > {policy.per_trade_risk_cap * 100:.0f}% of equity"
                 ),
             )
+        if notional > equity * policy.concentration_cap:
+            return (
+                CommandStatus.FAILED,
+                None,
+                (
+                    f"concentration_exceeded: ${notional:,.0f}"
+                    f" > {policy.concentration_cap * 100:.0f}% of equity"
+                ),
+            )
 
         order_id = uow.store.create_order(
             symbol=symbol,

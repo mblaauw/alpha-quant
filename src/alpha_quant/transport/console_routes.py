@@ -461,6 +461,9 @@ async def sizing_preview(req: SizingPreviewRequest):
             "buying_power_after": round(buying_power_after, 2),
             "equity": round(equity, 2),
             "guardrails": guards,
+            "per_trade_risk_cap": policy.per_trade_risk_cap,
+            "concentration_cap": policy.concentration_cap,
+            "buying_power_pct": policy.buying_power_pct,
         }
 
     uow = create_unit_of_work()
