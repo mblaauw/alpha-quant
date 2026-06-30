@@ -653,3 +653,28 @@ input[type=range].rng:disabled { opacity:.5; }
 .sys-toggle .tr::after{content:'';position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:var(--aq-paper);transition:left 140ms;box-shadow:0 1px 2px rgba(0,0,0,.25)}
 .sys-toggle[data-on="true"] .tr{background:var(--aq-claret)}
 .sys-toggle[data-on="true"] .tr::after{left:17px}
+
+/* ── Explanation styles ── */
+
+.exp-badge{display:inline-block;font-family:var(--aq-mono);font-size:10px;font-weight:600;padding:2px 7px;border-radius:3px;text-transform:uppercase;margin-left:8px}
+.exp-badge[data-exp="current"]{background:#1b5e20;color:#fff}
+.exp-badge[data-exp="stale"]{background:#e65100;color:#fff}
+.exp-badge[data-exp="unavailable"]{background:#616161;color:#fff}
+.exp-badge[data-exp="recalculating"]{background:#f9a825;color:#000}
+
+.exp-compact{margin:8px 0 4px;padding:8px 10px;background:var(--aq-bg2);border-radius:4px;border-left:3px solid var(--aq-rule2);font-size:12.5px;line-height:1.5}
+.exp-compact[data-exp="failed"],.exp-compact[data-exp="unavailable"]{border-left-color:var(--aq-down);opacity:.7}
+.exp-compact[data-exp="verified"]{border-left-color:var(--aq-up)}
+.exp-compact .exp-line{font-weight:600;color:var(--aq-ink1);margin-bottom:2px}
+.exp-compact .exp-sub{color:var(--aq-ink2);font-size:12px}
+
+.exp-detail{margin-top:6px;border-top:1px solid var(--aq-rule1);padding-top:6px;font-size:12px}
+.exp-detail .exp-section{margin-bottom:5px}
+.exp-detail .exp-label{font-family:var(--aq-mono);font-size:10.5px;font-weight:700;text-transform:uppercase;color:var(--aq-ink3);display:block;margin-bottom:2px}
+.exp-detail ul{margin:2px 0 0 14px;padding:0;color:var(--aq-ink2)}
+.exp-detail ul li{margin-bottom:2px}
+.exp-detail p{color:var(--aq-ink2);margin:2px 0}
+
+.dmod-exp{margin-top:6px;padding-top:6px;border-top:1px solid var(--aq-rule1)}
+.exp-toggle{font-family:var(--aq-mono);font-size:10.5px;font-weight:600;letter-spacing:.02em;color:var(--aq-claret);background:none;border:0;cursor:pointer;padding:2px 0}
+.exp-toggle:hover{text-decoration:underline}
