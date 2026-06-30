@@ -14,8 +14,8 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0006](./0006-use-duckdb-parquet-analytical-store.md) | Use DuckDB + Parquet for the Analytical Store | **Superseded** | 2026-06-10 |
 | [0007](./0007-use-sqlite-sqlalchemy-core-transactional.md) | Use SQLite WAL + SQLAlchemy Core for Transactional State | Superseded | 2026-06-10 |
 | [0008](./0008-use-custom-numpy-indicators.md) | Use Custom numpy Recurrences for Technical Indicators | **Superseded** | 2026-06-10 |
-| [0009](./0009-use-pessimistic-fill-model.md) | Use Custom Pessimistic Fill Model | Accepted | 2026-06-10 |
-| [0010](./0010-use-custom-event-driven-backtester.md) | Use Custom Event-Driven Backtester | Accepted | 2026-06-10 |
+| [0009](./0009-use-pessimistic-fill-model.md) | Use Custom Pessimistic Fill Model | **Superseded** | 2026-06-10 |
+| [0010](./0010-use-custom-event-driven-backtester.md) | Use Custom Event-Driven Backtester | **Superseded** | 2026-06-10 |
 | [0011](./0011-use-httpx-for-llm-integration.md) | Use Direct httpx (No SDK) for LLM Integration | Accepted | 2026-06-10 |
 | [0012](./0012-use-eodhd-as-primary-data-source.md) | Use EODHD as the Primary Market Data Source | Superseded | 2026-06-10 |
 | [0013](./0013-use-structlog-structured-logging.md) | Use structlog with JSON Format for Structured Logging | Accepted | 2026-06-10 |
@@ -26,16 +26,16 @@ This directory contains Architecture Decision Records (ADRs) for the Alpha-Quant
 | [0018](./0018-use-bootstrap-fixture-workflow.md) | Use Bootstrap + Fixture Bundle Developer Workflow | **Superseded** | 2026-06-10 |
 | [0019](./0019-use-astral-tooling-ruff-ty.md) | Use Astral Development Tooling (ruff + ty) | Accepted | 2026-06-10 |
 | [0020](./0020-use-duckdb-for-vault-manifest.md) | Use DuckDB for the Vault Manifest (Dual Use) | Superseded | 2026-06-11 |
-| [0021](./0021-use-duckdb-for-both-analytical-and-transactional-state.md) | Use DuckDB for Both Analytical and Transactional State | Accepted | 2026-06-11 |
-| [0022](./0022-use-paper-portfolio-engine.md) | Use Paper Portfolio Engine as Authoritative State Manager | Accepted | 2026-06-12 |
-| [0023](./0023-use-pipeline-orchestrator.md) | Use Pipeline Orchestrator for Daily Run Sequencing | Accepted | 2026-06-12 |
-| [0024](./0024-use-self-consistency-invariants.md) | Use Self-Consistency Invariants for Portfolio Integrity | Accepted | 2026-06-12 |
+| [0021](./0021-use-duckdb-for-both-analytical-and-transactional-state.md) | Use DuckDB for Both Analytical and Transactional State | **Superseded** | 2026-06-11 |
+| [0022](./0022-use-paper-portfolio-engine.md) | Use Paper Portfolio Engine as Authoritative State Manager | **Superseded** | 2026-06-12 |
+| [0023](./0023-use-pipeline-orchestrator.md) | Use Pipeline Orchestrator for Daily Run Sequencing | **Superseded** | 2026-06-12 |
+| [0024](./0024-use-self-consistency-invariants.md) | Use Self-Consistency Invariants for Portfolio Integrity | **Superseded** | 2026-06-12 |
 | [0025](./0025-use-sec-connector-sqlite-cache.md) | Use SQLite Cache for SEC Connector | Superseded | 2026-06-12 |
 | [0026](./0026-use-content-addressed-vault.md) | Use Content-Addressed Vault for Raw Data Storage | Superseded | 2026-06-12 |
-| [0027](./0027-use-dependency-pruning.md) | Dependency Pruning — polars, SQLAlchemy, APScheduler CLI, 50-Day Prune | Accepted | 2026-06-13 |
+| [0027](./0027-use-dependency-pruning.md) | Dependency Pruning — polars, SQLAlchemy, APScheduler CLI, 50-Day Prune | **Superseded** | 2026-06-13 |
 | [0028](./0028-use-clock-virtualization-for-determinism.md) | Clock Virtualization for Deterministic Replay | Accepted | 2026-06-15 |
-| [0029](./0029-use-store-mixin-decomposition.md) | Store Mixin Decomposition for Schema Organization | Accepted | 2026-06-15 |
-| [0030](./0030-use-shadow-ablation-books.md) | Shadow Ablation Books for Mechanism Evaluation | Accepted | 2026-06-15 |
+| [0029](./0029-use-store-mixin-decomposition.md) | Store Mixin Decomposition for Schema Organization | **Superseded** | 2026-06-15 |
+| [0030](./0030-use-shadow-ablation-books.md) | Shadow Ablation Books for Mechanism Evaluation | **Superseded** | 2026-06-15 |
 | [0031](./0031-use-file-based-halt-mechanism.md) | File-Based Halt Mechanism for System Safety | **Superseded** | 2026-06-15 |
 | [0032](./0032-alpha-lake-data-plane.md) | Alpha-Lake as the Sole Data Plane | **Superseded** | 2026-06-21 |
 | [0033](./0033-pit-reads-via-clock-asof.md) | PIT Reads via Clock-Driven `as_of` | Accepted | 2026-06-21 |

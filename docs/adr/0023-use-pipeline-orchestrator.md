@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by ADR-0048 (Command Bus + DailyCycleService).
 
 ## Date
 
