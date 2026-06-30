@@ -35,6 +35,7 @@ from alpha_quant.application.query.portfolio import PortfolioService
 from alpha_quant.application.query.risk import RiskService
 from alpha_quant.application.query.runs import RunService
 from alpha_quant.application.query.system import SystemService
+from alpha_quant.domain.categories import module_from_component
 from alpha_quant.domain.risk import RiskPolicy
 from alpha_quant.transport.deps import svc_depends
 
@@ -230,102 +231,7 @@ async def list_scorecards(
     return {"items": _list(run_id=run_id, limit=limit)}
 
 
-_M_CATEGORY: dict[str, tuple[str, str, str]] = {
-    "Universe": ("M1", "hard", "Can this security be traded?"),
-    "Universe & Investability": ("M1", "hard", "Can this security be traded?"),
-    "Regime": ("M2", "soft", "Should long risk be deployed?"),
-    "Market Regime": ("M2", "soft", "Should long risk be deployed?"),
-    "Technical": ("M3", "score", "Is it a leader with a valid setup now?"),
-    "Technical Trend": ("M3", "score", "Is it a leader with a valid setup now?"),
-    "Momentum": ("M3", "score", "Is it a leader with a valid setup now?"),
-    "Fundamental": ("M4", "soft", "Is there a fundamental reason to avoid it?"),
-    "Fundamental Resilience": ("M4", "soft", "Is there a fundamental reason to avoid it?"),
-    "Insider": ("M5", "evidence", "Is insider activity supportive?"),
-    "Insider Behaviour": ("M5", "evidence", "Is insider activity supportive?"),
-    "Attention": ("M6", "soft", "Is attention making the entry unsafe?"),
-    "Crowding": ("M6", "soft", "Is attention making the entry unsafe?"),
-    "Event Risk": ("M7", "hard", "Is event risk too large for normal risk controls?"),
-    "Known Event": ("M7", "hard", "Is event risk too large for normal risk controls?"),
-    "Rank": ("M8", "score", "Is this the best remaining use of risk budget?"),
-    "Ranking": ("M8", "score", "Is this the best remaining use of risk budget?"),
-}
-
-_M_NAMES: dict[str, str] = {
-    "M1": "Universe & investability",
-    "M2": "Market regime & posture",
-    "M3": "Technical state & leadership",
-    "M4": "Fundamental resilience",
-    "M5": "Insider behaviour",
-    "M6": "Crowding & attention",
-    "M7": "Known event & gap risk",
-    "M8": "Rank & selection",
-}
-
-
-def _module_from_component(c: Any) -> dict[str, object]:
-    """Map a ScorecardComponent to a M1-M8 module dict."""
-    mid, mtype, question = _M_CATEGORY.get(c.category, ("", "score", ""))
-    if not mid:
-        return {
-            "id": "",
-            "name": c.name,
-            "type": "score",
-            "question": "",
-            "state": c.state.value,
-            "state_tone": _tone_for_state(c.state.value),
-            "score": c.score if c.score else None,
-            "archetype": None,
-            "metrics": _parse_metrics(c.details_json),
-            "reason": c.reason,
-        }
-    has_score = mtype in ("score", "evidence")
-    return {
-        "id": mid,
-        "name": _M_NAMES.get(mid, c.name),
-        "type": mtype,
-        "question": question,
-        "state": _state_for_score(c.score, c.state.value, mtype),
-        "state_tone": _tone_for_state(c.state.value),
-        "score": round(c.score, 2) if has_score and c.score else None,
-        "archetype": _parse_archetype(c.details_json) if mid == "M3" else None,
-        "metrics": _parse_metrics(c.details_json),
-        "reason": c.reason,
-    }
-
-
-def _state_for_score(score: float, state: str, mtype: str) -> str:
-    if mtype == "hard":
-        return "PASS" if state == "pass" else "FAIL"
-    if mtype == "score" and score > 0:
-        return f"RANK {score:.0f}" if score > 90 else f"SCORE {score:.0f}"
-    return state.upper() if state else "PASS"
-
-
-def _tone_for_state(state: str) -> str:
-    return {"pass": "ok", "warn": "warn", "fail": "bad"}.get(state, "dim")
-
-
-def _parse_metrics(details_json: str) -> list[dict[str, str]]:
-    try:
-        details = json.loads(details_json)
-        raw = details.get("metrics", [])
-        if isinstance(raw, list):
-            return [
-                {"k": str(m.get("k", "")), "v": str(m.get("v", ""))}
-                for m in raw
-                if isinstance(m, dict)
-            ]
-        return []
-    except (json.JSONDecodeError, TypeError):  # fmt: skip
-        return []
-
-
-def _parse_archetype(details_json: str) -> str | None:
-    try:
-        details = json.loads(details_json)
-        return details.get("archetype")
-    except (json.JSONDecodeError, TypeError):  # fmt: skip
-        return None
+# M1-M8 mapping imported from domain/categories.py
 
 
 def _derive_rank(total_score: float) -> str:
@@ -376,7 +282,7 @@ async def get_scorecard(scorecard_id: str):
     sc = _get(scorecard_id)
     if sc is None:
         raise HTTPException(404, "Scorecard not found")
-    modules = [_module_from_component(c) for c in sc.components]
+    modules = [module_from_component(c) for c in sc.components]
     narrative = _synthetic_narrative(sc, modules)
     total = sc.total_score or 0
     rank_str = _derive_rank(total)
