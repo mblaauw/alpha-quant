@@ -251,38 +251,55 @@ class DailyCycleService:
                 )
                 sc_id = self._store.save_scorecard(sc_with_ids, run_id_str)
 
-                # Generate advice artifact for each scorecard
-                if self._advice_service and sc_id:
+                # Mark previous explanations stale for this scorecard, then generate new ones
+                if sc_id and (self._advice_service or self._explanation_service):
                     try:
+                        self._store.mark_explanations_stale(
+                            scope="scorecard_stage", scorecard_id=sc_id
+                        )
+                        self._store.mark_explanations_stale(
+                            scope="scorecard_overall", scorecard_id=sc_id
+                        )
+                        self._store.mark_explanations_stale(
+                            scope="final_output", scorecard_id=sc_id
+                        )
+
+                        sc_with_id = sc_with_ids.model_copy(update={"scorecard_id": sc_id})
                         portfolio_summary = PortfolioSummary(
                             equity=float(state.equity),
                             cash=float(state.cash),
                             position_count=len(state.positions),
                             regime=state.regime,
                         )
-                        sc_with_id = sc_with_ids.model_copy(update={"scorecard_id": sc_id})
-                        advice = self._advice_service.generate_advice(sc_with_id, portfolio_summary)
-                        self._store.save_advice_artifact(advice)
-                    except Exception:
-                        logger.exception("advice_generation_failed", symbol=sc.symbol)
 
-                # Mark previous explanations stale, then generate new ones
-                if self._explanation_service and sc_id:
-                    try:
-                        self._store.mark_explanations_stale(scope="scorecard_stage")
-                        self._store.mark_explanations_stale(scope="scorecard_overall")
-                        sc_with_id = sc_with_ids.model_copy(update={"scorecard_id": sc_id})
-                        stage_artifacts = self._explanation_service.generate_stage_explanations(
-                            sc_with_id
-                        )
-                        for sa in stage_artifacts:
-                            self._store.save_advice_artifact(sa)
-                        overall = self._explanation_service.generate_scorecard_explanation(
-                            sc_with_id
-                        )
-                        self._store.save_advice_artifact(overall)
+                        # Generate overall advice artifact
+                        if self._advice_service:
+                            try:
+                                advice = self._advice_service.generate_advice(
+                                    sc_with_id, portfolio_summary
+                                )
+                                self._store.save_advice_artifact(advice)
+                            except Exception:
+                                logger.exception("advice_generation_failed", symbol=sc.symbol)
+
+                        # Generate per-stage and overall explanations
+                        if self._explanation_service:
+                            try:
+                                stage_artifacts = (
+                                    self._explanation_service.generate_stage_explanations(
+                                        sc_with_id
+                                    )
+                                )
+                                for sa in stage_artifacts:
+                                    self._store.save_advice_artifact(sa)
+                                overall = self._explanation_service.generate_scorecard_explanation(
+                                    sc_with_id
+                                )
+                                self._store.save_advice_artifact(overall)
+                            except Exception:
+                                logger.exception("explanation_generation_failed", symbol=sc.symbol)
                     except Exception:
-                        logger.exception("explanation_generation_failed", symbol=sc.symbol)
+                        logger.exception("explanation_mark_stale_failed", symbol=sc.symbol)
 
             # -- Persist portfolio mark --
             total_mv_end = sum(float(p.market_value or 0) for p in state.positions.values())

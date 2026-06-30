@@ -367,12 +367,16 @@ class FakeOperationalStore:
         self._advice_artifacts[advice_id] = stored
         return advice_id
 
-    def mark_explanations_stale(self, scope: str = "", scope_id: str = "") -> int:
+    def mark_explanations_stale(
+        self, scope: str = "", scope_id: str = "", scorecard_id: str = ""
+    ) -> int:
         count = 0
         for aid, artifact in self._advice_artifacts.items():
             if scope and artifact.scope != scope:
                 continue
             if scope_id and artifact.scope_id != scope_id:
+                continue
+            if scorecard_id and artifact.scorecard_id != scorecard_id:
                 continue
             self._advice_artifacts[aid] = artifact.model_copy(update={"stale": True})
             count += 1

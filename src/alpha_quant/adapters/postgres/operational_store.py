@@ -693,7 +693,9 @@ class PostgresOperationalStore:
         )
         return advice_id
 
-    def mark_explanations_stale(self, scope: str = "", scope_id: str = "") -> int:
+    def mark_explanations_stale(
+        self, scope: str = "", scope_id: str = "", scorecard_id: str = ""
+    ) -> int:
         import structlog
 
         logger = structlog.get_logger()
@@ -706,12 +708,21 @@ class PostgresOperationalStore:
         if scope_id:
             where.append("scope_id = :scid")
             params["scid"] = scope_id
+        if scorecard_id:
+            where.append("scorecard_id = :scidref")
+            params["scidref"] = scorecard_id
         where_clause = " AND ".join(where) if where else "TRUE"
 
         sql = f"UPDATE run.advice_artifact SET stale = TRUE WHERE {where_clause}"
         result = self.session.execute(text(sql), params)
         count = result.rowcount
-        logger.info("explanations_marked_stale", scope=scope, scope_id=scope_id, count=count)
+        logger.info(
+            "explanations_marked_stale",
+            scope=scope,
+            scope_id=scope_id,
+            scorecard_id=scorecard_id,
+            count=count,
+        )
         return count
 
     def load_advice_artifacts(self, scope: str = "", scope_id: str = "") -> list[AdviceArtifact]:
