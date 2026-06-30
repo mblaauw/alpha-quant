@@ -1,4 +1,4 @@
-.PHONY: check format format-check type type-all test test-unit test-integration test-parallel test-e2e lint qa clean schema coverage check-docs
+.PHONY: check format format-check type type-all test test-unit test-integration test-parallel test-e2e test-fast test-risk test-score watch lint qa golden bless-golden clean schema coverage check-docs bootstrap
 
 check:
 	uv run ruff check src/
@@ -20,6 +20,18 @@ test:
 
 test-unit:
 	uv run pytest tests/unit/ -q
+
+test-fast:
+	uv run pytest tests/unit/ -q -m "not requires_pg" --no-header
+
+test-risk:
+	uv run pytest tests/unit/test_risk_engine.py tests/unit/test_risk_inputs.py tests/unit/test_risk_query.py -q
+
+test-score:
+	uv run pytest tests/unit/test_scorecard_engine.py tests/unit/test_scorecard.py -q
+
+watch:
+	uv run pytest-watch tests/unit/ -- -q -m "not requires_pg" 2>/dev/null || echo "Install pytest-watch: uv tool install pytest-watch"
 
 test-integration:
 	uv run pytest tests/integration/ -q

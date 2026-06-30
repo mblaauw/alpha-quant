@@ -85,5 +85,6 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 markers = [
     "chaos: destructive tests that corrupt state or kill processes (skip in CI).",
+    "requires_pg: tests that need a running PostgreSQL instance.",
 ]
 filterwarnings = ["error"]
