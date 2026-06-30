@@ -13,6 +13,7 @@ from alpha_quant.contracts.operational import (
     Command,
     CommandEnvelope,
     CommandStatus,
+    CorporateActionBooking,
     CurrentHalt,
     DecisionBatch,
     DecisionRun,
@@ -103,6 +104,8 @@ class FakeOperationalStore:
         self._security_refs: dict[str, str] = {}
         self._risk_policies: dict[str, RiskPolicy] = {}
         self._risk_events: list[RiskEvent] = []
+        self._corporate_action_bookings: list[CorporateActionBooking] = []
+        self._run_lock_audits: list[dict[str, str]] = []
 
     @property
     def session(self) -> _FakeSession:
@@ -622,3 +625,9 @@ class FakeOperationalStore:
 
     def write_risk_event(self, event: RiskEvent) -> None:
         self._risk_events.append(event)
+
+    def write_corporate_action_booking(self, booking: CorporateActionBooking) -> None:
+        self._corporate_action_bookings.append(booking)
+
+    def write_run_lock_audit(self, run_key: str, action: str) -> None:
+        self._run_lock_audits.append({"run_key": run_key, "action": action})
