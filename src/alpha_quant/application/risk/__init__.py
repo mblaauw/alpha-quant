@@ -21,6 +21,7 @@ from alpha_quant.application.risk.scenarios import compute_all as compute_scenar
 from alpha_quant.application.risk.var import compute_all as compute_var
 from alpha_quant.contracts.operational import HaltCommand, HaltReason, RiskEvent
 from alpha_quant.domain.risk import RiskAction, RiskDecision, RiskPolicy
+from alpha_quant.ports.clock import Clock
 
 
 def _round(value: float, digits: int = 4) -> float:
@@ -69,6 +70,7 @@ def decide(
     events: list[dict[str, Any]],
     halted: bool = False,
     requested_qty: int | None = None,
+    policy_version: str = "default",
 ) -> list[RiskDecision]:
     """Translate risk events into decisions.
 
@@ -95,6 +97,7 @@ def decide(
                         limit_name=title,
                         current_value=detail,
                         limit_value=detail,
+                        policy_version=policy_version,
                     )
                 )
             else:
@@ -103,6 +106,7 @@ def decide(
                         action=RiskAction.BLOCK,
                         reason=f"{title}: {detail} (already halted)",
                         limit_name=title,
+                        policy_version=policy_version,
                     )
                 )
 
@@ -115,6 +119,7 @@ def decide(
                     reason=f"{title}: {detail}",
                     limit_name=title,
                     resized_quantity=max(1, resized) if resized else None,
+                    policy_version=policy_version,
                 )
             )
 
@@ -123,6 +128,7 @@ def decide(
             RiskDecision(
                 action=RiskAction.ALLOW,
                 reason="All limits within policy",
+                policy_version=policy_version,
             )
         )
 
@@ -157,7 +163,10 @@ def process_risk_decisions(
                     decision_run_id=decision_run_id,
                     event_type=f"limit.{d.limit_name.lower().replace(' ', '_')}.breach",
                     severity="crit",
-                    details_json=f'{{"message": "{d.reason}", "action": "halt"}}',
+                    details_json=(
+                        f'{{"message": "{d.reason}", "action": "halt",'
+                        f' "policy_version": "{d.policy_version}"}}'
+                    ),
                     created_at=now,
                 )
             )
@@ -176,7 +185,10 @@ def process_risk_decisions(
                     decision_run_id=decision_run_id,
                     event_type=f"limit.{d.limit_name.lower().replace(' ', '_')}.breach",
                     severity="crit",
-                    details_json=f'{{"message": "{d.reason}", "action": "block"}}',
+                    details_json=(
+                        f'{{"message": "{d.reason}", "action": "block",'
+                        f' "policy_version": "{d.policy_version}"}}'
+                    ),
                     created_at=now,
                 )
             )
@@ -188,7 +200,10 @@ def process_risk_decisions(
                     decision_run_id=decision_run_id,
                     event_type=f"limit.{d.limit_name.lower().replace(' ', '_')}.warning",
                     severity="warn",
-                    details_json=f'{{"message": "{d.reason}", "action": "reduce"}}',
+                    details_json=(
+                        f'{{"message": "{d.reason}", "action": "reduce",'
+                        f' "policy_version": "{d.policy_version}"}}'
+                    ),
                     created_at=now,
                 )
             )
@@ -200,20 +215,23 @@ class RiskEngine:
     Called by RiskService.summary() which formats the result into the API response.
     """
 
-    def __init__(self, lake: Any | None = None) -> None:
+    def __init__(self, lake: Any | None = None, clock: Clock | None = None) -> None:
         self._lake = lake
+        self._clock = clock
 
     def run(
         self,
         book_id: str | None = None,
         policy: RiskPolicy | None = None,
+        as_of: datetime | None = None,
     ) -> dict[str, Any]:
         """Compute all risk measures for the given book."""
+        now = as_of or (self._clock.now() if self._clock else datetime.now(UTC))
         inputs = load_inputs(book_id, self._lake)
         policy = policy or RiskPolicy.default()
 
         if not inputs.positions:
-            return self._empty_response(inputs)
+            return self._empty_response(inputs, now)
 
         positions_list = inputs.positions
         # Generate daily returns with per-position seed for determinism
@@ -277,7 +295,7 @@ class RiskEngine:
         )
 
         # Factors
-        factors = compute_factors(pos_returns, benchmark_returns)
+        factors = compute_factors(pos_returns, benchmark_returns, weights=inputs.weights)
 
         # Liquidity — build ADV map from position data when Lake ADV unavailable
         adv_map = _estimate_adv_map(inputs.positions)
@@ -308,7 +326,7 @@ class RiskEngine:
         events = generate_events(limits, inputs.halt_active, warn_threshold=policy.warn_threshold)
 
         # Risk decisions
-        decisions = decide(events, inputs.halt_active)
+        decisions = decide(events, inputs.halt_active, policy_version=policy.version_label)
 
         # Posture
         posture = derive_posture(events, inputs.halt_active, inputs.halt_details)
@@ -316,13 +334,13 @@ class RiskEngine:
         ann_vol_val = _annualized_vol(portfolio_historical) if portfolio_historical else 0.0
 
         return {
-            "as_of": datetime.now(UTC).isoformat(),
+            "as_of": now.isoformat(),
             "equity": round(inputs.equity, 2),
             "halted": inputs.halt_active,
             "halt": {
                 "reason": inputs.halt_reason or "manual",
                 "details": inputs.halt_details or "",
-                "halted_at": datetime.now(UTC).isoformat(),
+                "halted_at": now.isoformat(),
             }
             if inputs.halt_active
             else None,
@@ -355,9 +373,10 @@ class RiskEngine:
             "near_stop": [],
         }
 
-    def _empty_response(self, inputs: Any) -> dict[str, Any]:
+    def _empty_response(self, inputs: Any, now: datetime | None = None) -> dict[str, Any]:
+        ts = now or (self._clock.now() if self._clock else datetime.now(UTC))
         return {
-            "as_of": datetime.now(UTC).isoformat(),
+            "as_of": ts.isoformat(),
             "equity": round(inputs.equity, 2),
             "halted": inputs.halt_active,
             "halt": None
@@ -365,7 +384,7 @@ class RiskEngine:
             else {
                 "reason": "manual",
                 "details": inputs.halt_details or "",
-                "halted_at": datetime.now(UTC).isoformat(),
+                "halted_at": ts.isoformat(),
             },
             "posture": derive_posture([], inputs.halt_active),
             "headline": {
