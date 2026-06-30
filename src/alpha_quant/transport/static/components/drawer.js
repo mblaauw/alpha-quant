@@ -8,11 +8,15 @@ export function openDrawer(title, content, subtitle) {
   }
   document.getElementById("drawer").classList.add("open");
   document.getElementById("drawer-overlay").classList.add("open");
+  // Focus management: move focus to drawer close button
+  setTimeout(() => document.getElementById("drawer-close-btn")?.focus(), 100);
 }
 
 export function closeDrawer() {
   document.getElementById("drawer").classList.remove("open");
   document.getElementById("drawer-overlay").classList.remove("open");
+  // Restore focus to the trigger element
+  if (document.activeElement) document.activeElement.blur();
 }
 
 document.addEventListener("click", (e) => {

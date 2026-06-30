@@ -21,8 +21,12 @@ export function navigate(hash) {
   const route = hash.replace(/^#\/?/, "").split("?")[0] || "advice";
   store.route = route;
   const navRoute = (route === "runs" || route === "journal") ? "system" : route;
-  document.querySelectorAll("#tabs a").forEach((a) =>
-    a.classList.toggle("active", a.getAttribute("href") === `#${navRoute}`));
+  document.querySelectorAll("#tabs a").forEach((a) => {
+    const isActive = a.getAttribute("href") === `#${navRoute}`;
+    a.classList.toggle("active", isActive);
+    if (isActive) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  });
   const render = routes[route];
   if (render) render();
 }

@@ -44,8 +44,8 @@
     </div>
   </header>
 
-  <nav class="nav" id="tabs">
-    <a href="#advice" class="active">Advice</a>
+  <nav class="nav" id="tabs" aria-label="Main navigation">
+    <a href="#advice" class="active" aria-current="page">Advice</a>
     <a href="#portfolio">Portfolio</a>
     <a href="#decisions">Decisions</a>
     <a href="#orders">Orders</a>
@@ -53,24 +53,24 @@
     <a href="#system">System</a>
   </nav>
 
-  <div id="global-banner"></div>
+  <div id="global-banner" role="status" aria-live="polite"></div>
 
-  <main><div id="view"></div></main>
+  <main><div id="view" role="main"></div></main>
 </div>
 
-<div id="drawer-overlay"></div>
-<aside id="drawer">
+<div id="drawer-overlay" role="presentation"></div>
+<aside id="drawer" aria-label="Detail drawer" role="dialog" aria-modal="true">
   <div id="drawer-header"><div class="drawer-titlewrap"><span id="drawer-title"></span><span id="drawer-sub" class="drawer-sub"></span></div><button class="drawer-close" id="drawer-close-btn">✕</button></div>
   <div id="drawer-body"></div>
 </aside>
 
-<dialog id="modal">
+<dialog id="modal" aria-labelledby="modal-title">
   <div class="modal-header"><span class="modal-title" id="modal-title"></span><button class="drawer-close" id="modal-close-btn">✕</button></div>
   <div class="modal-body" id="modal-body"></div>
   <div class="modal-actions" id="modal-actions"></div>
 </dialog>
 
-<div id="toast">
+<div id="toast" role="alert" aria-live="assertive">
   <div class="toast-head">
     <span class="toast-status" id="toast-status"><span class="d"></span><span id="toast-status-label">QUEUED</span></span>
     <span class="toast-id" id="toast-id"></span>
