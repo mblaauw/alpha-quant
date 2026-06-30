@@ -40,7 +40,7 @@ test-parallel:
 	uv run pytest tests/ -q -n auto
 
 test-e2e:
-	uv run pytest tests/ -v --timeout=30
+	uv run pytest tests/test_e2e_mock.py -v
 
 qa:
 	@for script in tests/qa/*.sh; do \
