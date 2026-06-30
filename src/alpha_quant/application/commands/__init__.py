@@ -109,6 +109,8 @@ def submit_command(
     envelope: CommandEnvelope,
     database_url: str | None = None,
 ) -> Command:
+    from sqlalchemy.exc import IntegrityError
+
     uow = create_unit_of_work(database_url or DEFAULT_DATABASE_URL)
     with uow:
         existing = uow.store.get_command_by_idempotency(
@@ -116,7 +118,16 @@ def submit_command(
         )
         if existing is not None:
             return existing
-        cmd = uow.store.submit_command(envelope)
+        try:
+            cmd = uow.store.submit_command(envelope)
+        except IntegrityError:
+            uow.session.rollback()
+            existing = uow.store.get_command_by_idempotency(
+                envelope.actor_id, envelope.type, envelope.idempotency_key
+            )
+            if existing is not None:
+                return existing
+            raise
         uow.store.queue_command(cmd.command_id)
         return cmd
 
@@ -124,13 +135,14 @@ def submit_command(
 def run_decision_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | None]:
     from alpha_quant.application.config import load_config
     from alpha_quant.application.daily_cycle import DailyCycleService
-    from alpha_quant.application.factory import create_alpha_lake_reader
+    from alpha_quant.application.factory import create_alpha_lake_reader, create_clock
 
     uow = create_unit_of_work()
     with uow:
         config = load_config()
         alpha_lake = create_alpha_lake_reader(config)
-        svc = DailyCycleService(alpha_lake, uow.store)
+        clock = create_clock(config)
+        svc = DailyCycleService(alpha_lake, uow.store, clock)
         book_id = cmd.book_id or UUID("00000000-0000-0000-0000-000000000001")
         result = svc.run(book_id=book_id, run_key=f"cmd-{cmd.command_id}")
         alpha_lake.close()
