@@ -4,7 +4,7 @@ import json
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from alpha_quant.application.commands import submit_command
@@ -71,7 +71,9 @@ async def get_command(command_id: str, uow: Any = Depends(_unit_of_work)):
 
 @router.get("")
 async def list_commands(
-    limit: int = 50, book_id: str | None = None, uow: Any = Depends(_unit_of_work)
+    limit: int = Query(50, ge=1, le=200),
+    book_id: str | None = Query(None, max_length=36),
+    uow: Any = Depends(_unit_of_work),
 ):
     with uow:
         cmds = uow.store.list_commands(book_id=UUID(book_id) if book_id else None, limit=limit)
