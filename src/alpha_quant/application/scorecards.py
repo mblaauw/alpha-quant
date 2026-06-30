@@ -74,11 +74,11 @@ REGIME_MULTIPLIERS: dict[str, float] = {
 }
 
 
-def _config_hash() -> str:
+def _config_hash(weights: dict[str, float] | None = None) -> str:
     return hashlib.sha256(
         json.dumps(
             {
-                "weights": _COMPONENT_WEIGHTS,
+                "weights": weights if weights is not None else _COMPONENT_WEIGHTS,
                 "thresholds": _RECOMMENDATION_THRESHOLDS,
                 "regime_mult": REGIME_MULTIPLIERS,
             },
@@ -1047,7 +1047,7 @@ def generate_scorecards(
     now = as_of or datetime.now(UTC)
     today = now.date()
     scorecards: list[Scorecard] = []
-    cfg_hash = _config_hash()
+    cfg_hash = _config_hash(weights)
 
     all_symbols = set(bundles.keys())
     if spy_bundle and spy_bundle.metadata.symbol in all_symbols:
