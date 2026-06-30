@@ -215,6 +215,7 @@ class DailyCycleService:
                 portfolio_ctx,
                 as_of=now,
                 spy_bundle=spy_facts,
+                strategy_version_id=str(strategy_version_id),
             )
             # -- Persist scorecards --
             run_id_str = str(run.decision_run_id)

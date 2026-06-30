@@ -324,6 +324,14 @@ class FakeOperationalStore:
     # --- Scorecards ---
 
     def save_scorecard(self, scorecard: Scorecard, decision_run_id: str) -> str:
+        if not scorecard.security_id:
+            raise ValueError("security_id is required on scorecard")
+        if not scorecard.facts_hash:
+            raise ValueError("facts_hash is required on scorecard")
+        if not scorecard.config_hash:
+            raise ValueError("config_hash is required on scorecard")
+        if not scorecard.strategy_version:
+            raise ValueError("strategy_version is required on scorecard")
         now = datetime.now(UTC)
         scorecard_id = str(uuid4())
         stored = scorecard.model_copy(

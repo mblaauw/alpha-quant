@@ -352,7 +352,7 @@ class TestComputeTotalScore:
 class TestGenerateScorecards:
     def test_empty_bundles(self) -> None:
         portfolio = PortfolioContext(equity=100000, cash=50000)
-        result = generate_scorecards({}, portfolio)
+        result = generate_scorecards({}, portfolio, strategy_version_id="sv-1")
         assert result == []
 
     def test_single_symbol(self) -> None:
@@ -368,17 +368,22 @@ class TestGenerateScorecards:
             ],
         )
         portfolio = PortfolioContext(equity=100000, cash=50000)
-        result = generate_scorecards({"AAPL": bundle}, portfolio)
+        result = generate_scorecards({"AAPL": bundle}, portfolio, strategy_version_id="sv-1")
         assert len(result) == 1
         assert result[0].symbol == "AAPL"
         assert result[0].total_score > 0
         assert len(result[0].components) == 13
+        assert result[0].config_hash != ""
+        assert result[0].strategy_version == "sv-1"
+        assert result[0].facts_hash != ""
 
     def test_spy_excluded(self) -> None:
         spy = _make_bundle("SPY", readouts=[_r("close", 100), _r("sma_50", 100)])
         aapl = _make_bundle("AAPL", readouts=[_r("close", 110), _r("sma_50", 100)])
         portfolio = PortfolioContext(equity=100000, cash=50000)
-        result = generate_scorecards({"AAPL": aapl, "SPY": spy}, portfolio, spy_bundle=spy)
+        result = generate_scorecards(
+            {"AAPL": aapl, "SPY": spy}, portfolio, spy_bundle=spy, strategy_version_id="sv-1"
+        )
         symbols = {s.symbol for s in result}
         assert "SPY" not in symbols
         assert "AAPL" in symbols
@@ -386,6 +391,40 @@ class TestGenerateScorecards:
     def test_data_quality_fail_blocks(self) -> None:
         bundle = _make_bundle("AAPL", readouts=[_r("close", 100)])
         portfolio = PortfolioContext(equity=100000, cash=50000)
-        result = generate_scorecards({"AAPL": bundle}, portfolio)
+        result = generate_scorecards({"AAPL": bundle}, portfolio, strategy_version_id="sv-1")
         assert len(result) == 1
         assert result[0].recommendation == Recommendation.do_nothing
+
+    def test_facts_hash_includes_sections(self) -> None:
+        from alpha_quant.contracts.alpha_lake import (
+            EarningsEvent,
+            InsiderTransaction,
+            MentionObservation,
+        )
+
+        bundle = _make_bundle(
+            "AAPL",
+            readouts=[_r("close", 110), _r("sma_50", 100)],
+            insider=[
+                InsiderTransaction(effective_date="2026-06-25", transaction_type="Buy", shares=1000)
+            ],
+            earnings=[EarningsEvent(effective_date="2026-07-15", symbol="AAPL")],
+            mentions=[MentionObservation(effective_date="2026-06-26", count=50)],
+        )
+        bundle_no_extra = _make_bundle(
+            "AAPL",
+            readouts=[_r("close", 110), _r("sma_50", 100)],
+        )
+        portfolio = PortfolioContext(equity=100000, cash=50000)
+        result1 = generate_scorecards({"AAPL": bundle}, portfolio, strategy_version_id="sv-1")
+        result2 = generate_scorecards(
+            {"AAPL": bundle_no_extra}, portfolio, strategy_version_id="sv-1"
+        )
+        assert result1[0].facts_hash != result2[0].facts_hash
+
+    def test_config_hash_stable(self) -> None:
+        bundle = _make_bundle("AAPL", readouts=[_r("close", 110), _r("sma_50", 100)])
+        portfolio = PortfolioContext(equity=100000, cash=50000)
+        result1 = generate_scorecards({"AAPL": bundle}, portfolio, strategy_version_id="sv-1")
+        result2 = generate_scorecards({"AAPL": bundle}, portfolio, strategy_version_id="sv-1")
+        assert result1[0].config_hash == result2[0].config_hash

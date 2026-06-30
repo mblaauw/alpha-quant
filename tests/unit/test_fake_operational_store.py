@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+import pytest
+
 from alpha_quant.adapters.fake.operational_store import FakeOperationalStore
 from alpha_quant.adapters.fake.unit_of_work import FakeUnitOfWork
 from alpha_quant.contracts.operational import (
@@ -553,6 +555,9 @@ class TestFakeScorecards:
         sc = Scorecard(
             symbol="AAPL",
             security_id="sec-1",
+            facts_hash="abc",
+            config_hash="def",
+            strategy_version="sv-1",
             recommendation="hold",
             total_score=75.0,
             components=[
@@ -568,13 +573,73 @@ class TestFakeScorecards:
 
     def test_load_scorecards_for_run(self) -> None:
         store = FakeOperationalStore()
-        sc1 = Scorecard(symbol="AAPL", security_id="sec-1")
-        sc2 = Scorecard(symbol="MSFT", security_id="sec-2")
+        sc1 = Scorecard(
+            symbol="AAPL",
+            security_id="sec-1",
+            facts_hash="abc",
+            config_hash="def",
+            strategy_version="sv-1",
+        )
+        sc2 = Scorecard(
+            symbol="MSFT",
+            security_id="sec-2",
+            facts_hash="abc",
+            config_hash="def",
+            strategy_version="sv-1",
+        )
         store.save_scorecard(sc1, "run-001")
         store.save_scorecard(sc2, "run-001")
 
         run_scs = store.load_scorecards_for_run("run-001")
         assert len(run_scs) == 2
+
+    def test_save_scorecard_requires_security_id(self) -> None:
+        store = FakeOperationalStore()
+        sc = Scorecard(
+            symbol="AAPL",
+            security_id="",
+            facts_hash="abc",
+            config_hash="def",
+            strategy_version="sv-1",
+        )
+        with pytest.raises(ValueError, match="security_id"):
+            store.save_scorecard(sc, "run-001")
+
+    def test_save_scorecard_requires_facts_hash(self) -> None:
+        store = FakeOperationalStore()
+        sc = Scorecard(
+            symbol="AAPL",
+            security_id="sec-1",
+            facts_hash="",
+            config_hash="def",
+            strategy_version="sv-1",
+        )
+        with pytest.raises(ValueError, match="facts_hash"):
+            store.save_scorecard(sc, "run-001")
+
+    def test_save_scorecard_requires_config_hash(self) -> None:
+        store = FakeOperationalStore()
+        sc = Scorecard(
+            symbol="AAPL",
+            security_id="sec-1",
+            facts_hash="abc",
+            config_hash="",
+            strategy_version="sv-1",
+        )
+        with pytest.raises(ValueError, match="config_hash"):
+            store.save_scorecard(sc, "run-001")
+
+    def test_save_scorecard_requires_strategy_version(self) -> None:
+        store = FakeOperationalStore()
+        sc = Scorecard(
+            symbol="AAPL",
+            security_id="sec-1",
+            facts_hash="abc",
+            config_hash="def",
+            strategy_version="",
+        )
+        with pytest.raises(ValueError, match="strategy_version"):
+            store.save_scorecard(sc, "run-001")
 
 
 class TestFakeConfig:
