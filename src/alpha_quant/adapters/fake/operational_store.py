@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -601,6 +602,15 @@ class FakeOperationalStore:
 
     def config_set(self, key: str, value: str) -> None:
         self._config[key] = value
+        self._audit_events.append(
+            AuditEvent(
+                event_id=uuid4(),
+                decision_run_id=UUID(int=0),
+                event_type=f"config.{key}.changed",
+                payload_json=json.dumps({"key": key, "value": value}),
+                created_at=datetime.now(UTC),
+            )
+        )
 
     # --- Risk Policy ---
 
