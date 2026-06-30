@@ -223,3 +223,74 @@ class TestExplanationService:
         assert ctx["posture"]["state"] == "ready"
         assert "var_levels" in ctx
         assert "decisions" in ctx
+
+
+class TestFakeStoreExplanationMethods:
+    """Tests for FakeOperationalStore explanation lifecycle methods."""
+
+    def test_save_and_load_advice_artifacts(self) -> None:
+        from alpha_quant.adapters.fake.operational_store import FakeOperationalStore
+        from alpha_quant.domain.advice import AdviceArtifact, AdviceRecommendation
+
+        store = FakeOperationalStore()
+        artifact = AdviceArtifact(
+            scorecard_id="sc-1",
+            scope="scorecard_stage",
+            scope_id="M3",
+            snapshot_id="snap-1",
+            recommendation=AdviceRecommendation(
+                headline="Test explanation",
+                summary="Test summary",
+                interpretation="Test interpretation",
+            ),
+        )
+        aid = store.save_advice_artifact(artifact)
+        assert aid != ""
+
+        loaded = store.load_advice_artifacts(scope="scorecard_stage")
+        assert len(loaded) == 1
+        assert loaded[0].scope_id == "M3"
+        assert loaded[0].recommendation.headline == "Test explanation"
+
+    def test_mark_explanations_stale_by_scope(self) -> None:
+        from alpha_quant.adapters.fake.operational_store import FakeOperationalStore
+        from alpha_quant.domain.advice import AdviceArtifact
+
+        store = FakeOperationalStore()
+        store.save_advice_artifact(
+            AdviceArtifact(scorecard_id="sc-1", scope="scorecard_stage", scope_id="M1")
+        )
+        store.save_advice_artifact(
+            AdviceArtifact(scorecard_id="sc-1", scope="scorecard_stage", scope_id="M2")
+        )
+        store.save_advice_artifact(AdviceArtifact(scorecard_id="sc-1", scope="scorecard_overall"))
+
+        count = store.mark_explanations_stale(scope="scorecard_stage")
+        assert count == 2
+
+        stage = store.load_advice_artifacts(scope="scorecard_stage")
+        assert all(a.stale for a in stage)
+
+        overall = store.load_advice_artifacts(scope="scorecard_overall")
+        assert not any(a.stale for a in overall)
+
+    def test_mark_explanations_stale_by_scorecard_id(self) -> None:
+        from alpha_quant.adapters.fake.operational_store import FakeOperationalStore
+        from alpha_quant.domain.advice import AdviceArtifact
+
+        store = FakeOperationalStore()
+        store.save_advice_artifact(
+            AdviceArtifact(scorecard_id="sc-1", scope="scorecard_stage", scope_id="M1")
+        )
+        store.save_advice_artifact(
+            AdviceArtifact(scorecard_id="sc-2", scope="scorecard_stage", scope_id="M1")
+        )
+
+        count = store.mark_explanations_stale(scope="scorecard_stage", scorecard_id="sc-1")
+        assert count == 1
+
+        sc1 = store.load_advice_artifacts(scope="scorecard_stage", scope_id="M1")
+        sc1_stale = [a for a in sc1 if a.scorecard_id == "sc-1"]
+        sc2_stale = [a for a in sc1 if a.scorecard_id == "sc-2"]
+        assert all(a.stale for a in sc1_stale)
+        assert not any(a.stale for a in sc2_stale)
