@@ -10,6 +10,8 @@ from typing import Any
 from alpha_quant.application.prompts import (
     ALLOWED_ACTIONS,
     PROMPT_VERSION,
+    risk_category_prompt,
+    risk_overall_prompt,
     scorecard_overall_prompt,
     scorecard_stage_prompt,
 )
@@ -111,6 +113,149 @@ class ExplanationService:
             deterministic_differs=False,
             created_at=now,
         )
+
+    def generate_risk_category_explanations(
+        self,
+        risk_report: dict[str, Any],
+        scorecard_id: str = "",
+    ) -> list[AdviceArtifact]:
+        """Generate one explanation per risk limit/category."""
+        now = datetime.now(UTC)
+        artifacts: list[AdviceArtifact] = []
+        limits = risk_report.get("limits", [])
+
+        for limit in limits:
+            name = limit.get("name", "Unknown")
+            category_context = {
+                "name": name,
+                "current": limit.get("current", ""),
+                "limit": limit.get("limit", ""),
+                "utilization": limit.get("utilization", 0.0),
+                "breach": limit.get("breach", False),
+            }
+            prompt = risk_category_prompt(category_context)
+            fb_rec = Recommendation.watch if not limit.get("breach") else Recommendation.do_nothing
+            rec, status = self._call_llm_with_retry(prompt, fb_rec)
+            input_json = json.dumps(category_context, indent=2, default=str)
+            input_hash = hashlib.sha256(input_json.encode()).hexdigest()[:16]
+            output_json = json.dumps(
+                rec.model_dump() if hasattr(rec, "model_dump") else {}, default=str
+            )
+            output_hash = hashlib.sha256(output_json.encode()).hexdigest()[:16]
+
+            artifacts.append(
+                AdviceArtifact(
+                    scorecard_id=scorecard_id,
+                    scope=ExplanationScope.risk_category,
+                    scope_id=name.lower().replace(" ", "_").replace("—", "_"),
+                    llm_provider=getattr(self._llm, "_provider", ""),
+                    llm_model=getattr(self._llm, "_model", ""),
+                    prompt_version=self._prompt_version,
+                    input_hash=input_hash,
+                    output_hash=output_hash,
+                    validation_status=status,
+                    recommendation=rec,
+                    deterministic_differs=False,
+                    created_at=now,
+                )
+            )
+
+        return artifacts
+
+    def generate_risk_overall_explanation(
+        self,
+        risk_report: dict[str, Any],
+        scorecard_id: str = "",
+    ) -> AdviceArtifact:
+        """Generate an overall explanation for a complete risk assessment."""
+        now = datetime.now(UTC)
+        context = self._build_risk_context(risk_report)
+        prompt = risk_overall_prompt(context)
+
+        decisions = risk_report.get("decisions", [])
+        primary_action = decisions[0].get("action", "allow") if decisions else "allow"
+        fb_action_map = {
+            "halt": Recommendation.do_nothing,
+            "block": Recommendation.do_nothing,
+            "reduce": Recommendation.reduce,
+            "allow": Recommendation.hold,
+        }
+        fb_rec = fb_action_map.get(primary_action, Recommendation.hold)
+
+        rec, status = self._call_llm_with_retry(prompt, fb_rec)
+        input_json = json.dumps(context, indent=2, default=str)
+        input_hash = hashlib.sha256(input_json.encode()).hexdigest()[:16]
+        output_json = json.dumps(
+            rec.model_dump() if hasattr(rec, "model_dump") else {}, default=str
+        )
+        output_hash = hashlib.sha256(output_json.encode()).hexdigest()[:16]
+
+        return AdviceArtifact(
+            scorecard_id=scorecard_id,
+            scope=ExplanationScope.risk_overall,
+            llm_provider=getattr(self._llm, "_provider", ""),
+            llm_model=getattr(self._llm, "_model", ""),
+            prompt_version=self._prompt_version,
+            input_hash=input_hash,
+            output_hash=output_hash,
+            validation_status=status,
+            recommendation=rec,
+            deterministic_differs=False,
+            created_at=now,
+        )
+
+    def _build_risk_context(self, risk_report: dict[str, Any]) -> dict[str, Any]:
+        limits = [
+            {
+                "name": lim.get("name", ""),
+                "current": lim.get("current", ""),
+                "limit": lim.get("limit", ""),
+                "utilization": lim.get("utilization", 0.0),
+                "breach": lim.get("breach", False),
+            }
+            for lim in risk_report.get("limits", [])
+        ]
+        decisions = [
+            {
+                "action": d.get("action", ""),
+                "reason": d.get("reason", ""),
+                "limit_name": d.get("limit_name", ""),
+            }
+            for d in risk_report.get("decisions", [])
+        ]
+        posture = risk_report.get("posture", {})
+        headline = risk_report.get("headline", {})
+        var = risk_report.get("var", {})
+        concentration = risk_report.get("concentration", {})
+
+        return {
+            "as_of": str(risk_report.get("as_of", "")),
+            "posture": posture,
+            "headline": {
+                "var_1d_99_pct": headline.get("var_1d_99_pct", ""),
+                "var_1d_99_usd": headline.get("var_1d_99_usd", ""),
+                "es_975_pct": headline.get("es_975_pct", ""),
+                "es_975_usd": headline.get("es_975_usd", ""),
+                "ann_vol": headline.get("ann_vol", ""),
+                "beta": headline.get("beta", ""),
+                "drawdown": headline.get("drawdown", ""),
+                "max_drawdown": headline.get("max_drawdown", ""),
+                "gross_exposure": headline.get("gross_exposure", ""),
+                "effective_bets": headline.get("effective_bets", ""),
+            },
+            "var_levels": {
+                k: {"pct": v.get("pct", ""), "usd": v.get("usd", "")}
+                for k, v in var.get("levels", {}).items()
+            }
+            if isinstance(var.get("levels"), dict)
+            else {},
+            "limits": limits,
+            "decisions": decisions,
+            "concentration": {
+                "effective_bets": concentration.get("effective_bets", ""),
+                "hhi": concentration.get("hhi", ""),
+            },
+        }
 
     def _build_stage_context(
         self,
