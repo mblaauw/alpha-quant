@@ -1350,6 +1350,8 @@ class PostgresOperationalStore:
         return row._mapping["value"] if row else default
 
     def config_set(self, key: str, value: str) -> None:
+        import json
+
         self.session.execute(
             text(
                 """INSERT INTO ops.app_config (key, value, updated_at)
@@ -1357,6 +1359,17 @@ class PostgresOperationalStore:
                    ON CONFLICT (key) DO UPDATE SET value = :v2, updated_at = NOW()"""
             ),
             {"k": key, "v": value, "v2": value},
+        )
+        self.session.execute(
+            text(
+                """INSERT INTO audit.audit_event (event_id, decision_run_id, event_type, payload_json, created_at)
+                   VALUES (:eid, NULL, :etype, :pj, NOW())"""
+            ),
+            {
+                "eid": str(uuid4()),
+                "etype": f"config.{key}.changed",
+                "pj": json.dumps({"key": key, "value": value}),
+            },
         )
 
     # --- Row mappers ---
