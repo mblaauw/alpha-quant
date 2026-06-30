@@ -29,6 +29,7 @@ from alpha_quant.contracts.operational import (
     Strategy,
 )
 from alpha_quant.domain.advice import AdviceArtifact, OperatorOverride
+from alpha_quant.domain.risk import RiskPolicy
 from alpha_quant.domain.scorecard import Scorecard, ScorecardComponent
 
 
@@ -98,6 +99,7 @@ class FakeOperationalStore:
         self._commands: dict[UUID, Command] = {}
         self._config: dict[str, str] = {}
         self._security_refs: dict[str, str] = {}
+        self._risk_policies: dict[str, RiskPolicy] = {}
 
     @property
     def session(self) -> _FakeSession:
@@ -597,3 +599,11 @@ class FakeOperationalStore:
 
     def config_set(self, key: str, value: str) -> None:
         self._config[key] = value
+
+    # --- Risk Policy ---
+
+    def load_risk_policy(self, version_label: str = "default") -> RiskPolicy | None:
+        return self._risk_policies.get(version_label)
+
+    def save_risk_policy_version(self, policy: RiskPolicy) -> None:
+        self._risk_policies[policy.version_label] = policy

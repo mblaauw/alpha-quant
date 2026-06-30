@@ -42,6 +42,7 @@ def component_var(
     cov_matrix: list[list[float]],
     portfolio_var_pct: float,
     portfolio_vol: float | None = None,
+    flag_multiplier: float = 1.5,
 ) -> list[dict[str, Any]]:
     """Compute component VaR per position via Euler allocation.
 
@@ -68,7 +69,7 @@ def component_var(
         pct_of_var = cvar_i / total_cvar if total_cvar > 0 else 0.0
         vol_i = math.sqrt(cov_matrix[i][i]) if cov_matrix[i][i] >= 0 else 0.0
         beta_i = mvar[i] / portfolio_vol if portfolio_vol > 0 else 0.0
-        flagged = pct_of_var > weights[i] * 1.5 and weights[i] > 0
+        flagged = pct_of_var > weights[i] * flag_multiplier and weights[i] > 0
 
         results.append(
             {

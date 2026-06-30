@@ -35,6 +35,7 @@ from alpha_quant.contracts.operational import (
     Strategy,
 )
 from alpha_quant.domain.advice import AdviceArtifact, OperatorOverride
+from alpha_quant.domain.risk import RiskPolicy
 from alpha_quant.domain.scorecard import (
     Recommendation,
     Scorecard,
@@ -946,6 +947,39 @@ class PostgresOperationalStore:
             )
             for r in rows
         ]
+
+    # --- Risk Policy ---
+
+    def load_risk_policy(self, version_label: str = "default") -> RiskPolicy | None:
+        row = self.session.execute(
+            text("SELECT policy_json FROM core.risk_policy_version WHERE version_label = :vl"),
+            {"vl": version_label},
+        ).fetchone()
+        if row is None:
+            return None
+        import json
+
+        return RiskPolicy.model_validate(json.loads(row._mapping["policy_json"]))
+
+    def save_risk_policy_version(self, policy: RiskPolicy) -> None:
+        import json
+
+        self.session.execute(
+            text(
+                "INSERT INTO core.risk_policy_version "
+                "(version_label, policy_json, config_hash, created_at) "
+                "VALUES (:vl, :pj, :ch, NOW()) "
+                "ON CONFLICT (version_label) DO UPDATE SET "
+                "policy_json = EXCLUDED.policy_json, "
+                "config_hash = EXCLUDED.config_hash, "
+                "created_at = NOW()"
+            ),
+            {
+                "vl": policy.version_label,
+                "pj": json.dumps(policy.model_dump(mode="json")),
+                "ch": policy.config_hash(),
+            },
+        )
 
     # --- Commands ---
 

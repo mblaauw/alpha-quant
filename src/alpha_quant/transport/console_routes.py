@@ -35,7 +35,7 @@ from alpha_quant.application.query.portfolio import PortfolioService
 from alpha_quant.application.query.risk import RiskService
 from alpha_quant.application.query.runs import RunService
 from alpha_quant.application.query.system import SystemService
-from alpha_quant.domain.risk import RiskConfig
+from alpha_quant.domain.risk import RiskPolicy
 from alpha_quant.transport.deps import svc_depends
 
 router = APIRouter(prefix="/v1/console", tags=["console"])
@@ -48,7 +48,7 @@ def _freshness_service() -> FreshnessService:  # noqa: B008
     else:
         config = AppConfig(
             data=DataConfig(mode="fixture"),
-            risk=RiskConfig(
+            risk=RiskPolicy(
                 stop_atr_mult=2.0,
                 trail_after_r=1.0,
                 partial_take_at_r=2.0,
@@ -482,6 +482,8 @@ class SizingPreviewRequest(BaseModel):
 async def sizing_preview(req: SizingPreviewRequest):
     from alpha_quant.application.factory import create_unit_of_work
 
+    policy = RiskPolicy.default()
+
     def _compute(uow):
         bid = UUID(req.book_id) if req.book_id else None
         portfolio = uow.store.load_portfolio(bid)
@@ -489,7 +491,7 @@ async def sizing_preview(req: SizingPreviewRequest):
         positions = uow.store.list_positions(bid)
         total_mv = sum(float(p.market_value or 0) for p in positions)
         equity = cash + total_mv if (cash + total_mv) > 0 else 350_000.0
-        risk_pct = req.risk_pct if req.risk_pct else 0.005
+        risk_pct = req.risk_pct if req.risk_pct else policy.default_risk_pct
 
         pos = next((p for p in positions if p.symbol == req.symbol), None)
         last_price = float(pos.current_price) if pos and pos.current_price else 100.0
@@ -498,14 +500,14 @@ async def sizing_preview(req: SizingPreviewRequest):
         method = req.method or "atr_2_0"
 
         if method == "fixed_8":
-            stop_distance = last_price * 0.08
-            stop_basis = f"8% × ${last_price:,.2f}"
+            stop_distance = last_price * policy.fixed_stop_pct
+            stop_basis = f"{policy.fixed_stop_pct * 100:.0f}% × ${last_price:,.2f}"
         elif method == "atr_2_5":
-            stop_distance = 2.5 * atr
-            stop_basis = f"2.5 × ATR ${atr:,.2f}"
+            stop_distance = policy.atr_stop_aggressive_mult * atr
+            stop_basis = f"{policy.atr_stop_aggressive_mult} × ATR ${atr:,.2f}"
         else:
-            stop_distance = 2.0 * atr
-            stop_basis = f"2.0 × ATR ${atr:,.2f}"
+            stop_distance = policy.atr_stop_default_mult * atr
+            stop_basis = f"{policy.atr_stop_default_mult} × ATR ${atr:,.2f}"
             method = "atr_2_0"
 
         stop_price = last_price - stop_distance
@@ -513,10 +515,18 @@ async def sizing_preview(req: SizingPreviewRequest):
         suggested_qty = max(1, int(risk_budget // stop_distance)) if stop_distance > 0 else 1
         notional = suggested_qty * last_price
         risk_at_stop = suggested_qty * stop_distance
-        buying_power = equity * 0.18
+        buying_power = equity * policy.buying_power_pct
         buying_power_after = buying_power - notional
 
-        guards = _compute_guardrails(notional, risk_at_stop, equity, buying_power, suggested_qty)
+        guards = _compute_guardrails(
+            notional,
+            risk_at_stop,
+            equity,
+            buying_power,
+            suggested_qty,
+            per_trade_risk_cap=policy.per_trade_risk_cap,
+            concentration_cap=policy.concentration_cap,
+        )
 
         return {
             "symbol": req.symbol,
@@ -547,6 +557,8 @@ def _compute_guardrails(
     equity: float,
     buying_power: float,
     suggested_qty: int,
+    per_trade_risk_cap: float = 0.01,
+    concentration_cap: float = 0.20,
 ) -> list[dict[str, object]]:
     guards: list[dict[str, object]] = []
     if notional > buying_power:
@@ -557,20 +569,26 @@ def _compute_guardrails(
                 "message": f"Notional ${notional:,.0f} exceeds buying power ${buying_power:,.0f}.",
             }
         )
-    if risk_at_stop > equity * 0.01:
+    if risk_at_stop > equity * per_trade_risk_cap:
         guards.append(
             {
                 "code": "per_trade_risk_exceeded",
                 "severity": "warn",
-                "message": f"Risk at stop ${risk_at_stop:,.0f} is above the 1% per-trade cap.",
+                "message": (
+                    f"Risk at stop ${risk_at_stop:,.0f}"
+                    f" is above the {per_trade_risk_cap * 100:.0f}% per-trade cap."
+                ),
             }
         )
-    if notional > equity * 0.20:
+    if notional > equity * concentration_cap:
         guards.append(
             {
                 "code": "concentration_exceeded",
                 "severity": "warn",
-                "message": f"Notional {notional / equity * 100:.1f}% of equity exceeds 20% limit.",
+                "message": (
+                    f"Notional {notional / equity * 100:.1f}% of equity"
+                    f" exceeds {concentration_cap * 100:.0f}% limit."
+                ),
             }
         )
     if suggested_qty == 0:

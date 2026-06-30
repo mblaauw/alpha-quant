@@ -1,4 +1,4 @@
-"""Limits, circuit breakers & risk events — policy threshold checking.
+"""Limits, circuit breakers & risk events — risk policy threshold checking.
 
 WS8 of the real risk engine epic (#612).
 """
@@ -9,9 +9,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from alpha_quant.domain.risk import RiskPolicy
+
 
 @dataclass(frozen=True)
 class PolicyLimits:
+    """Deprecated — use RiskPolicy directly instead."""
+
     gross_exposure_cap: float = 0.90
     var_99_budget: float = 0.04
     drawdown_limit: float = -0.10
@@ -28,16 +32,27 @@ def check_limits(
     sector_weights: list[dict[str, Any]],
     single_name_weights: list[float],
     symbols: list[str],
-    limits: PolicyLimits | None = None,
+    limits: RiskPolicy | PolicyLimits | None = None,
 ) -> list[dict[str, Any]]:
-    """Check all policy limits and return limit entries.
+    """Check all risk policy limits and return limit entries.
 
     Returns [{name, current, limit, utilization, breach}].
     """
-    p = limits or PolicyLimits()
+    if limits is None:
+        p = PolicyLimits()
+    elif isinstance(limits, RiskPolicy):
+        p = PolicyLimits(
+            gross_exposure_cap=limits.gross_exposure_cap,
+            var_99_budget=limits.var_99_budget,
+            drawdown_limit=limits.drawdown_limit,
+            sector_cap=limits.sector_cap,
+            single_name_cap=limits.single_name_cap,
+            daily_loss_limit=limits.daily_loss_limit,
+        )
+    else:
+        p = limits
     result: list[dict[str, Any]] = []
 
-    # Gross exposure
     result.append(
         {
             "name": "Gross exposure",
@@ -48,7 +63,6 @@ def check_limits(
         }
     )
 
-    # VaR budget
     result.append(
         {
             "name": "1-day 99% VaR",
@@ -59,7 +73,6 @@ def check_limits(
         }
     )
 
-    # Max drawdown
     dd_abs = abs(max_drawdown) if max_drawdown < 0 else abs(drawdown)
     dd_limit_abs = abs(p.drawdown_limit)
     result.append(
@@ -72,7 +85,6 @@ def check_limits(
         }
     )
 
-    # Sector concentration (top sector)
     if sector_weights:
         top_sector = sector_weights[0]
         result.insert(
@@ -86,7 +98,6 @@ def check_limits(
             },
         )
 
-    # Single-name concentration (top name)
     top_sn_weight = max(single_name_weights) if single_name_weights else 0.0
     top_sn_symbol = symbols[single_name_weights.index(top_sn_weight)] if single_name_weights else ""
     if top_sn_weight > 0:
@@ -106,10 +117,11 @@ def check_limits(
 def generate_events(
     limits: list[dict[str, Any]],
     halted: bool = False,
+    warn_threshold: float = 0.85,
 ) -> list[dict[str, Any]]:
     """Generate risk events from limit states.
 
-    breach → crit event, >=85% utilization → warn event.
+    breach → crit event, >=warn_threshold utilization → warn event.
     """
     events: list[dict[str, Any]] = []
     now = datetime.now(UTC).strftime("%H:%M")
@@ -130,7 +142,7 @@ def generate_events(
                     "detail": f"{current} exceeds {limit_str}.",
                 }
             )
-        elif util >= 0.85:
+        elif util >= warn_threshold:
             events.append(
                 {
                     "severity": "warn",

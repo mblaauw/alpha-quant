@@ -6,7 +6,7 @@ from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from alpha_quant.domain._base import FrozenModel
-from alpha_quant.domain.risk import RiskConfig
+from alpha_quant.domain.risk import RiskPolicy
 
 
 class DataConfig(FrozenModel):
@@ -78,7 +78,7 @@ class AppConfig(BaseSettings):
 
     data: DataConfig
     lake: LakeConfig = LakeConfig()
-    risk: RiskConfig
+    risk: RiskPolicy
     llm: AppLLMConfig
     freshness: FreshnessConfig = FreshnessConfig()
 

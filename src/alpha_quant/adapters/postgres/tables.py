@@ -535,4 +535,14 @@ class PositionRiskCurrent(Base):
     time_stop_date: Mapped[datetime | None] = date_opt()
     auto_trail_enabled: Mapped[bool] = bool_field()
     last_adjusted_at: Mapped[datetime | None] = dt_opt()
+
+
+class RiskPolicyVersion(Base):
+    __tablename__ = "risk_policy_version"
+    __table_args__ = {"schema": "core"}
+
+    version_label: Mapped[str] = mapped_column(String(64), primary_key=True)
+    policy_json: Mapped[str] = text_field()
+    config_hash: Mapped[str] = str_64()
+    created_at: Mapped[datetime] = dt_field()
     last_adjustment_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
