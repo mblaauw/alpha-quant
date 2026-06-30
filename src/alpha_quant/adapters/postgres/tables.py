@@ -7,13 +7,16 @@ from uuid import UUID
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy import (
     Enum as SAEnum,
@@ -120,7 +123,7 @@ class Strategy(Base):
     __table_args__ = {"schema": "core"}
 
     strategy_id: Mapped[str] = pk_uuid()
-    name: Mapped[str] = str_64()
+    name: Mapped[str] = str_255()
     created_at: Mapped[datetime] = dt_field()
 
 
@@ -148,7 +151,11 @@ class PortfolioBook(Base):
 
 class SecurityReference(Base):
     __tablename__ = "security_reference"
-    __table_args__ = {"schema": "core"}
+    __table_args__ = (
+        UniqueConstraint("symbol", name="uq_security_reference_symbol"),
+        CheckConstraint("symbol != ''", name="ck_security_symbol_not_empty"),
+        {"schema": "core"},
+    )
 
     security_id: Mapped[str] = pk_uuid()
     symbol: Mapped[str] = str_36()
@@ -207,7 +214,12 @@ class AlphaLakeManifest(Base):
 
 class CandidateEvaluation(Base):
     __tablename__ = "candidate_evaluation"
-    __table_args__ = {"schema": "run"}
+    __table_args__ = (
+        CheckConstraint("composite_score >= 0", name="ck_candidate_composite_nonneg"),
+        Index("ix_candidate_evaluation_decision_run_id", "decision_run_id"),
+        Index("ix_candidate_security_id", "security_id"),
+        {"schema": "run"},
+    )
 
     candidate_id: Mapped[str] = pk_uuid()
     decision_run_id: Mapped[str] = fk("run.decision_run.decision_run_id")
@@ -223,7 +235,10 @@ class CandidateEvaluation(Base):
 
 class PolicyEvaluation(Base):
     __tablename__ = "policy_evaluation"
-    __table_args__ = {"schema": "run"}
+    __table_args__ = (
+        Index("ix_policy_evaluation_candidate_id", "candidate_id"),
+        {"schema": "run"},
+    )
 
     evaluation_id: Mapped[str] = pk_uuid()
     candidate_id: Mapped[str] = fk("run.candidate_evaluation.candidate_id")
@@ -237,7 +252,12 @@ class PolicyEvaluation(Base):
 
 class PaperOrder(Base):
     __tablename__ = "paper_order"
-    __table_args__ = {"schema": "trade"}
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_paper_order_quantity_positive"),
+        Index("ix_paper_order_decision_run_id", "decision_run_id"),
+        Index("ix_paper_order_book_id", "portfolio_book_id"),
+        {"schema": "trade"},
+    )
 
     order_id: Mapped[str] = pk_uuid()
     decision_run_id: Mapped[str | None] = fk_opt("run.decision_run.decision_run_id")
@@ -255,7 +275,12 @@ class PaperOrder(Base):
 
 class PaperFill(Base):
     __tablename__ = "paper_fill"
-    __table_args__ = {"schema": "trade"}
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_paper_fill_quantity_positive"),
+        CheckConstraint("price > 0", name="ck_paper_fill_price_positive"),
+        Index("ix_paper_fill_security_id", "security_id"),
+        {"schema": "trade"},
+    )
 
     fill_id: Mapped[str] = pk_uuid()
     order_id: Mapped[str] = fk("trade.paper_order.order_id")
@@ -272,7 +297,12 @@ class PaperFill(Base):
 
 class CashLedgerEntry(Base):
     __tablename__ = "cash_ledger_entry"
-    __table_args__ = {"schema": "trade"}
+    __table_args__ = (
+        CheckConstraint("amount != 0", name="ck_cash_ledger_amount_nonzero"),
+        Index("ix_cash_ledger_fill_id", "fill_id"),
+        Index("ix_cash_ledger_book_id", "portfolio_book_id"),
+        {"schema": "trade"},
+    )
 
     entry_id: Mapped[str] = pk_uuid()
     portfolio_book_id: Mapped[str] = fk("core.portfolio_book.book_id")
@@ -298,7 +328,10 @@ class CorporateActionBooking(Base):
 
 class PortfolioMark(Base):
     __tablename__ = "portfolio_mark"
-    __table_args__ = {"schema": "trade"}
+    __table_args__ = (
+        UniqueConstraint("portfolio_book_id", "effective_date", name="uq_portfolio_mark_book_date"),
+        {"schema": "trade"},
+    )
 
     mark_id: Mapped[str] = pk_uuid()
     portfolio_book_id: Mapped[str] = fk("core.portfolio_book.book_id")
@@ -312,7 +345,11 @@ class PortfolioMark(Base):
 
 class PositionCurrent(Base):
     __tablename__ = "position_current"
-    __table_args__ = {"schema": "projection"}
+    __table_args__ = (
+        CheckConstraint("NOT (quantity = 0 AND avg_cost != 0)", name="ck_position_stale_check"),
+        Index("ix_position_current_book_id", "book_id"),
+        {"schema": "projection"},
+    )
 
     book_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("core.portfolio_book.book_id"), primary_key=True
@@ -345,7 +382,10 @@ class PortfolioCurrent(Base):
 
 class AuditEvent(Base):
     __tablename__ = "audit_event"
-    __table_args__ = {"schema": "audit"}
+    __table_args__ = (
+        Index("ix_audit_event_decision_run_id", "decision_run_id"),
+        {"schema": "audit"},
+    )
 
     event_id: Mapped[str] = pk_uuid()
     decision_run_id: Mapped[str] = fk_opt("run.decision_run.decision_run_id")
@@ -393,7 +433,10 @@ class CurrentHalt(Base):
 
 class Command(Base):
     __tablename__ = "command"
-    __table_args__ = {"schema": "ops"}
+    __table_args__ = (
+        UniqueConstraint("actor_id", "type", "idempotency_key", name="uq_command_idempotency"),
+        {"schema": "ops"},
+    )
 
     command_id: Mapped[str] = pk_uuid()
     type: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -434,7 +477,10 @@ class AppConfig(Base):
 
 class RiskMethod(Base):
     __tablename__ = "risk_method"
-    __table_args__ = {"schema": "core"}
+    __table_args__ = (
+        CheckConstraint("is_active IS NOT NULL", name="ck_risk_method_active_not_null"),
+        {"schema": "core"},
+    )
 
     risk_method_id: Mapped[str] = pk_uuid()
     name: Mapped[str] = str_64()
@@ -446,7 +492,15 @@ class RiskMethod(Base):
 
 class ScorecardOrm(Base):
     __tablename__ = "scorecard"
-    __table_args__ = {"schema": "run"}
+    __table_args__ = (
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1", name="ck_scorecard_confidence_range"
+        ),
+        CheckConstraint("total_score >= 0", name="ck_scorecard_total_score_nonneg"),
+        Index("ix_scorecard_decision_run_id", "decision_run_id"),
+        Index("ix_scorecard_security_id", "security_id"),
+        {"schema": "run"},
+    )
 
     scorecard_id: Mapped[str] = pk_uuid()
     decision_run_id: Mapped[str] = fk("run.decision_run.decision_run_id")
@@ -467,7 +521,12 @@ class ScorecardOrm(Base):
 
 class ScorecardComponentOrm(Base):
     __tablename__ = "scorecard_component"
-    __table_args__ = {"schema": "run"}
+    __table_args__ = (
+        CheckConstraint("score >= 0", name="ck_component_score_nonneg"),
+        CheckConstraint("weight > 0", name="ck_component_weight_positive"),
+        Index("ix_scorecard_component_scorecard_id", "scorecard_id"),
+        {"schema": "run"},
+    )
 
     component_id: Mapped[str] = pk_uuid()
     scorecard_id: Mapped[str] = fk("run.scorecard.scorecard_id")
@@ -483,7 +542,10 @@ class ScorecardComponentOrm(Base):
 
 class AdviceArtifactOrm(Base):
     __tablename__ = "advice_artifact"
-    __table_args__ = {"schema": "run"}
+    __table_args__ = (
+        Index("ix_advice_artifact_scorecard_id", "scorecard_id"),
+        {"schema": "run"},
+    )
 
     advice_id: Mapped[str] = pk_uuid()
     scorecard_id: Mapped[str] = fk("run.scorecard.scorecard_id")
@@ -523,7 +585,10 @@ class OperatorOverrideOrm(Base):
 
 class PositionRiskCurrent(Base):
     __tablename__ = "position_risk_current"
-    __table_args__ = {"schema": "projection"}
+    __table_args__ = (
+        Index("ix_position_risk_current_book_id", "book_id"),
+        {"schema": "projection"},
+    )
 
     book_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("core.portfolio_book.book_id"), primary_key=True
@@ -549,3 +614,17 @@ class RiskPolicyVersion(Base):
     config_hash: Mapped[str] = str_64()
     created_at: Mapped[datetime] = dt_field()
     last_adjustment_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class BookRiskProfile(Base):
+    __tablename__ = "book_risk_profile"
+    __table_args__ = {"schema": "core"}
+
+    book_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("core.portfolio_book.book_id"), primary_key=True
+    )
+    risk_method_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("core.risk_method.risk_method_id"), nullable=False
+    )
+    params_json: Mapped[str] = text_field()
+    updated_at: Mapped[datetime] = dt_field()

@@ -7,9 +7,15 @@ from alembic import context
 from alpha_quant.adapters.postgres.engine import create_engine
 from alpha_quant.adapters.postgres.tables import Base
 
+import os as _os
+
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+database_url = _os.environ.get("DATABASE_URL")
+if database_url:
+    config.set_main_option("sqlalchemy.url", database_url)
 
 target_metadata = Base.metadata
 
