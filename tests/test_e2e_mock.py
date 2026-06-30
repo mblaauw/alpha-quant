@@ -121,8 +121,8 @@ class TestE2EMock:
             assert sa.scope_id in ("M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8"), (
                 f"Invalid stage scope_id: {sa.scope_id}"
             )
-            assert artifact.recommendation.summary, "Advice missing summary"
-            assert artifact.deterministic_differs is not None
+            assert sa.recommendation.headline, "Stage explanation missing headline"
+            assert sa.deterministic_differs is not None
 
     # ── Scorecard component invariants ────────────────────────────────
 
