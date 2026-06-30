@@ -4,13 +4,10 @@
 
 | Port | Interface | Real Adapter | Fake Adapter |
 |------|-----------|--------------|--------------|
-| AlphaLakeReadPort | read_observations(), health(), contract() | AlphaLakeRestClient (httpx → Alpha-Lake REST API) | AlphaLakeHttpFixtureClient (pre-recorded JSON fixtures) |
-| OperationalStorePort | 20 methods (reserve_run, start_run, complete_run, commit_decision_batch, book_fill, load_portfolio, set_halt, clear_halt, rebuild_projections, list_decision_runs, etc.) | PostgresOperationalStore (SQLAlchemy Core + psycopg) | FakeOperationalStore (in-memory dict) |
-| ArtifactStorePort | put_json, get_json, verify | (removed — artifacts stored in PostgreSQL) | (none) |
-| Store (legacy) | 6 mixin interfaces (PositionStore, OrderStore, DecisionStore, EventStore, JournalStore, AdminStore) | CanonicalStore (DuckDB) | FixtureStore (in-memory) |
+| AlphaLakeReadPort | health(), contract(), read_facts_bundle() | AlphaLakeRestClient (httpx → Alpha-Lake REST API) | AlphaLakeHttpFixtureClient (pre-recorded JSON fixtures) |
+| OperationalStorePort | 25+ methods (reserve_run, start_run, complete_run, commit_decision_batch, book_fill, load_portfolio, save_scorecard, save_advice_artifact, etc.) | PostgresOperationalStore (SQLAlchemy Core + psycopg) | FakeOperationalStore (in-memory dict) |
 | Clock | now, today, market_date | SystemClock (datetime.now(UTC)) | VirtualClock (deterministic) |
-| EventSink (legacy) | emit, query | DuckDBEventSink | FakeEventSink |
-| LLM | explain, generate_card | OpenAILikeLLM (OpenAI-compatible API via httpx) | CannedLLM (static templates) |
+| LLM | explain, generate_card | OpenAILikeLLM (OpenAI-compatible API via httpx) | CannedLLM (static templates with explanation fixtures) |
 
 ---
 
@@ -101,30 +98,13 @@ All market facts enter through a single port (`ports/alpha_lake.py`). Every read
 
 ---
 
-## Legacy Adapters
-
-These adapters remain functional but are being phased out:
-
-| Adapter | Replaced By | Status |
-|---------|-------------|--------|
-| **CanonicalStore** (DuckDB) | PostgresOperationalStore | Active but legacy — new code targets PostgreSQL |
-| **DuckDBEventSink** | audit_event table in PostgresOperationalStore | Active but legacy — events migrate to audit schema |
-| **InProcessLakeGateway** | AlphaLakeRestClient | Removed — replaced by REST-based AlphaLakeReadPort |
-| **FixtureLakeGateway** | AlphaLakeHttpFixtureClient | Removed — replaced by fixture-based AlphaLakeReadPort |
-| **RestLakeGateway** | AlphaLakeRestClient | Removed — never shipped; superseded by AlphaLakeReadPort |
-| **LakeMarketData / LakeFundamentals / LakeInsiderFeed / LakeSentimentFeed** | AlphaLakeReadPort | Removed — per-domain wrappers consolidated into single port |
-
----
-
 ## Wiring (factory.py)
 
 ```python
 create_alpha_lake_reader → AlphaLakeRestClient (live) / AlphaLakeHttpFixtureClient (fixture)
-create_event_sink        → DuckDBEventSink (live) / FakeEventSink (fixture)
-create_store             → CanonicalStore (live) / FixtureStore (fixture)
 create_llm               → OpenAILikeLLM (live) / CannedLLM (fixture)
 create_clock             → SystemClock (live) / VirtualClock (fixture)
-create_unit_of_work      → OperationalUnitOfWork (PostgreSQL) — always
+create_unit_of_work      → OperationalUnitOfWork (PostgreSQL) / FakeUnitOfWork (test)
 run_migrations           → Alembic upgrade to head
 seed_default_data        → Insert default strategy + portfolio_book
 ```

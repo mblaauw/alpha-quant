@@ -24,7 +24,7 @@ Alpha-Quant is a **deterministic strategy-policy and paper-trading engine**. It 
 
 ## 2. Architecture Style
 
-**Ports-and-Adapters (Hexagonal).** The domain boundary is `ports/alpha_lake.py:AlphaLakeReadPort` — all market facts flow through a single authenticated REST interface. The operational system of record is `ports/operational_store.py:OperationalStorePort` — a PostgreSQL-backed append-only ledger with rebuildable projections. Artifact storage is `ports/artifact_store.py:ArtifactStorePort` — an S3-compatible store with content-addressable keys and SHA-256 verification.
+**Ports-and-Adapters (Hexagonal).** The domain boundary is `ports/alpha_lake.py:AlphaLakeReadPort` — all market facts flow through a single authenticated REST interface. The operational system of record is `ports/operational_store.py:OperationalStorePort` — a PostgreSQL-backed append-only ledger with rebuildable projections. Scorecards, advice artifacts, and explanations are persisted directly in PostgreSQL via the operational store.
 
 ## 3. Module Layout
 
@@ -50,7 +50,7 @@ src/alpha_quant/
 ├── ports/
 │   ├── alpha_lake.py             # AlphaLakeReadPort (Protocol): read_observations → NeutralObservations
 │   ├── operational_store.py      # OperationalStorePort (Protocol): 20 methods for PostgreSQL
-│   ├── artifact_store.py         # ArtifactStorePort (Protocol): put_json, get_json, verify
+│   ├── operational_store.py      # OperationalStorePort (Protocol): scorecards, advice, events, halts
 │   ├── store.py                  # Legacy Store port (DuckDB)
 │   ├── clock.py                  # Clock port
 │   ├── event_sink.py             # EventSink port
@@ -64,7 +64,7 @@ src/alpha_quant/
 │   │   ├── operational_store.py  # PostgresOperationalStore (20 methods, SQLAlchemy Core text)
 │   │   └── unit_of_work.py       # OperationalUnitOfWork context manager
 │   ├── artifacts/
-│   │   └── s3_artifact_store.py  # S3 artifact store with SHA-256 verification
+│   │   └── s3_artifact_store.py  # (removed — artifacts stored in PostgreSQL)
 │   ├── real/
 │   │   ├── alpha_lake_rest.py    # AlphaLakeRestClient (httpx → Alpha-Lake REST API)
 │   │   ├── clock.py              # SystemClock
@@ -233,7 +233,7 @@ The trade and audit schemas are append-only. Current positions and portfolio sta
 
 ### 6.5 S3-Compatible Artifact Store (ADR-0039)
 
-Decision evidence (JSON blobs) is stored in an S3-compatible bucket with SHA-256 content hashing. Each artifact is immutable and independently verifiable. The `ArtifactStorePort` protocol exposes `put_json`, `get_json`, and `verify` methods.
+Decision evidence (scorecards, advice artifacts, explanations) is stored in PostgreSQL via the `OperationalStorePort`. The `run.scorecard`, `run.advice_artifact`, `run.scorecard_component`, and `audit.operator_override` tables provide a complete audit trail. LLM explanation content includes provenance via `prompt_version`, `input_hash`, `output_hash`, and `snapshot_id`.
 
 ### 6.6 Point-in-Time (PIT) Determinism (ADR-0033)
 
