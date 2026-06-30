@@ -52,13 +52,31 @@ function buildCard(c) {
 
 // ── Scorecard drawer (rich M1→M8) ──
 
-function buildScorecardDrawer(s) {
+function buildScorecardDrawer(s, expMap) {
   const TYPE_LABEL = { hard: "Hard gate", soft: "Posture", score: "Score", evidence: "Evidence" };
   const ICON = { ok: "✓", info: "●", warn: "⚠", bad: "✕" };
+  expMap = expMap || {};
+
+  const expBadge = s.explanation_status ? `<span class="exp-badge" data-exp="${esc(s.explanation_status)}">${esc(s.explanation_status)}</span>` : "";
+
+  const buildExpBlock = (exp) => {
+    if (!exp) return "";
+    return `<div class="exp-compact" data-exp="${esc(exp.validation_status)}">
+      <div class="exp-line">${esc(exp.headline || exp.summary || "")}</div>
+      ${exp.interpretation ? `<div class="exp-sub">${esc(exp.interpretation)}</div>` : ""}
+      <div class="exp-detail">
+        ${exp.key_evidence && exp.key_evidence.length ? `<div class="exp-section"><span class="exp-label">Key evidence</span><ul>${exp.key_evidence.map(e => `<li>${esc(e)}</li>`).join("")}</ul></div>` : ""}
+        ${exp.key_caveats && exp.key_caveats.length ? `<div class="exp-section"><span class="exp-label">Caveats</span><ul>${exp.key_caveats.map(c => `<li>${esc(c)}</li>`).join("")}</ul></div>` : ""}
+        ${exp.educational_context ? `<div class="exp-section"><span class="exp-label">Learn more</span><p>${esc(exp.educational_context)}</p></div>` : ""}
+        ${exp.what_could_change && exp.what_could_change.length ? `<div class="exp-section"><span class="exp-label">Would change if</span><ul>${exp.what_could_change.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
+      </div>
+    </div>`;
+  };
 
   const modules = (s.modules || []).map(m => {
     const hasScore = m.score != null;
     const barTone = hasScore ? (m.score >= 0.7 ? "up" : m.score >= 0.45 ? "info" : "down") : "";
+    const stageExp = expMap["scorecard_stage:" + m.id];
     return `<div class="dmod" data-type="${esc(m.type || "score")}">
       <div class="dmod-q">${esc(m.question || "")}</div>
       <div class="dmod-head">
@@ -73,6 +91,7 @@ function buildScorecardDrawer(s) {
       ${hasScore ? `<div class="dmod-bar"><div class="dmod-bar-fill" data-tone="${barTone}" style="width:${Math.round((m.score || 0) * 100)}%"></div></div>` : ""}
       <div class="dmod-metrics">${(m.metrics || []).map(x => `<span class="dmet">${esc(x.k || "")} <b>${esc(x.v || "")}</b></span>`).join("")}</div>
       <div class="dmod-reason">${esc(m.reason || "")}</div>
+      ${stageExp ? `<div class="dmod-exp"><button class="exp-toggle" onclick="this.nextElementSibling.hidden=!this.nextElementSibling.hidden;this.textContent=this.nextElementSibling.hidden?'Why?':'Hide'">Why?</button><div hidden>${buildExpBlock(stageExp)}</div></div>` : ""}
     </div>`;
   }).join("");
 
@@ -103,6 +122,7 @@ function buildScorecardDrawer(s) {
   ${portfolio ? `<div class="dw-sechead"><span class="t">Portfolio fit</span></div><div class="ov-grid">${portfolio}</div>` : ""}
   ${invals ? `<div class="dw-sechead"><span class="t">What invalidates this</span></div><ul class="dlist" data-kind="inval">${invals}</ul>` : ""}
   ${changed ? `<div class="dw-sechead"><span class="t">Changed since last run</span></div><ul class="dlist" data-kind="changed">${changed}</ul>` : ""}
+  ${expMap["scorecard_overall:"] ? `<div class="dw-sechead"><span class="t">Scorecard explanation</span>${expBadge}</div>${buildExpBlock(expMap["scorecard_overall:"])}` : ""}
   <div class="dw-foot">
     <div class="left"><button class="btn" data-variant="danger" data-dw-reject="${s.scorecard_id}">Reject</button></div>
     <div class="right">
@@ -333,7 +353,22 @@ async function openScorecard(scorecardId) {
     }
   }
 
-  const body = buildScorecardDrawer(sc);
+  // Fetch explanations
+  let explanations = [];
+  try {
+    const expResp = await get(`/v1/console/scorecards/${scorecardId}/explanations`);
+    explanations = expResp.items || [];
+  } catch (_e) {
+    // Explanations are optional — drawer renders without them
+  }
+
+  const expMap = {};
+  for (const exp of explanations) {
+    const key = exp.scope + ":" + exp.scope_id;
+    expMap[key] = exp;
+  }
+
+  const body = buildScorecardDrawer(sc, expMap);
   const subtitle = `${item.name || item.symbol} · scorecard ${scorecardId.slice(0, 8)} · policy v4 · latest run`;
   openDrawer(`${esc(item.symbol)} <span class="rec-chip" data-rec="${item.recommendation}">${esc(recLabel(item.recommendation))}</span>`, body, subtitle);
 
