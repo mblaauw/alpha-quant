@@ -40,7 +40,7 @@ export async function openPositionDrawer(positionId) {
 
     const mv = pos.market_value || 0;
     const pl = pos.unrealized_pl || 0;
-    const equity = store.context?.equity || 350000;
+    const equity = store.context?.equity > 0 ? store.context.equity : null;
     const wt = listPos?.portfolio_weight || (mv / equity);
 
     const stats = [
