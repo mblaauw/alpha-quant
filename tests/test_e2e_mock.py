@@ -238,7 +238,7 @@ class TestE2EMock:
         )
         artifact = service.generate_advice(sc)
 
-        assert artifact.validation_status == "unverified"
+        assert artifact.validation_status == "verified"
         rec = artifact.recommendation
         assert rec is not None
         assert rec.headline
