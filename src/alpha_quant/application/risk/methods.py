@@ -218,3 +218,37 @@ def compute(
     """
     fn = METHOD_REGISTRY[method_type]
     return fn(ctx, **params)
+
+
+def compute_sizing(
+    equity: float,
+    last_price: float,
+    stop_distance: float,
+    risk_pct: float = 0.005,
+) -> dict[str, float | int]:
+    """Compute sizing metrics from portfolio and trade parameters.
+
+    Returns suggested_qty, notional, risk_at_stop, stop_distance, risk_budget.
+    Returns zero for all values when equity is zero (empty portfolio).
+    """
+    if equity <= 0 or stop_distance <= 0:
+        return {
+            "risk_budget": 0.0,
+            "suggested_qty": 0,
+            "notional": 0.0,
+            "risk_at_stop": 0.0,
+            "stop_distance": stop_distance,
+        }
+
+    risk_budget = equity * risk_pct
+    suggested_qty = int(risk_budget // stop_distance)
+    notional = suggested_qty * last_price
+    risk_at_stop = suggested_qty * stop_distance
+
+    return {
+        "risk_budget": round(risk_budget, 2),
+        "suggested_qty": max(0, suggested_qty),
+        "notional": round(notional, 2),
+        "risk_at_stop": round(risk_at_stop, 2),
+        "stop_distance": round(stop_distance, 2),
+    }

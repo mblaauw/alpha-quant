@@ -492,10 +492,13 @@ async def sizing_preview(req: SizingPreviewRequest):
             method = "atr_2_0"
 
         stop_price = last_price - stop_distance
-        risk_budget = equity * risk_pct
-        suggested_qty = max(1, int(risk_budget // stop_distance)) if stop_distance > 0 else 1
-        notional = suggested_qty * last_price
-        risk_at_stop = suggested_qty * stop_distance
+        from alpha_quant.application.risk.methods import compute_sizing
+
+        sizing = compute_sizing(equity, last_price, stop_distance, risk_pct)
+        suggested_qty = sizing["suggested_qty"]
+        risk_budget = sizing["risk_budget"]
+        notional = sizing["notional"]
+        risk_at_stop = sizing["risk_at_stop"]
         buying_power = equity * policy.buying_power_pct
         buying_power_after = buying_power - notional
 
