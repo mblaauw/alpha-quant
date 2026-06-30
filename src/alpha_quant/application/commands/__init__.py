@@ -601,6 +601,17 @@ def position_set_risk_method_handler(cmd: Command) -> tuple[CommandStatus, str |
         return CommandStatus.SUCCEEDED, symbol, None
 
 
+def set_mock_mode_handler(cmd: Command) -> tuple[CommandStatus, str | None, str | None]:
+    import json
+
+    payload: dict = json.loads(cmd.payload_json) if cmd.payload_json else {}
+    mock = payload.get("mock", False)
+    uow = create_unit_of_work()
+    with uow:
+        uow.store.config_set("mock_mode", "true" if mock else "false")
+    return CommandStatus.SUCCEEDED, None, None
+
+
 HANDLERS: dict[str, CommandHandler] = {
     "decision_run.create": run_decision_handler,
     "halt.create": create_halt_handler,
@@ -618,6 +629,7 @@ HANDLERS: dict[str, CommandHandler] = {
     "lake_symbol.add": lake_symbol_add_handler,
     "lake_symbol.remove": lake_symbol_remove_handler,
     "lake_symbol.refresh": lake_symbol_refresh_handler,
+    "system.set_mock_mode": set_mock_mode_handler,
 }
 
 

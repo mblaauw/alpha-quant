@@ -10,9 +10,9 @@ import asyncio
 import json
 import os
 from typing import Any, cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -75,8 +75,23 @@ async def get_context(svc: SystemService = svc_depends(SystemService)):
 
 
 @router.post("/mode")
-async def set_mode(req: ModeRequest, svc: SystemService = svc_depends(SystemService)):
-    svc.set_mock_mode(req.mock)
+async def set_mode(
+    req: ModeRequest,
+    svc: SystemService = svc_depends(SystemService),
+    x_actor_id: str = Header("operator"),
+    x_actor_name: str = Header("Operator"),
+):
+    from alpha_quant.application.commands import submit_command
+    from alpha_quant.contracts.operational import CommandEnvelope
+
+    envelope = CommandEnvelope(
+        type="system.set_mock_mode",
+        idempotency_key=f"set-mock-mode-{uuid4().hex[:8]}",
+        actor_id=x_actor_id,
+        actor_display_name=x_actor_name,
+        payload_json=json.dumps({"mock": req.mock}),
+    )
+    submit_command(envelope)
     return svc.context()
 
 

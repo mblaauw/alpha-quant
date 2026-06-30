@@ -9,6 +9,12 @@ function pct1(v) { return (v * 100).toFixed(1) + "%"; }
 function pct0(v) { return (v * 100).toFixed(0) + "%"; }
 function fmt(v, fn) { return v != null ? fn(v) : "—"; }
 
+let _varMode = "p99";
+
+function _pickLevel(varLevels) {
+  return varLevels[_varMode] || varLevels.p99 || null;
+}
+
 export async function renderRisk() {
   const view = document.getElementById("view");
   view.innerHTML = `<div class="skeleton" style="height:240px"></div>`;
@@ -45,14 +51,18 @@ function buildRisk(data) {
   const varLevels = varData.levels || {};
   const methodParams = varData.method_params || {};
 
-  // Use 99% VaR as default view
+  // Use active VaR mode (toggled by user)
+  const varActive = _pickLevel(varLevels);
   const v99 = varLevels.p99 || null;
   const v95 = varLevels.p95 || null;
   const ves = varLevels.es975 || null;
 
+  const varModeLabel = { p99: "99%", p95: "95%", es: "ES 97.5%" }[_varMode] || "99%";
+  const varBudgetPct = { p99: 0.90, p95: 0.50, es: 0.60 }[_varMode] || 0.90;
+
   // Headline KPIs
   const hl = [
-    { label: "1-day VaR 99%", value: fmt(headline.var_1d_99_pct, pct1), tone: "warn", sub: fmt(headline.var_1d_99_usd, v => "$" + Math.round(v).toLocaleString() + " · 90% of budget") },
+    { label: `1-day VaR ${varModeLabel}`, value: fmt(varActive ? varActive.pct : null, pct1), tone: "warn", sub: varActive ? `$${Math.round(varActive.usd).toLocaleString()} · ${pct0(headline.gross_cap || 0.90)} of budget` : "—" },
     { label: "Expected shortfall", value: fmt(headline.es_975_pct, pct1), tone: "", sub: fmt(headline.es_975_usd, v => "ES 97.5% · $" + Math.round(v).toLocaleString()) },
     { label: "Ann. volatility", value: fmt(headline.ann_vol, pct1), tone: "", sub: fmt(headline.ann_vol, v => "EWMA λ" + (methodParams.ewma_lambda || 0.94) + " · daily " + pct1(v / Math.sqrt(252))) },
     { label: "Portfolio beta", value: fmt(headline.beta, v => v.toFixed(2)), tone: "", sub: "to SPY · 105% net" },
@@ -174,20 +184,20 @@ function buildRisk(data) {
       <div class="card">
         <div class="card-head"><span class="card-title">Value at Risk &amp; Expected Shortfall</span><span class="card-method">1-day · 3 models</span></div>
         <div class="var-top">
-          <div class="var-big">${v99 ? pct1(v99.pct) : "—"}<small>99% · 1d</small></div>
+          <div class="var-big">${varActive ? pct1(varActive.pct) : "—"}<small>${varModeLabel} · 1d</small></div>
           <div class="seg">
-            <button data-on="true" data-var-mode="p99">99%</button>
-            <button data-var-mode="p95">95%</button>
-            <button data-var-mode="es">ES 97.5%</button>
+            <button data-on="${_varMode === 'p99'}" data-var-mode="p99">99%</button>
+            <button data-on="${_varMode === 'p95'}" data-var-mode="p95">95%</button>
+            <button data-on="${_varMode === 'es'}" data-var-mode="es">ES 97.5%</button>
           </div>
         </div>
-        <div class="var-note">1-day loss exceeded on roughly 1 session in 100 (99% confidence). Loss in equity terms: <b style="color:var(--aq-down)">${v99 ? fmtCurrency(v99.usd) : "—"}</b>.</div>
+        <div class="var-note">1-day ${_varMode === 'es' ? 'expected shortfall' : 'VaR'}: loss above threshold in equity terms: <b style="color:var(--aq-down)">${varActive ? fmtCurrency(varActive.usd) : "—"}</b>.</div>
         <div class="tail">${tailHTML}</div>
         <div class="tail-x"><span>−3σ</span><span>loss ◂</span><span>0</span><span>▸ gain</span><span>+3σ</span></div>
         <div class="mcomp">
-          <span class="mn">Parametric <b>variance–covariance</b> · EWMA λ${methodParams.ewma_lambda || "—"}</span><span class="mvv">${v99 ? esc(v99.parametric) : "—"}</span>
-          <span class="mn">Historical simulation <b>${methodParams.hist_window_days || "—"}-day</b></span><span class="mvv">${v99 ? esc(v99.historical) : "—"}</span>
-          <span class="mn">Monte Carlo <b>${methodParams.mc_paths ? (methodParams.mc_paths / 1000).toFixed(0) : "—"}k paths</b></span><span class="mvv">${v99 ? esc(v99.monte_carlo) : "—"}</span>
+          <span class="mn">Parametric <b>variance–covariance</b> · EWMA λ${methodParams.ewma_lambda || "—"}</span><span class="mvv">${varActive ? esc(varActive.parametric) : "—"}</span>
+          <span class="mn">Historical simulation <b>${methodParams.hist_window_days || "—"}-day</b></span><span class="mvv">${varActive ? esc(varActive.historical) : "—"}</span>
+          <span class="mn">Monte Carlo <b>${methodParams.mc_paths ? (methodParams.mc_paths / 1000).toFixed(0) : "—"}k paths</b></span><span class="mvv">${varActive ? esc(varActive.monte_carlo) : "—"}</span>
         </div>
       </div>
       <!-- Component VaR -->
@@ -246,9 +256,12 @@ function wire(data) {
   // Halt/resume button
   document.querySelector("[data-halt]")?.addEventListener("click", () => openConfirm(data.halted));
 
-  // VaR mode toggle — simply re-renders (server returns all percentiles)
+  // VaR mode toggle — switch active percentile and re-render
   document.querySelectorAll("[data-var-mode]").forEach(b => {
-    b.addEventListener("click", () => renderRisk());
+    b.addEventListener("click", () => {
+      _varMode = b.dataset.varMode;
+      renderRisk();
+    });
   });
 }
 

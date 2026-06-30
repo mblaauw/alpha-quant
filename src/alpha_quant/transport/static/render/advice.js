@@ -131,11 +131,15 @@ function _qtyGuardrails(qty, sizing, equity) {
   }
   const ptCap = sizing.per_trade_risk_cap || 0.01;
   const concCap = sizing.concentration_cap || 0.20;
-  if (riskAtStop > equity * ptCap) {
-    guards.push({ severity: "warn", icon: "⚠", message: `Risk at stop ${fmtCurrency(riskAtStop)} is above the ${pct1(ptCap)} per-trade cap (${fmtCurrency(equity * ptCap)}).` });
-  }
-  if (notional > equity * concCap) {
-    guards.push({ severity: "warn", icon: "⚠", message: `Notional ${pct1(notional / equity)} of equity — above ${pct1(concCap)} single-name guide.` });
+  if (!equity) {
+    guards.push({ severity: "warn", icon: "⚠", message: "Equity data unavailable — percentage-based checks skipped." });
+  } else {
+    if (riskAtStop > equity * ptCap) {
+      guards.push({ severity: "warn", icon: "⚠", message: `Risk at stop ${fmtCurrency(riskAtStop)} is above the ${pct1(ptCap)} per-trade cap (${fmtCurrency(equity * ptCap)}).` });
+    }
+    if (notional > equity * concCap) {
+      guards.push({ severity: "warn", icon: "⚠", message: `Notional ${pct1(notional / equity)} of equity — above ${pct1(concCap)} single-name guide.` });
+    }
   }
   if (qty === 0) {
     guards.push({ severity: "block", icon: "⛔", message: "Quantity is zero — nothing to submit." });
@@ -150,7 +154,7 @@ function _qtyGuardrails(qty, sizing, equity) {
 
 function buildTicket(ticket, sizing) {
   const lock = ticket.mode !== "modify";
-  const equity = sizing.equity || 350000;
+  const equity = sizing.equity > 0 ? sizing.equity : null;
   const qty = ticket.qtyOverride != null ? ticket.qtyOverride : sizing.suggested_qty;
   const notional = qty * sizing.last_price;
   const riskAtStop = qty * sizing.stop_distance;
@@ -250,7 +254,7 @@ function buildPage(data, portfolio) {
 
   const p = portfolio || {};
   const posCount = p.positions_count || items.length;
-  const eq = p.equity || 350000;
+  const eq = p.equity > 0 ? p.equity : null;
   const ge = p.gross_exposure || (p.equity ? p.equity * 0.82 : 285774);
   const gePct = eq > 0 ? ((ge / eq) * 100).toFixed(1) : "—";
 
@@ -422,7 +426,7 @@ function wireTicket() {
   document.getElementById("tk-submit")?.addEventListener("click", () => {
     if (!_ticketSizing) return;
     const qty = _activeTicket.qtyOverride ?? _ticketSizing.suggested_qty;
-    const equity = _ticketSizing.equity || 350000;
+    const equity = _ticketSizing.equity > 0 ? _ticketSizing.equity : null;
     const riskAtStop = qty * _ticketSizing.stop_distance;
     const notional = qty * _ticketSizing.last_price;
     const ptc = _ticketSizing.per_trade_risk_cap || 0.01;
