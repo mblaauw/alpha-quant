@@ -247,10 +247,10 @@ class DailyCycleService:
                         "security_id": sec_id,
                     }
                 )
-                self._store.save_scorecard(sc_with_ids, run_id_str)
+                sc_id = self._store.save_scorecard(sc_with_ids, run_id_str)
 
                 # Generate advice artifact for each scorecard
-                if self._advice_service and sc_with_ids.scorecard_id:
+                if self._advice_service and sc_id:
                     try:
                         portfolio_summary = PortfolioSummary(
                             equity=float(state.equity),
@@ -258,9 +258,8 @@ class DailyCycleService:
                             position_count=len(state.positions),
                             regime=state.regime,
                         )
-                        advice = self._advice_service.generate_advice(
-                            sc_with_ids, portfolio_summary
-                        )
+                        sc_with_id = sc_with_ids.model_copy(update={"scorecard_id": sc_id})
+                        advice = self._advice_service.generate_advice(sc_with_id, portfolio_summary)
                         self._store.save_advice_artifact(advice)
                     except Exception:
                         logger.exception("advice_generation_failed", symbol=sc.symbol)
