@@ -7,6 +7,8 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
+
 from alpha_quant.application.prompts import (
     ALLOWED_ACTIONS,
     PROMPT_VERSION,
@@ -24,6 +26,7 @@ from alpha_quant.domain.categories import module_from_component
 from alpha_quant.domain.scorecard import Recommendation, Scorecard, ScorecardComponent
 from alpha_quant.ports.llm import LLM
 
+logger = structlog.get_logger()
 _MAX_RETRIES = 2
 
 
@@ -112,6 +115,13 @@ class ExplanationService:
                 )
             )
 
+        logger.info(
+            "explanations_generated",
+            scope="scorecard_stage",
+            scorecard_id=scorecard.scorecard_id,
+            count=len(artifacts),
+            snapshot_id=snapshot_id,
+        )
         return artifacts
 
     def generate_scorecard_explanation(
@@ -134,6 +144,13 @@ class ExplanationService:
         )
         output_hash = hashlib.sha256(output_json.encode()).hexdigest()[:16]
 
+        logger.info(
+            "explanations_generated",
+            scope="scorecard_overall",
+            scorecard_id=scorecard.scorecard_id,
+            snapshot_id=snapshot_id,
+            validation_status=status,
+        )
         return AdviceArtifact(
             scorecard_id=scorecard.scorecard_id,
             scope=ExplanationScope.scorecard_overall,
@@ -164,6 +181,7 @@ class ExplanationService:
 
         for limit in limits:
             name = limit.get("name", "Unknown")
+            cat_id = name.lower().replace(" ", "_").replace("—", "_")
             category_context = {
                 "name": name,
                 "current": limit.get("current", ""),
@@ -187,7 +205,7 @@ class ExplanationService:
                 AdviceArtifact(
                     scorecard_id=scorecard_id,
                     scope=ExplanationScope.risk_category,
-                    scope_id=name.lower().replace(" ", "_").replace("—", "_"),
+                    scope_id=cat_id,
                     snapshot_id=snapshot_id,
                     input_fingerprint=fingerprint,
                     llm_provider=getattr(self._llm, "_provider", ""),
@@ -202,6 +220,12 @@ class ExplanationService:
                 )
             )
 
+        logger.info(
+            "explanations_generated",
+            scope="risk_category",
+            count=len(artifacts),
+            snapshot_id=snapshot_id,
+        )
         return artifacts
 
     def generate_risk_overall_explanation(

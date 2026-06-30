@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -634,24 +635,30 @@ class PostgresOperationalStore:
             text("""
                 INSERT INTO run.advice_artifact
                     (advice_id, scorecard_id,
+                     scope, scope_id, snapshot_id, input_fingerprint,
                      llm_provider, llm_model, prompt_version,
                      input_hash, output_hash, validation_status,
                      recommendation, headline, summary,
                      rationale_json, risks_json,
                      confidence_label, what_changed_json, override_guidance_json,
-                     deterministic_differs, created_at)
+                     deterministic_differs, stale, created_at)
                 VALUES
                     (:aid, :sid,
+                     :sc, :scid, :snap, :fp,
                      :lp, :lm, :pv,
                      :ih, :oh, :vs,
                      :rec, :hl, :sum,
                      :rj, :rkj,
                      :cl, :wcj, :ogj,
-                     :dd, :now)
+                     :dd, :st, :now)
             """),
             {
                 "aid": advice_id,
                 "sid": advice.scorecard_id,
+                "sc": advice.scope,
+                "scid": advice.scope_id,
+                "snap": advice.snapshot_id or None,
+                "fp": advice.input_fingerprint or None,
                 "lp": advice.llm_provider,
                 "lm": advice.llm_model,
                 "pv": advice.prompt_version,
@@ -667,10 +674,90 @@ class PostgresOperationalStore:
                 "wcj": json.dumps(rec.what_changed if rec else []),
                 "ogj": json.dumps(rec.override_guidance if rec else []),
                 "dd": advice.deterministic_differs,
+                "st": advice.stale,
                 "now": now,
             },
         )
         return advice_id
+
+    def mark_explanations_stale(self, scope: str = "", scope_id: str = "") -> int:
+        import structlog
+
+        logger = structlog.get_logger()
+
+        where = []
+        params: dict[str, object] = {}
+        if scope:
+            where.append("scope = :sc")
+            params["sc"] = scope
+        if scope_id:
+            where.append("scope_id = :scid")
+            params["scid"] = scope_id
+        where_clause = " AND ".join(where) if where else "TRUE"
+
+        sql = f"UPDATE run.advice_artifact SET stale = TRUE WHERE {where_clause}"
+        result = self.session.execute(text(sql), params)
+        count = result.rowcount
+        logger.info("explanations_marked_stale", scope=scope, scope_id=scope_id, count=count)
+        return count
+
+    def load_advice_artifacts(self, scope: str = "", scope_id: str = "") -> list[AdviceArtifact]:
+        from alpha_quant.domain.advice import AdviceRecommendation as AR
+
+        where = []
+        params: dict[str, object] = {}
+        if scope:
+            where.append("scope = :sc")
+            params["sc"] = scope
+        if scope_id:
+            where.append("scope_id = :scid")
+            params["scid"] = scope_id
+        where_clause = " AND ".join(where) if where else "TRUE"
+
+        rows = self.session.execute(
+            text(f"""
+                SELECT advice_id, scorecard_id, scope, scope_id,
+                       snapshot_id, input_fingerprint,
+                       validation_status, stale,
+                       recommendation, headline, summary,
+                       interpretation, key_reasons, main_risks,
+                       confidence_label, what_changed_json, override_guidance_json,
+                       created_at
+                FROM run.advice_artifact
+                WHERE {where_clause}
+                ORDER BY created_at DESC
+            """),
+            params,
+        ).fetchall()
+
+        return [
+            AdviceArtifact(
+                advice_id=str(r._mapping["advice_id"]),
+                scorecard_id=str(r._mapping["scorecard_id"]),
+                scope=str(r._mapping.get("scope", "")),
+                scope_id=str(r._mapping.get("scope_id", "")),
+                snapshot_id=str(r._mapping.get("snapshot_id") or ""),
+                input_fingerprint=str(r._mapping.get("input_fingerprint") or ""),
+                validation_status=str(r._mapping.get("validation_status", "")),
+                stale=bool(r._mapping.get("stale", False)),
+                recommendation=AR(
+                    recommendation=r._mapping.get(
+                        "recommendation", Recommendation.do_nothing.value
+                    ),
+                    confidence_label=str(r._mapping.get("confidence_label", "medium")),
+                    headline=str(r._mapping.get("headline", "")),
+                    summary=str(r._mapping.get("summary", "")),
+                    key_reasons=json.loads(r._mapping.get("key_reasons", "[]") or "[]"),
+                    main_risks=json.loads(r._mapping.get("main_risks", "[]") or "[]"),
+                    what_changed=json.loads(r._mapping.get("what_changed_json", "[]") or "[]"),
+                    override_guidance=json.loads(
+                        r._mapping.get("override_guidance_json", "[]") or "[]"
+                    ),
+                ),
+                created_at=r._mapping.get("created_at"),
+            )
+            for r in rows
+        ]
 
     # --- Operator Overrides ---
 
