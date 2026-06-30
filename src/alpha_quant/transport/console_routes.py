@@ -516,13 +516,13 @@ def _compute_guardrails(
             }
         )
     if notional > equity * concentration_cap:
+        pct = f"{notional / equity * 100:.1f}%" if equity > 0 else f"${notional:,.0f}"
         guards.append(
             {
                 "code": "concentration_exceeded",
                 "severity": "warn",
                 "message": (
-                    f"Notional {notional / equity * 100:.1f}% of equity"
-                    f" exceeds {concentration_cap * 100:.0f}% limit."
+                    f"Notional {pct} of equity exceeds {concentration_cap * 100:.0f}% limit."
                 ),
             }
         )
