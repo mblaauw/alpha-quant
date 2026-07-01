@@ -10,7 +10,6 @@ from alpha_quant.ports.llm import LLM, LLMConfig
 
 logger = structlog.get_logger()
 
-_FALLBACK_EXPLAIN = "No explanation available at this time."
 _FALLBACK_CARD = "## {symbol}\n\nConcept card unavailable."
 _SYSTEM_EXPLAIN = (
     "You are a quantitative trading assistant. "
@@ -66,15 +65,7 @@ class OpenAILikeLLM(LLM):
 
     @override
     def explain(self, context: str) -> str:
-        try:
-            return self._chat_completion(_SYSTEM_EXPLAIN, context)
-        except Exception:
-            logger.exception(
-                "LLM explain failed (provider=%s, key=%s); using fallback",
-                self._provider,
-                self._masked_key(),
-            )
-            return _FALLBACK_EXPLAIN
+        return self._chat_completion(_SYSTEM_EXPLAIN, context)
 
     @override
     def generate_card(self, symbol: str, data: str) -> str:

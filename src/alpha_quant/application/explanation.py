@@ -28,7 +28,6 @@ from alpha_quant.domain.scorecard import Recommendation, Scorecard, ScorecardCom
 from alpha_quant.ports.llm import LLM
 
 logger = structlog.get_logger()
-_MAX_RETRIES = 2
 
 
 @dataclass
@@ -397,22 +396,29 @@ class ExplanationService:
             "portfolio_regime": portfolio.regime,
         }
 
+    @staticmethod
+    def _corrective_prompt(original: str) -> str:
+        return (
+            original
+            + "\n\nYour previous response did not parse as valid JSON. "
+            + "Return ONLY valid JSON with no additional text, explanation, "
+            + "or markdown formatting."
+        )
+
     def _call_llm_with_retry(
         self,
         prompt: str,
         fallback_rec: Recommendation,
     ) -> tuple[AdviceRecommendation, str]:
-        for attempt in range(_MAX_RETRIES + 1):
+        for attempt_prompt in (prompt, self._corrective_prompt(prompt)):
             try:
-                response = self._llm.explain(prompt)
+                response = self._llm.explain(attempt_prompt)
                 parsed = self._parse_llm_response(response)
                 if parsed is not None:
                     status = self._validate_recommendation(parsed)
                     return parsed, status
             except Exception:
-                if attempt == _MAX_RETRIES:
-                    fb = self._fallback_recommendation(fallback_rec)
-                    return fb, "failed"
+                logger.warning("llm_call_failed", exc_info=True)
         fb = self._fallback_recommendation(fallback_rec)
         return fb, "failed"
 
@@ -422,6 +428,8 @@ class ExplanationService:
             return "failed"
         if rec.confidence_label not in ("low", "medium", "high"):
             return "failed"
+        if not rec.headline or not rec.summary or not rec.key_reasons:
+            return "degraded"
         return "verified"
 
     def _parse_llm_response(self, raw: str) -> AdviceRecommendation | None:

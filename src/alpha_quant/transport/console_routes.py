@@ -412,14 +412,14 @@ async def get_symbol_scorecard(
 
 
 @router.get("/positions/{symbol}/advice")
-async def get_position_advice(
+async def position_advice(
     symbol: str,
     book_id: str | None = Query(None),
 ):
-    from alpha_quant.application.query.scorecards import get_position_advice as _get_advice
+    from alpha_quant.application.query.scorecards import get_position_advice
 
     bid = UUID(book_id) if book_id else None
-    items = _get_advice(symbol, book_id=bid, limit=5)
+    items = get_position_advice(symbol, book_id=bid, limit=5)
     return {"items": items}
 
 
@@ -500,7 +500,7 @@ async def sizing_preview(req: SizingPreviewRequest):
         from alpha_quant.application.risk.methods import compute_sizing
 
         sizing = compute_sizing(equity, last_price, stop_distance, risk_pct)
-        suggested_qty = sizing["suggested_qty"]
+        suggested_qty = int(sizing["suggested_qty"])
         risk_budget = sizing["risk_budget"]
         notional = sizing["notional"]
         risk_at_stop = sizing["risk_at_stop"]

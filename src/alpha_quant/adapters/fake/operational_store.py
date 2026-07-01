@@ -382,7 +382,9 @@ class FakeOperationalStore:
             count += 1
         return count
 
-    def load_advice_artifacts(self, scope: str = "", scope_id: str = "") -> list[AdviceArtifact]:
+    def load_advice_artifacts(
+        self, scope: str = "", scope_id: str = "", scorecard_id: str = "", limit: int = 0
+    ) -> list[AdviceArtifact]:
         return [
             a
             for a in self._advice_artifacts.values()

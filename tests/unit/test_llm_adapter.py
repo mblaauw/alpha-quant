@@ -1,6 +1,8 @@
 """Unit tests for LLM adapter (adapters.real.llm_adapter)."""
 
 import httpx
+import pytest
+from tenacity import RetryError
 
 from alpha_quant.adapters.real.llm_adapter import OpenAILikeLLM
 from alpha_quant.ports.llm import LLMConfig
@@ -40,14 +42,16 @@ class TestOpenAILikeLLM:
         assert "AAPL" in result
         assert "Apple" in result
 
-    def test_explain_returns_fallback_on_http_error(self) -> None:
+    def test_explain_raises_on_http_error(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(500)
 
         client = httpx.Client(transport=httpx.MockTransport(handler))
         llm = OpenAILikeLLM(_config(), client=client)
-        result = llm.explain("context")
-        assert "No explanation available" in result
+        from tenacity import RetryError
+
+        with pytest.raises(RetryError):
+            llm.explain("context")
 
     def test_generate_card_returns_fallback_on_http_error(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
@@ -58,11 +62,11 @@ class TestOpenAILikeLLM:
         result = llm.generate_card("AAPL", "data")
         assert "AAPL" in result
 
-    def test_explain_fallback_on_malformed_response(self) -> None:
+    def test_explain_raises_on_malformed_response(self) -> None:
         client = _mock_client({"unexpected": "response"})
         llm = OpenAILikeLLM(_config(), client=client)
-        result = llm.explain("context")
-        assert "No explanation available" in result
+        with pytest.raises(RetryError):
+            llm.explain("context")
 
     def test_sends_correct_request_body(self) -> None:
         import json

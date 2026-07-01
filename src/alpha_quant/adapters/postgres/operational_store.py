@@ -716,7 +716,7 @@ class PostgresOperationalStore:
 
         sql = f"UPDATE run.advice_artifact SET stale = TRUE WHERE {where_clause}"
         result = self.session.execute(text(sql), params)
-        count = result.rowcount
+        count = result.rowcount  # type: ignore
         logger.info(
             "explanations_marked_stale",
             scope=scope,
@@ -726,7 +726,9 @@ class PostgresOperationalStore:
         )
         return count
 
-    def load_advice_artifacts(self, scope: str = "", scope_id: str = "") -> list[AdviceArtifact]:
+    def load_advice_artifacts(
+        self, scope: str = "", scope_id: str = "", scorecard_id: str = "", limit: int = 0
+    ) -> list[AdviceArtifact]:
         from alpha_quant.domain.advice import AdviceRecommendation
 
         where = []
@@ -737,27 +739,33 @@ class PostgresOperationalStore:
         if scope_id:
             where.append("scope_id = :scid")
             params["scid"] = scope_id
+        if scorecard_id:
+            where.append("scorecard_id = :scid2")
+            params["scid2"] = scorecard_id
         where_clause = " AND ".join(where) if where else "TRUE"
+        limit_clause = " LIMIT :lim" if limit else ""
 
-        rows = self.session.execute(
-            text(f"""
-                SELECT advice_id, scorecard_id, scope, scope_id,
-                       snapshot_id, input_fingerprint,
-                       validation_status, stale,
-                       recommendation, headline, summary,
-                       rationale_json AS key_reasons,
-                       risks_json AS main_risks,
-                       confidence_label, what_changed_json, override_guidance_json,
-                       interpretation, key_evidence_json, key_caveats_json,
-                       data_quality_notes, decision_context,
-                       educational_context, what_could_change_json,
-                       created_at
-                FROM run.advice_artifact
-                WHERE {where_clause}
-                ORDER BY created_at DESC
-            """),
-            params,
-        ).fetchall()
+        raw_sql = f"""
+            SELECT advice_id, scorecard_id, scope, scope_id,
+                   snapshot_id, input_fingerprint,
+                   validation_status, stale,
+                   recommendation, headline, summary,
+                   rationale_json AS key_reasons,
+                   risks_json AS main_risks,
+                   confidence_label, what_changed_json, override_guidance_json,
+                   interpretation, key_evidence_json, key_caveats_json,
+                   data_quality_notes, decision_context,
+                   educational_context, what_could_change_json,
+                   created_at
+            FROM run.advice_artifact
+            WHERE {where_clause}
+            ORDER BY created_at DESC
+            {limit_clause}
+        """
+        if limit:
+            params["lim"] = limit
+
+        rows = self.session.execute(text(raw_sql), params).fetchall()
 
         def _load_json(val: str | None, default: str = "[]") -> list:
             try:

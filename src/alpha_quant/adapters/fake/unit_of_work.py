@@ -1,14 +1,24 @@
 from __future__ import annotations
 
 from types import TracebackType
+from typing import Any
 
 from alpha_quant.adapters.fake.operational_store import FakeOperationalStore
+
+
+class _NoopSession:
+    def rollback(self) -> None: ...
+    def close(self) -> None: ...
 
 
 class FakeUnitOfWork:
     def __init__(self, store: FakeOperationalStore | None = None) -> None:
         self._store: FakeOperationalStore | None = None
         self._seed_store = store
+
+    @property
+    def session(self) -> Any:
+        return _NoopSession()
 
     @property
     def store(self) -> FakeOperationalStore:

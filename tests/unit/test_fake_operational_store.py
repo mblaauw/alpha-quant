@@ -27,7 +27,7 @@ from alpha_quant.contracts.operational import (
     RunStatus,
     Strategy,
 )
-from alpha_quant.domain.scorecard import Scorecard, ScorecardComponent
+from alpha_quant.domain.scorecard import Recommendation, Scorecard, ScorecardComponent
 
 
 class TestFakeRunLifecycle:
@@ -558,7 +558,7 @@ class TestFakeScorecards:
             facts_hash="abc",
             config_hash="def",
             strategy_version="sv-1",
-            recommendation="hold",
+            recommendation=Recommendation.hold,
             total_score=75.0,
             components=[
                 ScorecardComponent(name="momentum", category="technical", score=80.0),

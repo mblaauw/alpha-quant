@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi_mcp import FastApiMCP
 
 from alpha_quant.transport.commands import router as commands_router
 from alpha_quant.transport.console_routes import router as console_router
@@ -30,13 +31,31 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Alpha Quant", lifespan=lifespan)
 
+mcp_server = FastApiMCP(
+    app,
+    name="Alpha Quant",
+    description="Alpha-Quant trading system — positions, decisions, risk, and orders",
+)
+mcp_server.mount()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[],
     allow_credentials=True,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "X-Idempotency-Key", "X-Expected-Version", "X-CSRF-Token"],
+    allow_headers=[
+        "Content-Type",
+        "X-API-Key",
+        "X-Idempotency-Key",
+        "X-Expected-Version",
+        "X-CSRF-Token",
+        "X-Actor-Id",
+        "X-Actor-Name",
+    ],
 )
+
+
+_PUBLIC_PATHS = frozenset({"/", "/health", "/livez", "/readyz"})
 
 
 @app.middleware("http")
@@ -44,10 +63,15 @@ async def auth_middleware(request: Request, call_next):
     if AQ_AUTH_MODE == "dev":
         return await call_next(request)
 
-    if request.method == "POST" and request.url.path.startswith("/v1/commands"):
+    path = request.url.path
+    if path.startswith("/static") or path in _PUBLIC_PATHS:
+        return await call_next(request)
+
+    if path.startswith("/v1/"):
         api_key = request.headers.get("X-API-Key", "")
         if api_key != AQ_API_KEY:
             return JSONResponse({"error": "unauthorized"}, status_code=401)
+        return await call_next(request)
 
     return await call_next(request)
 

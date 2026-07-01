@@ -44,7 +44,7 @@ def _compute_sizing(
     equity: float,
     last_price: float,
     atr_value: float | None,
-) -> dict[str, object]:
+) -> dict[str, int | float]:
     """Compute one-row sizing preview."""
     from alpha_quant.application.risk.methods import compute_sizing
 
@@ -195,14 +195,27 @@ def get_position_advice(
     return with_uow(_query)
 
 
+_EXPLANATION_SCOPE_MAP: dict[str, str] = {
+    "stages": "scorecard_stage",
+    "overall": "scorecard_overall",
+    "risk_category": "risk_category",
+    "risk_overall": "risk_overall",
+    "final_output": "final_output",
+}
+
+
 def get_explanations(
     scorecard_id: str,
     scope: str | None = None,
 ) -> list[dict[str, Any]]:
     def _query(uow: Any) -> list[dict[str, Any]]:
+        resolved = scope or ""
+        mapped_scope = _EXPLANATION_SCOPE_MAP.get(resolved, resolved)
         artifacts = uow.store.load_advice_artifacts(
-            scope=scope or "",
+            scope=mapped_scope,
             scope_id="",
+            scorecard_id=scorecard_id,
+            limit=100,
         )
         return [
             {
@@ -231,7 +244,6 @@ def get_explanations(
                 "created_at": str(a.created_at) if a.created_at else None,
             }
             for a in artifacts
-            if a.scorecard_id == scorecard_id and (not scope or a.scope == scope)
         ]
 
     return with_uow(_query)

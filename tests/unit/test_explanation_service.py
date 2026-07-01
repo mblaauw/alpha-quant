@@ -70,6 +70,9 @@ class TestExplanationService:
         rec = AdviceRecommendation(
             recommendation=Recommendation.hold,
             confidence_label="medium",
+            headline="Test headline",
+            summary="Test summary",
+            key_reasons=["Test reason"],
         )
         assert ExplanationService._validate_recommendation(rec) == "verified"
 

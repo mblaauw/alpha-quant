@@ -15,10 +15,9 @@ dependencies = [
     "sqlalchemy>=2.0",
     "psycopg[binary,pool]>=3.2",
     "alembic>=1.15",
-
     "fastapi>=0.115",
     "uvicorn[standard]>=0.34",
-
+    "fastapi-mcp>=0.4.0",
 ]
 
 [project.scripts]
