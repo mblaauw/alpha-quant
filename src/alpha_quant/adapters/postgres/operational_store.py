@@ -761,9 +761,28 @@ class PostgresOperationalStore:
 
         def _load_json(val: str | None, default: str = "[]") -> list:
             try:
-                return json.loads(val) if val else json.loads(default)
+                if isinstance(val, str):
+                    result = json.loads(val) if val else json.loads(default)
+                elif val is None:
+                    result = json.loads(default)
+                else:
+                    result = val
             except (json.JSONDecodeError, TypeError):  # fmt: skip
                 return json.loads(default)
+
+            if isinstance(result, dict):
+                items = []
+                for v in result.values():
+                    if isinstance(v, list):
+                        items.extend(str(i) for i in v)
+                    elif isinstance(v, str):
+                        items.append(v)
+                return items
+
+            if isinstance(result, list):
+                return [str(i) for i in result]
+
+            return json.loads(default)
 
         return [
             AdviceArtifact(

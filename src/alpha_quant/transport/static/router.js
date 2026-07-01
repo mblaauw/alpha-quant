@@ -5,6 +5,7 @@ import { renderDecisions } from "./render/decisions.js";
 import { renderOrders } from "./render/orders.js";
 import { renderRisk } from "./render/risk.js";
 import { renderSystem } from "./render/system.js";
+import { closeDrawer } from "./components/drawer.js";
 
 const routes = {
   advice: renderAdvice,
@@ -19,6 +20,14 @@ const routes = {
 
 export function navigate(hash) {
   const route = hash.replace(/^#\/?/, "").split("?")[0] || "advice";
+
+  closeDrawer();
+  const tk = document.getElementById("tk-overlay");
+  if (tk) {
+    tk.dataset.open = "false";
+    tk.remove();
+  }
+
   store.route = route;
   const navRoute = (route === "runs" || route === "journal") ? "system" : route;
   document.querySelectorAll("#tabs a").forEach((a) => {
