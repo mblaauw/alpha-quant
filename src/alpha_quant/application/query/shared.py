@@ -32,7 +32,7 @@ def with_uow(query_fn: Callable, database_url: str | None = None) -> Any:
 
 
 def resolve_active_book_id() -> UUID:
-    """Return active book — mock or earliest-registered book."""
+    """Return active book — mock or earliest-registered paper book."""
     if _check_mock_mode():
         return MOCK_BOOK_ID
     try:
@@ -41,7 +41,7 @@ def resolve_active_book_id() -> UUID:
         uow = create_unit_of_work()
         with uow:
             books = sorted(
-                uow.store.list_books(),
+                [b for b in uow.store.list_books() if b.kind == "paper"],
                 key=lambda b: b.created_at,
             )
             if books:

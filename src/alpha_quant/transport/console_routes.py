@@ -96,8 +96,11 @@ async def set_mode(
 
 
 @router.get("/portfolio")
-async def get_portfolio(svc: PortfolioService = svc_depends(PortfolioService)):
-    return svc.summary()
+async def get_portfolio(
+    book_id: str | None = Query(None),
+    svc: PortfolioService = svc_depends(PortfolioService),
+):
+    return svc.summary(book_id=book_id)
 
 
 @router.get("/positions")
