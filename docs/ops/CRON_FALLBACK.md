@@ -14,7 +14,7 @@ If APScheduler is unavailable or unreliable, use the system cron daemon as a fal
 #
 # Use a single entry that the pipeline validates:
 
-30 21 * * 1-5 cd /path/to/alpha-quant && /path/to/uv run alpha-quant run --mode live >> logs/cron.out 2>&1
+30 21 * * 1-5 cd /path/to/alpha-quant && /path/to/uv run alpha-quant daily-cycle >> logs/cron.out 2>&1
 ```
 
 ## Daylight saving note
@@ -33,7 +33,7 @@ The pipeline checks the `runs` table for an existing `completed` run on today's 
 When running via cron, redirect stdout/stderr to a log file:
 
 ```cron
-30 21 * * 1-5 cd /path/to/alpha-quant && /path/to/uv run alpha-quant run --mode live >> logs/cron_pipeline.log 2>&1
+30 21 * * 1-5 cd /path/to/alpha-quant && /path/to/uv run alpha-quant daily-cycle >> logs/cron_pipeline.log 2>&1
 ```
 
 Maintain the same log retention as the APScheduler setup (30-day rotation via an external `logrotate` config).

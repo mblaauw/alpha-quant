@@ -10,6 +10,11 @@
       "type": "local",
       "command": ["npx", "@playwright/mcp@latest", "--headless"],
       "enabled": true
+    },
+    "context7": {
+      "type": "local",
+      "command": ["npx", "-y", "@upstash/context7-mcp"],
+      "enabled": true
     }
   }
 }

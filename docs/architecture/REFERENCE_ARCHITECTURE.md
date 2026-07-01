@@ -31,58 +31,47 @@ Alpha-Quant is a **deterministic strategy-policy and paper-trading engine**. It 
 ```
 src/alpha_quant/
 ├── contracts/
-│   ├── alpha_lake.py             # NeutralObservation data contracts (frozen dataclasses)
-│   └── operational.py            # 25 frozen dataclass contracts for PostgreSQL operational store
+│   ├── alpha_lake.py             # FactsBundle data contracts (frozen Pydantic)
+│   └── operational.py            # Frozen dataclass contracts for PostgreSQL operational store
 ├── domain/
-│   ├── decision_context.py       # DecisionContext wrapping NeutralObservations
-│   ├── policy/                   # 7 policy modules
-│   │   ├── regime_policy.py, technical_policy.py, fundamental_policy.py
-│   │   ├── insider_policy.py, attention_policy.py
-│   │   ├── earnings_blackout_policy.py, composite_policy.py
+│   ├── _base.py                  # Shared FrozenModel base class
 │   ├── models.py                 # Bar, Position, Order, Fill, Decision, Candidate, PortfolioSnapshot (frozen Pydantic)
-│   ├── events.py                 # 20+ DomainEvent types (discriminated union)
-│   ├── fills.py                  # FillConfig, fill_entry_order, fill_stop_loss, fill_partial_take
-│   ├── risk.py                   # RiskConfig, evaluate_stops, evaluate_drawdown, evaluate_daily_loss
-│   ├── sizing.py                 # SizingConfig, size_position
-│   ├── ranking.py                # Candidate ranking with sector diversification
-│   ├── invariants.py             # Self-consistency invariant checks
-│   └── narration.py, journal.py, reporting.py, calendar.py, ask.py, degradation.py, regime.py, constants.py
+│   ├── events.py                 # DomainEvent types (regressed to plain dict)
+│   ├── risk.py                   # RiskPolicy, RiskCalculation, RiskDecision (unified policy model)
+│   ├── scorecard.py              # Scorecard, ComponentState, Recommendation, StageResult
+│   ├── advice.py                 # AdviceArtifact, AdviceRecommendation, ExplanationScope, OperatorOverride
+│   ├── categories.py             # Module-to-category mapping
+│   ├── calendar.py               # Market calendar utilities
+│   └── regime.py                 # Regime literal type
 ├── ports/
-│   ├── alpha_lake.py             # AlphaLakeReadPort (Protocol): read_observations → NeutralObservations
-│   ├── operational_store.py      # OperationalStorePort (Protocol): 20 methods for PostgreSQL
-│   ├── operational_store.py      # OperationalStorePort (Protocol): scorecards, advice, events, halts
-│   ├── store.py                  # Legacy Store port (DuckDB)
+│   ├── alpha_lake.py             # AlphaLakeReadPort (Protocol): read_facts_bundle → FactsBundle
+│   ├── operational_store.py      # OperationalStorePort (Protocol): 33 methods for PostgreSQL
 │   ├── clock.py                  # Clock port
-│   ├── event_sink.py             # EventSink port
 │   └── llm.py                    # LLM port
 ├── adapters/
 │   ├── _parse.py                 # Shared parsing helpers for Alpha-Lake responses
 │   ├── postgres/                 # PostgreSQL adapters
-│   │   ├── tables.py             # 21 ORM models across 6 schemas (core, run, trade, projection, audit, ops)
+│   │   ├── tables.py             # ORM models across 6 schemas (core, run, trade, projection, audit, ops)
 │   │   ├── engine.py             # Engine + session factory + init_schema()
 │   │   ├── health.py             # Health check
-│   │   ├── operational_store.py  # PostgresOperationalStore (20 methods, SQLAlchemy Core text)
+│   │   ├── operational_store.py  # PostgresOperationalStore (SQLAlchemy Core text)
 │   │   └── unit_of_work.py       # OperationalUnitOfWork context manager
-│   ├── artifacts/
-│   │   └── s3_artifact_store.py  # (removed — artifacts stored in PostgreSQL)
 │   ├── real/
 │   │   ├── alpha_lake_rest.py    # AlphaLakeRestClient (httpx → Alpha-Lake REST API)
 │   │   ├── clock.py              # SystemClock
-│   │   ├── event_sink.py         # DuckDBEventSink
 │   │   └── llm_adapter.py        # OpenAILikeLLM
 │   └── fake/
 │       ├── alpha_lake_http_fixture.py  # Offline replay from fixture files
-│       ├── fake_operational_store.py   # In-memory fake for unit tests
-│       ├── fixture_store.py      # FixtureStore for test replay
+│       ├── operational_store.py        # In-memory fake for unit tests
+│       ├── unit_of_work.py       # FakeUnitOfWork for tests
 │       ├── virtual_clock.py      # Deterministic clock for tests
-│       ├── canned_llm.py         # Static LLM responses for tests
-│       └── fake_event_sink.py    # In-memory event sink for tests
+│       └── canned_llm.py         # Static LLM responses for tests
 ├── transport/
-│   ├── app.py                    # FastAPI BFF with CORS, static mounts, health, dashboard, and command routes
+│   ├── app.py                    # FastAPI BFF with CORS, static mounts, health, console routes, commands, MCP
 │   ├── health.py                 # /livez, /readyz endpoints
-│   ├── dashboard.py              # Router aggregation for /v1/dashboard/*
+│   ├── console_routes.py         # /v1/* console API (equity, positions, runs, decisions, scorecards, advice, risk, journal, orders, system, freshness)
 │   ├── commands.py               # /v1/commands CRUD + cancel API
-│   ├── handlers/                 # Transport handler modules (command_center, decisions, portfolio, orders, risk, runs, journal, reports, system, halts)
+│   ├── deps.py                   # FastAPI dependency injection helpers
 │   └── static/                   # Vanilla JS SPA
 │       ├── index.html            # Application shell
 │       ├── styles.css            # CSS custom properties design system
@@ -91,28 +80,48 @@ src/alpha_quant/
 │       ├── router.js             # Hash-based client-side router
 │       ├── api.js                # Fetch API wrapper with idempotency headers
 │       ├── commands.js           # Command confirmation modal workflow
-│       ├── render/               # 9 view renderers (command_center, decisions, portfolio, orders, risk, runs, journal, reports, system)
-│       └── components/           # Reusable UI components (cards, table, drawer, modal, tooltip, empty_state, loading_state)
+│       ├── formatters.js         # Shared display formatters
+│       ├── freshness.js          # Freshness status indicator
+│       ├── render/               # View renderers (advice, decisions, drawers, orders, portfolio, risk, shell, system)
+│       └── components/           # Reusable UI components (banner, drawer, empty_state, error_state, modal, status, table, toast, tooltip)
 ├── application/
-│   ├── cli.py                    # Typer CLI: run, journal, ask, report, status, halt, backup, db-*, dashboard, worker
+│   ├── cli.py                    # Typer CLI: db-*, dashboard, worker
 │   ├── config.py                 # pydantic-settings AppConfig with nested configs
-│   ├── factory.py                # Composition root: create_alpha_lake_reader, create_event_sink, create_store, create_llm, create_clock, create_unit_of_work, run_migrations, seed_default_data
-│   ├── pipeline_v2.py            # Pipeline orchestrator (daily decision cycle with NeutralObservations)
-│   ├── halt.py                   # Database-backed halt via ops.current_halt (ADR-0040)
-│   ├── backup.py                 # DuckDB state store backup
+│   ├── factory.py                # Composition root: create_alpha_lake_reader, create_llm, create_clock, create_unit_of_work, run_migrations, seed_default_data
+│   ├── daily_cycle.py            # DailyCycleService — pipeline orchestrator (scorecard decision cycle with FactsBundle)
+│   ├── scorecards.py             # Scorecard engine — M1–M8 evaluation (1126 lines)
+│   ├── explanation.py            # LLM explanation service (479 lines)
+│   ├── prompts.py                # LLM prompt templates
 │   ├── alerts.py                 # System alert management
-│   ├── catalog.py                # Data catalog queries
+│   ├── dev_seed.py               # Dev seed data for development/testing
 │   ├── import_legacy_duckdb.py   # One-time DuckDB → PostgreSQL migration tool
-│   ├── query/                    # Query service layer (9 domain services, PostgreSQL-backed)
-│   ├── commands/                 # Durable command model + handler dispatcher
-│   └── store/                    # CanonicalStore (DuckDB legacy — being replaced)
-│       ├── state.py              # CanonicalStore base + schema init
-│       └── *mixins               # PositionStore, OrderStore, DecisionStore, EventStore, JournalStore, AdminStore
-└── migrations/                   # Alembic migrations
+│   ├── query/                    # Query service layer (10 domain services, PostgreSQL-backed)
+│   │   ├── decisions.py, freshness.py, journal.py, orders.py
+│   │   ├── portfolio.py, risk.py, runs.py, scorecards.py
+│   │   ├── shared.py, system.py
+│   ├── risk/                     # Risk engine (10 modules)
+│   │   ├── component.py, concentration.py, factors.py, inputs.py
+│   │   ├── limits.py, liquidity.py, methods.py, posture.py
+│   │   ├── scenarios.py, var.py
+│   └── commands/                 # Durable command model + handler dispatcher
+└── migrations/                   # Alembic migrations (14 versions)
     ├── env.py
+    ├── script.py.mako
     └── versions/
-        ├── 0001_schema_baseline.py  # 21 tables across 6 schemas
-        └── 0002_command_table.py     # ops.command table for durable commands
+        ├── 0001_schema_baseline.py   # Schema baselines
+        ├── 0002_command_table.py      # ops.command table
+        ├── 0003_scorecards_advice_risk.py
+        ├── 0004_nullable_order_decision_fk.py
+        ├── 0005_book_risk_profile_and_constraints.py
+        ├── 0006_check_constraints_and_enums.py
+        ├── 0007_enum_check_constraints.py
+        ├── 0008_app_config_table.py
+        ├── 0009_fix_audit_event_nullable.py
+        ├── 0010_risk_policy_version.py
+        ├── 0011_advice_artifact_columns.py
+        ├── 0012_explanation_columns.py
+        ├── 0013_explanation_persist_fields.py
+        └── 0014_explanation_constraints.py
 ```
 
 ## 4. Technology Stack
@@ -122,8 +131,7 @@ src/alpha_quant/
 | Runtime | Python 3.14 | Type hints, pattern matching, free-threaded |
 | HTTP Client | httpx | Async-capable, connection pooling, timeout support |
 | Operational Store | PostgreSQL 17+ (psycopg 3, SQLAlchemy 2 Core) | ACID-compliant system of record, append-only ledger |
-| Artifact Store | S3-compatible (boto3) | Durable, content-addressed, SHA-256 verified decision evidence |
-| CLI | Typer + Rich | Type-hint-driven commands, formatted tables, panels |
+| CLI | Typer + Rich | Type-hint-driven commands (db-*, dashboard, worker) |
 | Dashboard | Vanilla JS SPA + FastAPI BFF | No build step, same-origin, same container |
 | Type Checker | ty (Astral) | Fast, Python 3.14 compatible |
 | Linter/Formatter | ruff (Astral) | Unified lint + format, 10-100x faster |
@@ -135,7 +143,7 @@ src/alpha_quant/
 
 ## 5. Architecture Decision Records
 
-45 ADRs document every technology and architectural decision.
+71 ADRs document every technology and architectural decision.
 
 | ADR | Title | Status |
 |-----|-------|--------|
@@ -143,47 +151,73 @@ src/alpha_quant/
 | 0002 | uv as Package Manager | Accepted |
 | 0003 | Ports-and-Adapters Architecture | Accepted |
 | 0005 | pydantic-settings + TOML Configuration | Accepted |
-| 0009 | Custom Pessimistic Fill Model | Accepted |
-| 0010 | Custom Event-Driven Backtester | Accepted |
 | 0011 | Direct httpx for LLM | Accepted |
 | 0013 | structlog JSON Logging | Accepted |
-| 0014 | Streamlit Dashboard | **Superseded** (by FastAPI dashboard) |
 | 0016 | Degrade-Don't-Block Failure Model | Accepted |
 | 0017 | Golden Replay as CI Strategy | Accepted |
 | 0019 | Astral Development Tooling (ruff + ty) | Accepted |
-| 0021 | DuckDB for Both State Types | Accepted |
-| 0022 | Paper Portfolio Engine | Accepted |
-| 0023 | Pipeline Orchestrator | Accepted |
-| 0024 | Self-Consistency Invariants | Accepted |
-| 0027 | Dependency Pruning | Accepted |
 | 0028 | Clock Virtualization | Accepted |
-| 0029 | Store Mixin Decomposition | Accepted |
-| 0030 | Shadow Ablation Books | Accepted |
-| 0031 | File-Based Halt Mechanism | **Superseded** (by ADR-0040) |
 | 0033 | Clock-Driven PIT Reads | Accepted |
 | 0035 | Alpha-Lake REST Is the Sole Facts Plane | Accepted |
 | 0036 | Neutral Facts in Alpha-Lake, Strategy Policy in Alpha-Quant | Accepted |
 | 0037 | PostgreSQL as Operational System of Record | **Accepted** |
 | 0038 | Append-Only Ledger with Rebuildable Projections | **Accepted** |
-| 0039 | S3-Compatible Artifact Store | **Accepted** |
 | 0040 | Database-Backed Halts and Transactional Run Locks | **Accepted** |
 | 0041 | Migration Strategy — Consolidating to `src/alpha_quant/` | **Accepted** |
 | 0042 | Static SPA and Same-Origin FastAPI BFF | **Accepted** |
 | 0043 | Durable Command Model for Dashboard Mutations | **Accepted** |
 | 0044 | Persistent Named Docker Volumes and Idempotent Migrations | **Accepted** |
 | 0045 | No Offline Cache for the Write-Capable Operational Console | **Accepted** |
+| 0046 | Static Lake Watch–Aligned Operational Console | **Accepted** |
+| 0047 | Operational Context Is Not Global PIT Context | **Accepted** |
+| 0048 | Commands Are the Sole Mutation Boundary | **Accepted** |
+| 0049 | Alpha-Lake Facts Bundle as Primary Scorecard Data Source | Accepted |
+| 0050 | Scorecards Are the Primary Decision Artifact | Accepted |
+| 0051 | LLM Explains Deterministic Advice — Never Computes It | Accepted |
+| 0052 | User Overrides Are Audited Commands | Accepted |
+| 0053 | Risk Methods Are User-Visible Deterministic Policies | Accepted |
+| 0054 | Desk Redesigned with Advice-First Tab | Accepted |
+| 0056 | Real Risk Engine Replaces Placeholder Calculations | Accepted |
+| 0057 | Scorecard Engine Replaces Policy Modules as Decision Core | Accepted |
+| 0058 | Removal of CLI run/status/journal/ask/report/halt/backup Commands | Accepted |
+| 0059 | DomainEvent Regression to Plain dict | Accepted |
+| 0060 | Risk Engine Uses Synthetic Returns as v1 Methodology | Accepted |
+| 0061 | DuckDB Retained for Legacy Import Only | Accepted |
+| 0062 | Console Mutation Routes Reconciled with Command Bus | Accepted |
+| 0063 | Unified Risk Policy Model Replaces Three Disconnected Systems | Accepted |
+| 0064 | Scoring Policy Versioning via RiskPolicy.component_weights_json | Accepted |
+| 0065 | LLM Integration and Guardrails for Deterministic Advice | Accepted |
+| 0066 | FakeOperationalStore Enables Containerless Testing | Accepted |
+| 0067 | LLM Explanation Boundary and Non-Authoritative Role | Accepted |
+| 0068 | Calculation-Snapshot-Based Explanation Invalidation | Accepted |
+| 0069 | Structured Output and Validation Contract for Explanations | Accepted |
+| 0070 | Mock-First LLM Provider Strategy for Explanations | Accepted |
+| 0071 | Explanation Persistence and Provenance | Accepted |
 | 0004 | argparse for CLI | Superseded |
 | 0006 | DuckDB + Parquet for Analytics | Superseded |
 | 0007 | SQLite WAL + SQLAlchemy Core | Superseded |
 | 0008 | Custom numpy Indicator Recurrences | Superseded |
+| 0009 | Custom Pessimistic Fill Model | Superseded |
+| 0010 | Custom Event-Driven Backtester | Superseded |
 | 0012 | EODHD as Primary Data Source | Superseded |
+| 0014 | Streamlit Dashboard | Superseded |
 | 0015 | Incremental O(1) Indicator Engine | Superseded |
 | 0018 | Bootstrap + Fixture Bundle Workflow | Superseded |
 | 0020 | DuckDB for Vault Manifest | Superseded |
+| 0021 | DuckDB for Both State Types | Superseded |
+| 0022 | Paper Portfolio Engine | Superseded |
+| 0023 | Pipeline Orchestrator | Superseded |
+| 0024 | Self-Consistency Invariants | Superseded |
 | 0025 | SQLite Cache for SEC Connector | Superseded |
 | 0026 | Content-Addressed Vault | Superseded |
+| 0027 | Dependency Pruning | Superseded |
+| 0029 | Store Mixin Decomposition | Superseded |
+| 0030 | Shadow Ablation Books | Superseded |
+| 0031 | File-Based Halt Mechanism | Superseded |
 | 0032 | Alpha-Lake Data Plane | Superseded |
 | 0034 | LakeGateway Port | Superseded |
+| 0039 | S3-Compatible Artifact Store | Superseded |
+| 0055 | Risk Desk Placeholder Contract | Superseded |
 
 See [docs/adr/README.md](../adr/README.md) for full ADR index with titles and dates.
 
@@ -198,13 +232,13 @@ All market facts enter through `AlphaLakeReadPort` — one protocol, one impleme
 
 No other runtime data-access mechanism exists. The old in-process lake gateway (ADR-0034) and DuckDB/Parquet data plane (ADR-0032) are superseded.
 
-### 6.2 Neutral Observation Contract (ADR-0036)
+### 6.2 Facts Bundle Contract (ADR-0036, ADR-0049)
 
-Alpha-Lake returns `NeutralObservations` — pre-computed, versioned observations. Policies never recalculate a neutral metric:
+Alpha-Lake returns `FactsBundle` — pre-computed, versioned observations keyed by category. Scorecards consume facts; they never calculate neutral metrics locally:
 
 ```python
-# Correct: policy applies threshold to Alpha-Lake metric
-rsi = context.indicator("momentum.rsi_14")
+# Correct: scorecard reads pre-computed metric from FactsBundle
+rsi = facts.get("momentum.rsi_14")
 if rsi is not None and rsi > 70:
     return 0.0
 
@@ -212,30 +246,34 @@ if rsi is not None and rsi > 70:
 # rsi = calc_rsi(bars, 14)  # forbidden
 ```
 
-The contract is a frozen dataclass hierarchy: `NeutralObservations` → `SymbolObservations` → `PriceObservation | TechnicalObservations | FundamentalMetric | InsiderTransaction | EarningsEvent | MentionObservation | BarObservation`. Bars are provided solely for fill simulation and stop tracking — policies must not read bars directly.
+The contract is a Pydantic model containing pre-computed observations by category. Bars are provided solely for fill simulation and stop tracking — scorecards must not read bars directly.
 
 ### 6.3 PostgreSQL Operational System of Record (ADR-0037)
 
-PostgreSQL 17+ replaces DuckDB as the authoritative operational store. The schema spans 21 tables across 6 schemas:
+PostgreSQL 17+ replaces DuckDB as the authoritative operational store. The schema spans 25+ tables across 6 schemas:
 
 | Schema | Tables | Purpose |
 |--------|--------|---------|
 | `core` | strategy, strategy_version, portfolio_book, security_reference, execution_profile | Static reference data |
-| `run` | decision_run, alpha_lake_manifest, candidate_evaluation, policy_evaluation | Decision run lifecycle |
+| `run` | decision_run, alpha_lake_manifest, candidate_evaluation, policy_evaluation, scorecard, scorecard_component, advice_artifact | Decision run lifecycle + LLM advice |
 | `trade` | paper_order, paper_fill, cash_ledger_entry, corporate_action_booking, portfolio_mark | Paper execution |
 | `projection` | position_current, portfolio_current | Rebuildable read models |
-| `audit` | audit_event, risk_event, halt_transition | Append-only event log |
-| `ops` | current_halt, run_lock_audit | Operational controls |
+| `audit` | audit_event, risk_event, halt_transition, operator_override | Append-only event log |
+| `ops` | current_halt, run_lock_audit, command, app_config | Operational controls |
 
 ### 6.4 Append-Only Ledger with Rebuildable Projections (ADR-0038)
 
 The trade and audit schemas are append-only. Current positions and portfolio state are `projection` tables rebuilt on demand from the raw ledger. `rebuild_projections()` replays all fills to reconstruct position_current and portfolio_current. This eliminates update-in-place anomalies and provides a complete audit trail.
 
-### 6.5 S3-Compatible Artifact Store (ADR-0039)
+### 6.5 Scorecard-Based Decision Core (ADR-0050, ADR-0057)
 
-Decision evidence (scorecards, advice artifacts, explanations) is stored in PostgreSQL via the `OperationalStorePort`. The `run.scorecard`, `run.advice_artifact`, `run.scorecard_component`, and `audit.operator_override` tables provide a complete audit trail. LLM explanation content includes provenance via `prompt_version`, `input_hash`, `output_hash`, and `snapshot_id`.
+The scorecard engine (`application/scorecards.py`) replaces the old 7-policy-module architecture. Scorecards compute M1–M8 component scores, composite rank, and a final recommendation. Scorecards are persisted in `run.scorecard` and `run.scorecard_component` tables with full version tracking. The scoring policy includes versioned weights via `RiskPolicy.component_weights_json` (ADR-0064).
 
-### 6.6 Point-in-Time (PIT) Determinism (ADR-0033)
+### 6.6 LLM Explanation Layer (ADR-0051, ADR-0065–0071)
+
+The LLM explains deterministic advice — it never computes it. Explanations are generated on-demand, persisted in `run.advice_artifact`, and invalidated via calculation snapshots. A mock-first strategy (ADR-0070) enables containerless testing. Provenance tracking includes prompt version, input/output hashes, and validation status.
+
+### 6.7 Point-in-Time (PIT) Determinism (ADR-0033)
 
 Every decision, backtest, and replay run uses:
 - `as_of` (mandatory): the knowledge-time boundary for all facts
@@ -243,54 +281,40 @@ Every decision, backtest, and replay run uses:
 
 This ensures byte-stable reproducibility: same config + same snapshot = same decisions.
 
-### 6.7 Pessimistic Fill Model (ADR-0009)
+### 6.8 Unified Risk Policy Model (ADR-0063)
 
-The fill model is shared across backtest, replay, paper, and shadow books:
-- **Gap-through-stops**: if `bar.low <= stop_price`, fills at `min(open, stop_price) - slippage`
-- **Gap-up entries**: cancels if the open gaps >2% above the decision quote
-- **Partial fills**: scaled by `max_fill_pct` with a deterministic volume-based fill price
+A single `RiskPolicy` model (`domain/risk.py`) unifies all trading thresholds, limits, and decisions — replacing three disconnected systems (stop-loss config, drawdown ladder, position sizing). The risk engine (`application/risk/`) evaluates 10+ dimensions: component, concentration, factors, inputs, limits, liquidity, methods, posture, scenarios, and VaR.
 
-### 6.8 Database-Backed Halts and Run Locks (ADR-0040)
+### 6.9 Durable Command Model (ADR-0043, ADR-0048)
 
-The `ops.current_halt` table stores halt state per portfolio book. Pipeline execution uses PostgreSQL advisory locks to prevent concurrent runs. The old file-based `.HALT` sentinel (ADR-0031) is being phased out. Halt transitions are recorded in `audit.halt_transition` for full traceability.
+All dashboard mutations flow through the command bus (`ops.command` table). Commands are persisted, claimed via `SKIP LOCKED`, dispatched to typed handlers, and polled until terminal status. This provides exactly-once semantics and a full audit trail.
 
-### 6.9 FastAPI Dashboard (supersedes ADR-0014)
+### 6.10 Vanilla JS Operational Console (ADR-0042, ADR-0046)
 
-A FastAPI + HTMX v2 SPA replaces the deprecated Streamlit dashboard. It serves 10 route modules (status, equity, positions, runs, events, quarantine, reports, journal, decisions, concepts) with SSE-based real-time updates and a DuckDB read layer for operator display.
-
-### 6.10 Policy over Facts
-
-Strategy modules in `domain/policy/` apply thresholds and rules to Alpha-Lake observations. Policy execution order: regime → technical → fundamental → insider → attention → earnings blackout → ranking → composite. Each policy computes a score or gate result independently.
-
-### 6.11 Ablation Framework (ADR-0030)
-
-Shadow books run in parallel during every pipeline execution. Each book disables one mechanism (e.g., `NO_INSIDER`, `NO_CROWDING_VETO`) to measure its marginal contribution. Books share the same Alpha-Lake decision panel — the `as_of` and `snapshot_id` are identical across all books.
-
-### 6.12 Self-Consistency Invariants (ADR-0024)
-
-After every pipeline run, `check_invariants` verifies: equity = cash + market value, all positions have non-negative quantity, no duplicate run IDs, and cash accounts balance. Violations trigger audit events and optionally halt the pipeline.
+A FastAPI BFF + Vanilla JS SPA serves the operational console. No build step, no bundler — ES modules served directly. The console reads from PostgreSQL query services, not directly from DuckDB.
 
 ## 7. Runtime Flow
 
-### Decision Run
+### Decision Run (via DailyCycleService)
 ```
-1. CLI: alpha-quant run
-2. Factory: create_alpha_lake_reader(config) → AlphaLakeRestClient
-3. Halt check: is_halted() → ops.current_halt table (ADR-0040)
-4. Store init: CanonicalStore(base_path) for legacy DuckDB state
+1. External trigger: HTTP POST /v1/commands (decision_run.create) or cron
+2. Command worker claims the command via SKIP LOCKED on ops.command
+3. Factory: create_alpha_lake_reader(config) → AlphaLakeRestClient
+4. Halt check: current_halt(book_id) → ops.current_halt table (ADR-0040)
 5. Client: GET /v1/health → verify server readiness
 6. Client: GET /v1/contract → verify version + capabilities
-7. Client: GET /v1/observations?symbols=...&as_of=T → NeutralObservations
-8. Parse: build NeutralObservations from JSON response (contracts/alpha_lake.py)
-9. Assembly: build DecisionContext for each symbol (domain/decision_context.py)
-10. Regime detection: regime_policy.detect(spy_ctx) → RISK_ON | CAUTION | RISK_OFF
-11. Risk controls: evaluate_stops, evaluate_time_stop, evaluate_drawdown on existing positions
-12. Policy: regime → technical → fundamental → insider → attention → earnings blackout → ranking → composite
-13. Portfolio: size_position, fill_entry_order, mark_to_market
-14. Persist (DuckDB legacy): store decisions, orders, fills, portfolio snapshot, events
-15. Self-consistency: check_invariants(equity, cash, positions)
-16. Persist (PostgreSQL): via OperationalStorePort → reserve_run, start_run, commit_decision_batch, book_fill, save_portfolio_mark, complete_run
-17. Artifact: S3 artifact store (decision evidence JSON, SHA-256 verified)
+7. Reserve run: OperationalStorePort.reserve_run() → decision_run record
+8. For each symbol in universe:
+   a. Client: GET /v1/facts?symbol=X&as_of=T → FactsBundle
+   b. Scorecard engine: evaluate M1–M8 components (application/scorecards.py)
+   c. Persist: candidate_evaluation, policy_evaluation, scorecard_component
+9. Composite ranking and final recommendation
+10. Risk engine: evaluate portfolio-level limits (gross exposure, VaR, concentration, liquidity)
+11. Position sizing: apply RiskPolicy thresholds
+12. Book fills via OperationalStorePort.book_fill()
+13. Persist scorecard, advice artifacts via OperationalStorePort
+14. Mark portfolio, rebuild projections
+15. Complete run
 ```
 
 ### Dashboard Mutation Flow
@@ -320,43 +344,46 @@ After every pipeline run, `check_invariants` verifies: equity = cash + market va
 ## 8. Configuration
 
 ```toml
-[alpha_lake]
+[lake]
+mode = "rest"
 base_url = "http://alpha-lake:8000"
 api_key_env = "ALPHA_LAKE_API_KEY"
-mode = "rest"
+fixture_version = "v1"
 
 [data]
 mode = "live"
-
-[bootstrap]
-symbols = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "JPM"]
-include_benchmarks = ["SPY", "^VIX"]
-
-[portfolio]
-max_positions = 8
-max_position_pct = 0.15
-risk_per_trade_pct = 0.01
+fixture_version = "v1"
 
 [risk]
+version_label = "default"
 stop_atr_mult = 2.0
-trail_after_r = 1.5
-partial_take_at_r = 2.5
-time_stop_days = 60
+trail_after_r = 1.0
+partial_take_at_r = 2.0
+time_stop_days = 30
+dd_ladder = [[0.10, 0.5], [0.15, 0.0]]
+drawdown_limit = -0.10
+daily_loss_limit = -0.02
 daily_loss_halt_pct = 0.03
-
-[paper]
-starting_equity = 100000.0
-slippage_bps = 5
+gross_exposure_cap = 0.90
+sector_cap = 0.70
+single_name_cap = 0.25
+default_risk_pct = 0.005
+buying_power_pct = 0.18
+per_trade_risk_cap = 0.01
 
 [llm]
 provider = "openrouter"
 model = "anthropic/claude-sonnet-4"
+timeout_s = 30
 
+[freshness]
+sla_minutes = 120
+critical_minutes = 1440
+gate_live_decisions = true
 ```
 
 ## 9. Related Documents
 
-- [ADR Index](../adr/README.md)
-- [C4 Architecture Diagrams](./README.md)
+- [ADR Index](../adr/README.md) — 71 ADRs
 - [DESIGN.md](../DESIGN.md)
 - [Alpha-Lake API Documentation](https://github.com/mblaauw/alpha-lake)
