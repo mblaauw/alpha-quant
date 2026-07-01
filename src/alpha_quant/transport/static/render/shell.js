@@ -95,7 +95,11 @@ function paintShell(ctx) {
   const sel = document.getElementById("book-selector");
   if (ctx.books) {
     sel.innerHTML = ctx.books.map((b) => `<option value="${b.book_id}"${b.book_id === ctx.active_book_id ? " selected" : ""}>${b.label}</option>`).join("");
-    sel.onchange = () => { store.bookId = sel.value; window.dispatchEvent(new CustomEvent("bookchange", { detail: { bookId: sel.value } })); };
+    sel.onchange = () => {
+      store.bookId = sel.value;
+      document.getElementById("book-label").textContent = "Book — " + (sel.options[sel.selectedIndex]?.text || "—");
+      window.dispatchEvent(new CustomEvent("bookchange", { detail: { bookId: sel.value } }));
+    };
     const active = ctx.books.find((b) => b.book_id === ctx.active_book_id);
     document.getElementById("book-label").textContent = "Book — " + (active ? active.label : "—");
   }

@@ -548,6 +548,16 @@ def seed_dev_data(database_url: str | None = None) -> tuple[int, int]:
         )
 
         # --- Cash Ledger Entry ---
+        _exec(
+            "INSERT INTO trade.cash_ledger_entry (entry_id, portfolio_book_id, fill_id, "
+            "amount, currency, reason, booked_at) "
+            "VALUES (:eid, :bid, NULL, :amt, 'USD', :reason, :now)",
+            eid=str(uuid4()),
+            bid=bid,
+            amt=100_000,
+            reason="Starting capital",
+            now=now,
+        )
         for sym, qty, price in [
             ("MSFT", 50, 395.00),
             ("AAPL", 100, 150.00),

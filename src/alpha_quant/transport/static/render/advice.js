@@ -414,13 +414,12 @@ async function fetchSizing(params) {
 }
 
 function renderTicket() {
-  const el = document.getElementById("tk-overlay");
-  const overlay = el || document.createElement("div");
-  if (!el) {
-    overlay.id = "tk-overlay";
-    overlay.className = "tk-overlay";
-    document.body.appendChild(overlay);
-  }
+  let overlay = document.getElementById("tk-overlay");
+  if (overlay) overlay.remove();
+  overlay = document.createElement("div");
+  overlay.id = "tk-overlay";
+  overlay.className = "tk-overlay";
+  document.body.appendChild(overlay);
   if (!_ticketSizing) {
     overlay.innerHTML = `<div class="ticket" style="text-align:center;padding:40px"><div class="skeleton" style="height:200px"></div></div>`;
   } else {
@@ -430,7 +429,7 @@ function renderTicket() {
 }
 
 function wireTicket() {
-  const close = () => { document.getElementById("tk-overlay").dataset.open = "false"; _activeTicket = null; _ticketSizing = null; };
+  const close = () => { const o = document.getElementById("tk-overlay"); if (o) { o.dataset.open = "false"; o.remove(); } _activeTicket = null; _ticketSizing = null; };
   document.getElementById("tk-close-btn")?.addEventListener("click", close);
   document.getElementById("tk-cancel")?.addEventListener("click", close);
   document.getElementById("tk-overlay")?.addEventListener("click", (e) => { if (e.target === e.currentTarget) close(); });
