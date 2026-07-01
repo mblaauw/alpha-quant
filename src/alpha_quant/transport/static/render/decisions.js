@@ -23,7 +23,7 @@ export async function renderDecisions() {
   }
 }
 
-window.addEventListener("bookchange", renderDecisions);
+window.addEventListener("bookchange", () => { if (store.route === "decisions") renderDecisions(); });
 
 function decTone(d) {
   return { enter: "enter", hold: "hold", blocked: "blocked", rejected: "rejected", exclude: "dim" }[d] || "dim";

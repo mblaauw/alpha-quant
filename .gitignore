@@ -27,6 +27,7 @@ data.bak/
 :memory:
 **/.coverage
 htmlcov/
+.playwright-mcp/
 
 # OpenCode vendored deps (60MB+)
 .opencode/node_modules/

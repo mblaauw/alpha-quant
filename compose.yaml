@@ -37,6 +37,19 @@ services:
     restart: "no"
     logging: *logging
 
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["db-seed"]
+    environment:
+      DATABASE_URL: "${DATABASE_URL:-postgresql+psycopg://alpha_quant:${POSTGRES_PASSWORD:-alpha_quant_dev}@postgres:5432/alpha_quant}"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+    logging: *logging
+
   api:
     build:
       context: .
@@ -56,7 +69,7 @@ services:
       retries: 3
       start_period: 20s
     depends_on:
-      migrate:
+      seed:
         condition: service_completed_successfully
     restart: unless-stopped
     logging: *logging
@@ -77,7 +90,7 @@ services:
       ALPHA_QUANT_LAKE__BASE_URL: "${ALPHA_QUANT_LAKE__BASE_URL:-http://host.docker.internal:8000}"
       ALPHA_LAKE_API_KEY: "${ALPHA_LAKE_API_KEY:-}"
     depends_on:
-      migrate:
+      seed:
         condition: service_completed_successfully
     restart: unless-stopped
     logging: *logging

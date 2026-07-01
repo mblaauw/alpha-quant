@@ -26,7 +26,7 @@ export async function renderOrders() {
   }
 }
 
-window.addEventListener("bookchange", renderOrders);
+window.addEventListener("bookchange", () => { if (store.route === "orders") renderOrders(); });
 
 function buildOrders(data) {
   const header = `<div class="dthead" style="grid-template-columns:${COLS}">

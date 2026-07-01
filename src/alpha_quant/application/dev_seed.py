@@ -669,15 +669,17 @@ def seed_dev_data(database_url: str | None = None) -> tuple[int, int]:
         from alpha_quant.application.daily_cycle import DailyCycleService
         from alpha_quant.application.factory import (
             create_alpha_lake_reader,
+            create_clock,
             create_unit_of_work,
         )
 
         uow = create_unit_of_work(url)
         with uow:
             config = load_config()
+            clock = create_clock(config)
             fixture_lake = config.lake.model_copy(update={"mode": "fixture"})
             alpha_lake = create_alpha_lake_reader(config.model_copy(update={"lake": fixture_lake}))
-            svc = DailyCycleService(alpha_lake, uow.store)
+            svc = DailyCycleService(alpha_lake, uow.store, clock)
             cycle_result = svc.run(
                 book_id=UUID(book_id),
                 run_key=f"dev-seed-cycle-{uuid4().hex[:8]}",

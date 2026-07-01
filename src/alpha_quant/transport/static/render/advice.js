@@ -265,7 +265,7 @@ export async function renderAdvice() {
   }
 }
 
-window.addEventListener("bookchange", renderAdvice);
+window.addEventListener("bookchange", () => { if (store.route === "advice") renderAdvice(); });
 
 function buildPage(data, portfolio) {
   const items = data.items || [];

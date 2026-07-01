@@ -58,6 +58,32 @@ def _compute_sizing(
     return sizing
 
 
+def _load_theses(
+    uow: Any,
+    scorecard_ids: list[str],
+) -> dict[str, str]:
+    """Batch-load the LLM headline ('thesis') for each scorecard.
+
+    Uses the most recent `scorecard_overall` advice artifact.
+    """
+    if not scorecard_ids:
+        return {}
+    from sqlalchemy import text as _text
+
+    rows = uow.store.session.execute(
+        _text("""
+            SELECT DISTINCT ON (aa.scorecard_id)
+                   aa.scorecard_id, aa.headline AS thesis
+            FROM run.advice_artifact aa
+            WHERE aa.scorecard_id = ANY(:ids)
+              AND aa.scope = 'scorecard_overall'
+            ORDER BY aa.scorecard_id, aa.created_at DESC
+        """),
+        {"ids": scorecard_ids},
+    ).fetchall()
+    return {str(r._mapping["scorecard_id"]): (r._mapping["thesis"] or "") for r in rows}
+
+
 def get_today_advice(
     book_id: UUID | None = None,
     limit: int = 50,
@@ -99,22 +125,27 @@ def get_today_advice(
             p.symbol: float(p.current_price) for p in positions if p.current_price
         }
 
+        scorecard_ids = [str(r._mapping["scorecard_id"]) for r in rows]
+        theses = _load_theses(uow, scorecard_ids)
+
         results: list[dict[str, Any]] = []
         for r in rows:
             sym = r._mapping["symbol"]
+            sc_id = str(r._mapping["scorecard_id"])
             last_price = price_map.get(sym, 100.0)
             sizing = _compute_sizing(equity, last_price, None)
             results.append(
                 {
                     "decision_run_id": r._mapping["decision_run_id"],
                     "run_date": str(r._mapping["started_at"]),
-                    "scorecard_id": r._mapping["scorecard_id"],
+                    "scorecard_id": sc_id,
                     "symbol": sym,
                     "name": r._mapping["display_name"] or "",
                     "recommendation": r._mapping["recommendation"],
                     "confidence": float(r._mapping["confidence"]),
                     "total_score": float(r._mapping["total_score"]),
                     "data_quality": r._mapping["data_quality"],
+                    "thesis": theses.get(sc_id, ""),
                     **sizing,
                 }
             )

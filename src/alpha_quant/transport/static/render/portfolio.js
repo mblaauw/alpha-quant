@@ -21,7 +21,7 @@ export async function renderPortfolio() {
   }
 }
 
-window.addEventListener("bookchange", renderPortfolio);
+window.addEventListener("bookchange", () => { if (store.route === "portfolio") renderPortfolio(); });
 
 function symFresh(pos) {
   const f = pos.freshness || freshnessFor(pos.symbol);

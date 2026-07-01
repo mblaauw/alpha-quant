@@ -27,7 +27,7 @@ export async function renderRisk() {
   }
 }
 
-window.addEventListener("bookchange", renderRisk);
+window.addEventListener("bookchange", () => { if (store.route === "risk") renderRisk(); });
 
 // ── Gaussian tail histogram ──
 
