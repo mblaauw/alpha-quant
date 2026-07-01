@@ -47,6 +47,7 @@ def session(engine):
     s.execute(
         text(
             "TRUNCATE TABLE"
+            " core.security_reference,"
             " ops.current_halt, ops.run_lock_audit,"
             " audit.halt_transition, audit.risk_event, audit.audit_event,"
             " projection.portfolio_current, projection.position_current,"

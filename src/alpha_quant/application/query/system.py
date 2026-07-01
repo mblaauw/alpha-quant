@@ -86,6 +86,7 @@ class SystemService:
                         "policy": "full",
                     }
                     for b in books
+                    if b.kind == "paper"
                 ],
                 "mode": "PAPER",
                 "snapshot": None,
